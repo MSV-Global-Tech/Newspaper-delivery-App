@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-primary { color: #2563EB; }
+  .bg-primary { background-color: #2563EB; }
+  .text-secondary { color: #F97316; }
+  .bg-secondary { background-color: #F97316; }
+  .text-success { color: #22C55E; }
+  .bg-success { background-color: #22C55E; }
+  .bg-background { background-color: #F8FAFC; }
+}
