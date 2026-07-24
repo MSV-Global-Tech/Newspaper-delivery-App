@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.newspaper.delivery",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
@@ -22,7 +23,17 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
     ],
     "scheme": "newspaperapp",
     "experiments": {
@@ -31,9 +42,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "5a7f9fa3-dcf3-4911-a90a-45684b1f4981"
+        "projectId": "9e02384b-1a4b-417e-a857-6e3ccd1d30c8"
       }
     },
-    "owner": "shivakumar-0830"
+    "owner": ""
   }
 }

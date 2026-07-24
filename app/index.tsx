@@ -40,7 +40,7 @@ export default function OnboardingScreen() {
       <View style={styles.bottomContainer}>
         <TouchableOpacity
           style={styles.primaryBtn}
-          onPress={() => router.replace('/(tabs)/home')}
+          onPress={() => router.replace('/customer/bottom_nav/home')}
           activeOpacity={0.85}
         >
           <Text style={styles.btnText}>Get Started</Text>
