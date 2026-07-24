@@ -4,13 +4,18 @@
     "slug": "newspaper-delivery-app",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
     "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "com.newspaper.delivery"
+      "package": "com.newspaper.delivery",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {
       "bundler": "metro"
@@ -22,6 +27,13 @@
     "scheme": "newspaperapp",
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5a7f9fa3-dcf3-4911-a90a-45684b1f4981"
+      }
+    },
+    "owner": "shivakumar-0830"
   }
 }

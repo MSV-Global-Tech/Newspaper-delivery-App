@@ -32,7 +32,7 @@ import { store } from '../../utils/store';
 
 
 
-const QUICK_ACTIONS = [
+const QUICK_ACTIONS: any[] = [
   { id: 'skip', label: 'Skip\nTomorrow', icon: SkipForward, bg: '#EEF2FF', color: '#2563EB' },
   { id: 'pause', label: 'Pause', icon: PauseCircle, bg: '#FFF7ED', color: '#EA580C' },
   { id: 'call', label: 'Call Agent', subtitle: 'Akhil K S', icon: FontAwesome, iconName: 'phone', bg: '#EEF2FF', color: '#2563EB' },
