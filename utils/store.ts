@@ -18,7 +18,14 @@ import {
   removeAdminNumber as fbRemoveAdminNumber,
   seedSettings,
   saveUser,
+  listenAgents,
+  addAgent as fbAddAgent,
+  deleteAgent as fbDeleteAgent,
+  seedAgents,
 } from '../database';
+import type { AgentDoc, AdminUserDoc } from '../database';
+
+export type { AgentDoc, AdminUserDoc };
 
 // ── Types ────────────────────────────────────────────────────────────────────
 export interface User {
@@ -82,9 +89,23 @@ let availablePapers: Newspaper[] = [
   { id: '6', name: 'Dainik Bhaskar', language: 'Hindi',   priceDay: 5,  priceMonth: 150, rating: 4.2, src: IMAGES.prajavani },
 ];
 
-let adminNumbers: string[] = ['8123363394', '9972505709'];
+let adminUsers: AdminUserDoc[] = [
+  { name: 'System Admin', phone: '8123363394' },
+  { name: 'Akhil KS', phone: '9972505709' },
+];
 
 let deliveries: Delivery[] = [];
+
+let agents: AgentDoc[] = [
+  {
+    id: 'seed-1',
+    name: 'Akhil KS',
+    phone: '9972505709',
+    area: 'Mahalakshmi Layout',
+    location: 'North Bengaluru',
+    isActive: true,
+  },
+];
 
 const listeners = new Set<() => void>();
 
@@ -99,6 +120,7 @@ async function bootstrap() {
     await seedDeliveries();
     await seedPapers();
     await seedSettings();
+    await seedAgents();
 
     // Listen to deliveries in real-time
     listenDeliveries((docs) => {
@@ -119,8 +141,14 @@ async function bootstrap() {
     });
 
     // Listen to admin numbers in real-time
-    listenAdminNumbers((numbers) => {
-      adminNumbers = numbers;
+    listenAdminNumbers((admins) => {
+      adminUsers = admins;
+      notify();
+    });
+
+    // Listen to agents in real-time
+    listenAgents((docs) => {
+      agents = docs;
       notify();
     });
   } catch (e) {
@@ -204,21 +232,38 @@ export const store = {
   },
 
   getAdminNumbers() {
-    return adminNumbers;
+    return adminUsers;
   },
 
-  addAdminNumber(phone: string) {
-    if (!adminNumbers.includes(phone)) {
-      adminNumbers = [...adminNumbers, phone];
+  addAdminNumber(phone: string, name: string) {
+    if (!adminUsers.some(a => a.phone === phone)) {
+      adminUsers = [...adminUsers, { name, phone }];
       notify();
     }
-    fbAddAdminNumber(phone).catch(console.warn);
+    fbAddAdminNumber(phone, name).catch(console.warn);
   },
 
   removeAdminNumber(phone: string) {
-    adminNumbers = adminNumbers.filter((n) => n !== phone);
+    adminUsers = adminUsers.filter((a) => a.phone !== phone);
     notify();
     fbRemoveAdminNumber(phone).catch(console.warn);
+  },
+
+  getAgents() {
+    return agents;
+  },
+
+  addAgent(agent: Omit<AgentDoc, 'id'>) {
+    const tempId = `local-${Date.now()}`;
+    agents = [...agents, { ...agent, id: tempId }];
+    notify();
+    fbAddAgent(agent).catch(console.warn);
+  },
+
+  deleteAgent(id: string) {
+    agents = agents.filter((a) => a.id !== id);
+    notify();
+    fbDeleteAgent(id).catch(console.warn);
   },
 
   subscribe(listener: () => void) {

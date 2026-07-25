@@ -12,3 +12,5 @@ export { listenAdminNumbers, addAdminNumber, removeAdminNumber, seedSettings } f
 export { saveUser, fetchUser, deleteUser } from './users';
 export type { UserDoc } from './users';
 export { uploadNewspaperLogo, uploadImage, deleteImage } from './storageHelper';
+export { listenAgents, addAgent, updateAgent, deleteAgent, seedAgents } from './agents';
+export type { AgentDoc } from './agents';

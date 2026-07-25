@@ -91,42 +91,50 @@ export default function NewspapersScreen() {
             key={item.id}
             style={styles.paperCard}
             activeOpacity={0.8}
-            onPress={() => requireAuth(() => router.push(`/newspaper/${item.id}` as any))}
+            onPress={() => requireAuth(() => router.push(`/customer/newspaper/${item.id}` as any))}
           >
-            {/* Logo area */}
+            {/* Logo area - styled as portrait vertical newspaper cover */}
             <View style={styles.logoTile}>
-              <Image source={item.src} style={{ width: 64, height: 64 }} resizeMode="contain" />
+              <Image source={item.src} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
             </View>
 
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={styles.paperName}>{item.name}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <View style={{ flex: 1, marginLeft: 16, height: 110, justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.paperName}>{item.name}</Text>
+                  <Text style={styles.paperLang}>{item.language}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
                   <Star size={11} color="#F59E0B" fill="#F59E0B" />
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>{item.rating}</Text>
                 </View>
               </View>
-              <Text style={styles.paperLang}>{item.language}</Text>
-              <Text style={styles.paperPrice}>₹{item.priceDay}/day  •  ₹{item.priceMonth}/mo</Text>
-            </View>
 
-            {(() => {
-              const isSubscribed = deliveries.some(d => d.paperName === item.name);
-              return (
-                <TouchableOpacity
-                  style={[
-                    styles.subBtn, 
-                    isSubscribed && { backgroundColor: '#16A34A', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }
-                  ]}
-                  onPress={() => !isSubscribed && requireAuth(() => router.push(`/subscribe/${item.id}` as any))}
-                  activeOpacity={isSubscribed ? 1 : 0.85}
-                >
-                  <Text style={[styles.subBtnText, isSubscribed && { fontSize: 10 }]}>
-                    {isSubscribed ? 'Active' : 'Subscribe'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })()}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <View>
+                  <Text style={styles.priceText}>₹{item.priceDay} / day</Text>
+                  <Text style={styles.priceText}>₹{item.priceMonth} / month</Text>
+                </View>
+
+                {(() => {
+                  const isSubscribed = deliveries.some(d => d.paperName === item.name);
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.subBtn,
+                        isSubscribed && { backgroundColor: '#16A34A' }
+                      ]}
+                      onPress={() => !isSubscribed && requireAuth(() => router.push(`/customer/subscribe/${item.id}` as any))}
+                      activeOpacity={isSubscribed ? 1 : 0.85}
+                    >
+                      <Text style={styles.subBtnText}>
+                        {isSubscribed ? 'Active' : 'Subscribe'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })()}
+              </View>
+            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -170,16 +178,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03, shadowRadius: 6, elevation: 2,
   },
   logoTile: {
-    width: 76, height: 76, backgroundColor: '#F8FAFC',
-    borderRadius: 12, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, borderColor: '#F1F5F9',
+    width: 108,
+    height: 118,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  paperName: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
+  paperName: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
   paperLang: { fontSize: 12, color: '#64748B', marginTop: 1 },
-  paperPrice: { fontSize: 11, color: '#64748B', marginTop: 3, fontWeight: '500' },
+  priceText: { fontSize: 13, color: '#1E293B', fontWeight: '600', marginTop: 2 },
   subBtn: {
-    backgroundColor: '#2563EB', paddingHorizontal: 13,
-    paddingVertical: 8, borderRadius: 10, marginLeft: 8,
+    backgroundColor: '#2563EB', paddingHorizontal: 16,
+    paddingVertical: 8, borderRadius: 8,
   },
   subBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
 });

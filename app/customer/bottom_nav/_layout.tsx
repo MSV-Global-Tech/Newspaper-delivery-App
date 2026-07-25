@@ -5,12 +5,24 @@ import { store } from '../../../utils/store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
-  const [user, setUser] = useState(store.getUser());
+  const getInitialUser = () => {
+    const u = store.getUser();
+    if (!u) return null;
+    const admins = store.getAdminNumbers();
+    const updatedAdmin = admins.some(a => a.phone === u.phone);
+    return { ...u, isAdmin: updatedAdmin };
+  };
+
+  const [user, setUser] = useState(getInitialUser());
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
-      setUser(store.getUser());
+      const u = store.getUser();
+      // Ensure we fetch the updated admin list from the store
+      const admins = store.getAdminNumbers();
+      const updatedAdmin = u ? admins.some(a => a.phone === u.phone) : false;
+      setUser(u ? { ...u, isAdmin: updatedAdmin } : null);
     });
     return unsubscribe;
   }, []);

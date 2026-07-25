@@ -25,6 +25,9 @@ import {
   ArrowLeft,
   PlusCircle,
   Image as ImageIcon,
+  Phone,
+  Trash2,
+  UserPlus,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
@@ -35,26 +38,50 @@ import { store } from '../../utils/store';
 import { uploadNewspaperLogo } from '../../database';
 
 export default function AdminScreen() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'deliveries' | 'papers' | 'access'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'deliveries' | 'papers' | 'agents' | 'access'>('overview');
   const [search, setSearch] = useState('');
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [papersList, setPapersList] = useState(store.getPapers());
   const [adminNumbers, setAdminNumbers] = useState(store.getAdminNumbers());
+  const [agentsList, setAgentsList] = useState(store.getAgents());
   const [newAdminPhone, setNewAdminPhone] = useState('');
+  const [newAdminName, setNewAdminName] = useState('');
 
   // Add Paper State
   const [isAddingPaper, setIsAddingPaper] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [newPaper, setNewPaper] = useState({ name: '', language: '', priceDay: '', priceMonth: '', imageUrl: '' });
 
+  // Add Agent State
+  const [isAddingAgent, setIsAddingAgent] = useState(false);
+  const [newAgent, setNewAgent] = useState({ name: '', phone: '', area: '', location: '' });
+
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
       setDeliveries(store.getDeliveries());
       setPapersList(store.getPapers());
       setAdminNumbers(store.getAdminNumbers());
+      setAgentsList(store.getAgents());
     });
     return unsubscribe;
   }, []);
+
+  const handleAddAgent = () => {
+    if (!newAgent.name || !newAgent.phone || !newAgent.area) return;
+    store.addAgent({
+      name: newAgent.name.trim(),
+      phone: newAgent.phone.trim(),
+      area: newAgent.area.trim(),
+      location: newAgent.location.trim(),
+      isActive: true,
+    });
+    setNewAgent({ name: '', phone: '', area: '', location: '' });
+    setIsAddingAgent(false);
+  };
+
+  const handleDeleteAgent = (id: string) => {
+    store.deleteAgent(id);
+  };
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -141,19 +168,32 @@ export default function AdminScreen() {
       </View>
 
       {/* Tab Switcher */}
-      <View style={styles.tabBar}>
-        {(['overview', 'deliveries', 'papers', 'access'] as const).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            onPress={() => setActiveTab(tab)}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.tabBarContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabBar}
+        >
+          {([
+            { key: 'overview',   label: 'Overview' },
+            { key: 'deliveries', label: 'Deliveries' },
+            { key: 'papers',     label: 'Papers' },
+            { key: 'agents',     label: 'Agents' },
+            { key: 'access',     label: 'Access' },
+          ] as const).map(({ key, label }) => {
+            const isActive = activeTab === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                onPress={() => setActiveTab(key)}
+                style={[styles.tab, isActive && styles.tabActive]}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
@@ -348,44 +388,183 @@ export default function AdminScreen() {
         {activeTab === 'access' && (
           <View style={styles.container}>
             <Text style={styles.sectionTitle}>Manage Admin Access</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+            
+            <View style={{ backgroundColor: '#F8FAFC', padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}>
+              <Text style={[styles.inputLabel, { marginBottom: 4 }]}>Admin Name</Text>
               <TextInput
-                style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
-                placeholder="Enter 10-digit phone"
-                keyboardType="number-pad"
-                maxLength={10}
-                value={newAdminPhone}
-                onChangeText={setNewAdminPhone}
+                style={[styles.modalInput, { paddingVertical: 10, marginBottom: 12 }]}
+                placeholder="e.g. Akhil KS"
+                value={newAdminName}
+                onChangeText={setNewAdminName}
               />
+
+              <Text style={[styles.inputLabel, { marginBottom: 4 }]}>Mobile Number</Text>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TextInput
+                  style={[styles.modalInput, { flex: 1, paddingVertical: 10, marginBottom: 0 }]}
+                  placeholder="Enter 10-digit phone"
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  value={newAdminPhone}
+                  onChangeText={setNewAdminPhone}
+                />
+                <TouchableOpacity
+                  style={[styles.addPaperBtn, { borderRadius: 12, height: 46 }]}
+                  onPress={() => {
+                    if (newAdminPhone.length === 10 && newAdminName.trim().length > 0) {
+                      store.addAdminNumber(newAdminPhone, newAdminName.trim());
+                      setNewAdminPhone('');
+                      setNewAdminName('');
+                    }
+                  }}
+                >
+                  <PlusCircle size={16} color="#FFFFFF" />
+                  <Text style={styles.addPaperBtnText}>Add Admin</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {adminNumbers.map(admin => {
+              const isPermanent = admin.phone === '9972505709' || admin.phone === '8123363394';
+              return (
+                <View key={admin.phone} style={styles.paperCatalogItem}>
+                  <View style={[styles.paperLogoBox, { backgroundColor: '#F1F5F9', width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' }]}>
+                    <Users size={20} color="#64748B" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.custName}>{admin.name || 'Admin User'}</Text>
+                    <Text style={styles.custAddress}>+91 {admin.phone} {isPermanent ? '• Owner' : ''}</Text>
+                  </View>
+                  {!isPermanent ? (
+                    <TouchableOpacity
+                      style={[styles.editBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1 }]}
+                      onPress={() => store.removeAdminNumber(admin.phone)}
+                    >
+                      <Text style={[styles.editBtnText, { color: '#EF4444' }]}>Delete</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[styles.editBtn, { backgroundColor: '#F8FAFC' }]}>
+                      <Text style={[styles.editBtnText, { color: '#94A3B8' }]}>Locked</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* ── Agents Tab ── */}
+        {activeTab === 'agents' && (
+          <View style={styles.container}>
+            {/* Header row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View>
+                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Delivery Agents</Text>
+                <Text style={{ fontSize: 12, color: '#94A3B8', fontWeight: '500', marginTop: 2 }}>{agentsList.length} agents in Bengaluru</Text>
+              </View>
               <TouchableOpacity
-                style={[styles.addPaperBtn, { borderRadius: 12 }]}
-                onPress={() => {
-                  if (newAdminPhone.length === 10) {
-                    store.addAdminNumber(newAdminPhone);
-                    setNewAdminPhone('');
-                  }
-                }}
+                style={styles.addPaperBtn}
+                onPress={() => setIsAddingAgent(!isAddingAgent)}
+                activeOpacity={0.8}
               >
-                <PlusCircle size={16} color="#FFFFFF" />
-                <Text style={styles.addPaperBtnText}>Add Admin</Text>
+                <UserPlus size={15} color="#FFFFFF" />
+                <Text style={styles.addPaperBtnText}>{isAddingAgent ? 'Cancel' : 'Add Agent'}</Text>
               </TouchableOpacity>
             </View>
 
-            {adminNumbers.map(phone => (
-              <View key={phone} style={styles.paperCatalogItem}>
-                <View style={[styles.paperLogoBox, { backgroundColor: '#F1F5F9', width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' }]}>
-                  <Users size={20} color="#64748B" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.custName}>Admin User</Text>
-                  <Text style={styles.custAddress}>+91 {phone}</Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.editBtn, { backgroundColor: '#FEF2F2' }]}
-                  onPress={() => store.removeAdminNumber(phone)}
-                >
-                  <Text style={[styles.editBtnText, { color: '#EF4444' }]}>Revoke</Text>
+            {/* Inline add-agent form */}
+            {isAddingAgent && (
+              <View style={styles.agentFormBox}>
+                <Text style={[styles.sectionTitle, { fontSize: 14, marginBottom: 14 }]}>New Delivery Agent</Text>
+
+                <Text style={styles.inputLabel}>Full Name *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. Akhil KS"
+                  value={newAgent.name}
+                  onChangeText={t => setNewAgent({ ...newAgent, name: t })}
+                />
+
+                <Text style={styles.inputLabel}>Mobile Number *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. 9972505709"
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  value={newAgent.phone}
+                  onChangeText={t => setNewAgent({ ...newAgent, phone: t })}
+                />
+
+                <Text style={styles.inputLabel}>Area (Delivery Zone) *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. Mahalakshmi Layout"
+                  value={newAgent.area}
+                  onChangeText={t => setNewAgent({ ...newAgent, area: t })}
+                />
+
+                <Text style={styles.inputLabel}>Location / Sector</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. North Bengaluru"
+                  value={newAgent.location}
+                  onChangeText={t => setNewAgent({ ...newAgent, location: t })}
+                />
+
+                <TouchableOpacity style={styles.saveBtn} onPress={handleAddAgent} activeOpacity={0.85}>
+                  <Text style={styles.saveBtnText}>Save Agent</Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Agent cards */}
+            {agentsList.map(agent => (
+              <View key={agent.id} style={styles.agentCard}>
+                {/* Avatar */}
+                <View style={styles.agentAvatar}>
+                  <Text style={styles.agentAvatarText}>
+                    {agent.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+                  </Text>
+                </View>
+
+                {/* Info */}
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.custName}>{agent.name}</Text>
+                    <View style={[styles.badge, { backgroundColor: agent.isActive ? '#D1FAE5' : '#FEE2E2' }]}>
+                      <Text style={[styles.badgeText, { color: agent.isActive ? '#065F46' : '#991B1B' }]}>
+                        {agent.isActive ? 'Active' : 'Inactive'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                    <MapPin size={11} color="#64748B" />
+                    <Text style={styles.custAddress}>{agent.area}</Text>
+                  </View>
+
+                  {agent.location ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                      <MapPin size={11} color="#94A3B8" />
+                      <Text style={[styles.custAddress, { color: '#94A3B8' }]}>{agent.location}</Text>
+                    </View>
+                  ) : null}
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+                    <View style={styles.agentPhonePill}>
+                      <Phone size={12} color="#2563EB" />
+                      <Text style={styles.agentPhoneText}>{agent.phone}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.deleteAgentBtn}
+                      onPress={() => handleDeleteAgent(agent.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Trash2 size={13} color="#EF4444" />
+                      <Text style={styles.deleteAgentBtnText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
             ))}
           </View>
@@ -472,6 +651,9 @@ export default function AdminScreen() {
         </View>
       </Modal>
 
+      {/* ── Agents Tab ── */}
+      {activeTab === 'agents' && false /* rendered inside ScrollView below */ && null}
+
     </SafeAreaView>
   );
 }
@@ -511,23 +693,37 @@ const styles = StyleSheet.create({
   },
   logoutBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
 
+  tabBarContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 4,
+    gap: 2,
   },
   tab: {
     flex: 1,
     paddingVertical: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 8,
   },
-  tabActive: { backgroundColor: '#F1F5F9' },
-  tabText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
-  tabTextActive: { color: '#0F172A' },
+  tabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabText: { fontSize: 11, fontWeight: '700', color: '#64748B' },
+  tabTextActive: { color: '#2563EB', fontWeight: '800' },
 
   container: { padding: 16 },
 
@@ -761,4 +957,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+
+  /* ── Agent styles ── */
+  agentFormBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  agentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EEF2F7',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  agentAvatar: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#BFDBFE',
+  },
+  agentAvatarText: { fontSize: 15, fontWeight: '800', color: '#2563EB' },
+  agentPhonePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1, borderColor: '#BFDBFE',
+  },
+  agentPhoneText: { fontSize: 12, fontWeight: '700', color: '#2563EB' },
+  deleteAgentBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1, borderColor: '#FECACA',
+  },
+  deleteAgentBtnText: { fontSize: 12, fontWeight: '700', color: '#EF4444' },
 });

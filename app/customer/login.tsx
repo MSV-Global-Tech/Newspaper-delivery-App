@@ -13,20 +13,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
-import { Lock, MapPin } from 'lucide-react-native';
+import { MapPin } from 'lucide-react-native'; // Lock is commented out for now: import { Lock, MapPin } from 'lucide-react-native';
 import { store } from '../../utils/store';
 import { fetchUser } from '../../database';
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+// import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [confirmation, setConfirmation] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [loadingLoc, setLoadingLoc] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+
+  // Future Firebase OTP state (commented out for direct login bypass):
+  // const [otp, setOtp] = useState('');
+  // const [otpSent, setOtpSent] = useState(false);
+  // const [confirmation, setConfirmation] = useState<any>(null); // For future: useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -55,6 +57,8 @@ export default function LoginScreen() {
     finally { setLoadingLoc(false); }
   };
 
+  /*
+  // Future Firebase OTP login handlers (commented out for direct login bypass):
   const handleSendOtp = async () => {
     if (phone.length < 10) return;
     try {
@@ -109,8 +113,47 @@ export default function LoginScreen() {
       showToast('Invalid OTP code');
     }
   };
+  */
 
-  const canProceed = !otpSent ? phone.length === 10 : otp.length === 4;
+  const handleDirectLogin = async () => {
+    if (phone.length < 10) return;
+    try {
+      showToast('Logging in...');
+      
+      const isUserAdmin = store.getAdminNumbers().some(a => a.phone === phone);
+      let existingUser = null;
+      try {
+        existingUser = await fetchUser(phone);
+      } catch (e) {
+        console.warn("Failed to fetch user from DB:", e);
+      }
+      
+      if (existingUser) {
+        store.setUser({
+          name: existingUser.name,
+          phone: existingUser.phone,
+          address: existingUser.address,
+          isAdmin: isUserAdmin,
+        });
+      } else {
+        store.setUser({
+          name: isUserAdmin ? 'Admin' : (name || 'Customer'),
+          phone,
+          address: isUserAdmin ? 'Admin HQ' : (address || 'Not Provided'),
+          isAdmin: isUserAdmin,
+        });
+      }
+      showToast('Logged in successfully!');
+      router.replace('/customer/bottom_nav/home');
+    } catch (error: any) {
+      console.warn("Login Error:", error);
+      showToast('Failed to log in');
+    }
+  };
+
+  // For direct login canProceed is based only on phone input, originally was:
+  // const canProceed = !otpSent ? phone.length === 10 : otp.length === 4;
+  const canProceed = phone.length === 10;
 
   return (
     <SafeAreaView style={s.root}>
@@ -136,58 +179,55 @@ export default function LoginScreen() {
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             {/* Customer fields */}
-            {!otpSent && (
-              <>
-                <Text style={s.lbl}>Your Name</Text>
-                <TextInput
-                  style={s.inp}
-                  placeholder="Enter your full name"
-                  placeholderTextColor="#9CA3AF"
-                  value={name}
-                  onChangeText={setName}
-                />
+            <>
+              <Text style={s.lbl}>Your Name</Text>
+              <TextInput
+                style={s.inp}
+                placeholder="Enter your full name"
+                placeholderTextColor="#9CA3AF"
+                value={name}
+                onChangeText={setName}
+              />
 
-                <Text style={s.lbl}>Delivery Address</Text>
-                <View style={s.inpRow}>
-                  <TextInput
-                    style={{ flex: 1, fontSize: 15, color: '#111827', fontWeight: '600', paddingVertical: 0 }}
-                    placeholder={loadingLoc ? 'Fetching current location...' : 'Your doorstep address'}
-                    placeholderTextColor="#9CA3AF"
-                    value={loadingLoc ? '' : address}
-                    onChangeText={setAddress}
-                    onFocus={() => { if (!address && !loadingLoc) fetchGPS(); }}
-                    editable={!loadingLoc}
-                  />
-                  <TouchableOpacity style={s.gpsPill} onPress={fetchGPS}>
-                    <MapPin size={12} color="#2563EB" />
-                    <Text style={s.gpsTxt}>{loadingLoc ? '…' : 'GPS'}</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+              <Text style={s.lbl}>Delivery Address</Text>
+              <View style={s.inpRow}>
+                <TextInput
+                  style={{ flex: 1, fontSize: 15, color: '#111827', fontWeight: '600', paddingVertical: 0 }}
+                  placeholder={loadingLoc ? 'Fetching current location...' : 'Your doorstep address'}
+                  placeholderTextColor="#9CA3AF"
+                  value={loadingLoc ? '' : address}
+                  onChangeText={setAddress}
+                  onFocus={() => { if (!address && !loadingLoc) fetchGPS(); }}
+                  editable={!loadingLoc}
+                />
+                <TouchableOpacity style={s.gpsPill} onPress={fetchGPS}>
+                  <MapPin size={12} color="#2563EB" />
+                  <Text style={s.gpsTxt}>{loadingLoc ? '…' : 'GPS'}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
 
             {/* Phone */}
-            {!otpSent && (
-              <>
-                <Text style={s.lbl}>Mobile Number</Text>
-                <View style={s.inpRow}>
-                  <Text style={s.flag}>🇮🇳 +91</Text>
-                  <View style={s.divV} />
-                  <TextInput
-                    style={{ flex: 1, fontSize: 15, color: '#111827', fontWeight: '600' }}
-                    placeholder="10-digit number"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    value={phone}
-                    onChangeText={setPhone}
-                  />
-                  {phone.length === 10 && <Text style={s.tick}>✓</Text>}
-                </View>
-              </>
-            )}
+            <>
+              <Text style={s.lbl}>Mobile Number</Text>
+              <View style={s.inpRow}>
+                <Text style={s.flag}>🇮🇳 +91</Text>
+                <View style={s.divV} />
+                <TextInput
+                  style={{ flex: 1, fontSize: 15, color: '#111827', fontWeight: '600' }}
+                  placeholder="10-digit number"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  value={phone}
+                  onChangeText={setPhone}
+                />
+                {phone.length === 10 && <Text style={s.tick}>✓</Text>}
+              </View>
+            </>
 
-            {/* OTP */}
+            {/* OTP (commented out for direct login bypass) */}
+            {/*
             {otpSent && (
               <>
                 <Text style={s.lbl}>One-Time Password</Text>
@@ -209,16 +249,17 @@ export default function LoginScreen() {
                 <Text style={s.otpHint}>Sent to +91 {phone} · Demo OTP: 1234</Text>
               </>
             )}
+            */}
 
             {/* CTA */}
             <TouchableOpacity
               style={[s.cta, !canProceed && s.ctaOff]}
               disabled={!canProceed}
-              onPress={!otpSent ? handleSendOtp : handleLogin}
+              onPress={handleDirectLogin} // Originally: onPress={!otpSent ? handleSendOtp : handleLogin}
               activeOpacity={0.85}
             >
               <Text style={[s.ctaTxt, !canProceed && s.ctaTxtOff]}>
-                {!otpSent ? 'Send OTP' : 'Verify & Continue'}
+                Login & Continue
               </Text>
             </TouchableOpacity>
 

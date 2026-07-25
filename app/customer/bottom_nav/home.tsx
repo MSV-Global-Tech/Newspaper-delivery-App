@@ -36,13 +36,13 @@ const QUICK_ACTIONS: any[] = [
   { id: 'skip', label: 'Skip\nTomorrow', icon: SkipForward, bg: '#EEF2FF', color: '#2563EB' },
   { id: 'pause', label: 'Pause', icon: PauseCircle, bg: '#FFF7ED', color: '#EA580C' },
   { id: 'call', label: 'Call Agent', subtitle: 'Akhil K S', icon: FontAwesome, iconName: 'phone', bg: '#EEF2FF', color: '#2563EB' },
-  { 
-    id: 'whatsapp', 
-    label: 'WhatsApp', 
-    isImage: true, 
-    imageSrc: { uri: 'https://raw.githubusercontent.com/WalkxCode/dashboard-icons/main/png/whatsapp.png' }, 
-    bg: '#E8FBF0', 
-    color: '#25D366' 
+  {
+    id: 'whatsapp',
+    label: 'WhatsApp',
+    isImage: true,
+    imageSrc: { uri: 'https://raw.githubusercontent.com/WalkxCode/dashboard-icons/main/png/whatsapp.png' },
+    bg: '#E8FBF0',
+    color: '#25D366'
   },
 ];
 
@@ -54,6 +54,7 @@ export default function HomeScreen() {
   const [user, setUser] = useState(store.getUser());
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [papers, setPapers] = useState(store.getPapers());
+  const [agents, setAgents] = useState(store.getAgents());
 
   const contactAgent = () => {
     Linking.openURL('tel:9972505709');
@@ -68,6 +69,7 @@ export default function HomeScreen() {
       setUser(store.getUser());
       setDeliveries(store.getDeliveries());
       setPapers(store.getPapers());
+      setAgents(store.getAgents());
     });
     return unsubscribe;
   }, []);
@@ -170,7 +172,7 @@ export default function HomeScreen() {
               <PauseCircle size={32} color="#94A3B8" />
               <Text style={{ fontSize: 16, fontWeight: '700', color: '#64748B', marginTop: 12 }}>Delivery Paused</Text>
               <Text style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>You have skipped today's delivery.</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={{ marginTop: 16, backgroundColor: '#2563EB', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}
                 onPress={() => store.updateDeliveryStatus(currentDelivery.id, 'Pending')}
               >
@@ -205,16 +207,16 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={[styles.todayCard, { paddingVertical: 24, paddingHorizontal: 0, overflow: 'hidden', minHeight: 180 }]}>
-              <ScrollView 
+              <ScrollView
                 ref={scrollRef}
-                horizontal 
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 pagingEnabled
                 snapToInterval={CARD_WIDTH}
                 decelerationRate="fast"
               >
                 {papers.map((paper, index) => (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     key={index}
                     activeOpacity={0.9}
                     onPress={() => requireAuth(() => router.push(`/customer/newspaper/${paper.id}` as any))}
@@ -233,7 +235,7 @@ export default function HomeScreen() {
                       <Text style={styles.todayTitle} numberOfLines={1}>
                         {paper.name}
                       </Text>
-                      
+
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 12 }}>
                         <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
                           ₹{paper.priceMonth}/mo
@@ -330,6 +332,39 @@ export default function HomeScreen() {
             </>
           )}
 
+          {/* ── DELIVERY AGENTS ───────────────────────────────── */}
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Delivery Agents</Text>
+              <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }}>Your neighbourhood paper-boys</Text>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/customer/agents' as any)}>
+              <Text style={styles.viewAll}>See All</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 4, paddingRight: 4 }} style={{ marginBottom: 24 }}>
+            {agents.slice(0, 5).map((agent) => (
+              <TouchableOpacity
+                key={agent.id}
+                style={styles.agentChip}
+                activeOpacity={0.85}
+                onPress={() => router.push('/customer/agents' as any)}
+              >
+                <View style={styles.agentChipAvatar}>
+                  <Text style={styles.agentChipAvatarText}>
+                    {agent.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+                  </Text>
+                </View>
+                <Text style={styles.agentChipName} numberOfLines={1}>{agent.name}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                  <MapPin size={9} color="#94A3B8" />
+                  <Text style={styles.agentChipArea} numberOfLines={1}>{agent.area}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
           {/* ── POPULAR NEWSPAPERS ────────────────────────────── */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Popular Newspapers</Text>
@@ -345,28 +380,38 @@ export default function HomeScreen() {
               activeOpacity={0.85}
               onPress={() => requireAuth(() => router.push(`/customer/newspaper/${paper.id}` as any))}
             >
-              {/* Logo area — grey tinted background strip */}
+              {/* Logo area — styled as portrait vertical newspaper cover */}
               <View style={styles.paperLogoArea}>
-                <Image source={paper.src} style={{ width: 64, height: 64 }} resizeMode="contain" />
+                <Image source={paper.src} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
               </View>
 
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.paperName}>{paper.name}</Text>
-                <Text style={styles.paperLang}>{paper.language}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
-                  <Star size={11} color="#F59E0B" fill="#F59E0B" />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>{paper.rating}</Text>
+              <View style={{ flex: 1, marginLeft: 16, height: 110, justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={styles.paperName}>{paper.name}</Text>
+                    <Text style={styles.paperLang}>{paper.language}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                    <Star size={11} color="#F59E0B" fill="#F59E0B" />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>{paper.rating}</Text>
+                  </View>
                 </View>
-                <Text style={styles.paperPrice}>₹{paper.priceDay}/day  •  ₹{paper.priceMonth}/mo</Text>
-              </View>
 
-              <TouchableOpacity
-                style={styles.subBtn}
-                onPress={() => requireAuth(() => router.push(`/customer/subscribe/${paper.id}` as any))}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.subBtnText}>Subscribe</Text>
-              </TouchableOpacity>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <View>
+                    <Text style={styles.priceText}>₹{paper.priceDay} / day</Text>
+                    <Text style={styles.priceText}>₹{paper.priceMonth} / month</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.subBtn}
+                    onPress={() => requireAuth(() => router.push(`/customer/subscribe/${paper.id}` as any))}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.subBtnText}>Subscribe</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </TouchableOpacity>
           ))}
 
@@ -487,16 +532,49 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03, shadowRadius: 6, elevation: 2,
   },
   paperLogoArea: {
-    width: 76, height: 76, backgroundColor: '#F8FAFC',
-    borderRadius: 12, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, borderColor: '#F1F5F9',
+    width: 108,
+    height: 118,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  paperName: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
+  paperName: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
   paperLang: { fontSize: 12, color: '#64748B', marginTop: 1 },
-  paperPrice: { fontSize: 11, color: '#64748B', marginTop: 3, fontWeight: '500' },
+  priceText: { fontSize: 13, color: '#1E293B', fontWeight: '600', marginTop: 2 },
   subBtn: {
-    backgroundColor: '#2563EB', paddingHorizontal: 13,
-    paddingVertical: 8, borderRadius: 10, marginLeft: 8,
+    backgroundColor: '#2563EB', paddingHorizontal: 16,
+    paddingVertical: 8, borderRadius: 8,
   },
   subBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+
+  /* Agent chip (horizontal scroll) */
+  agentChip: {
+    width: 100,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EEF2F7',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  agentChipAvatar: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#BFDBFE',
+    marginBottom: 6,
+  },
+  agentChipAvatarText: { fontSize: 15, fontWeight: '800', color: '#2563EB' },
+  agentChipName: { fontSize: 12, fontWeight: '700', color: '#0F172A', textAlign: 'center' },
+  agentChipArea: { fontSize: 10, color: '#94A3B8', fontWeight: '500', textAlign: 'center' },
 });
