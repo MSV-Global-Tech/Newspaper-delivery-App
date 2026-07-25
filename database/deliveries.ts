@@ -82,17 +82,30 @@ export async function seedDeliveries() {
   const snap = await getDocs(collection(db, COL));
   if (!snap.empty) return;
   for (const d of INITIAL_DELIVERIES) {
-    await addDoc(collection(db, COL), { ...d, createdAt: serverTimestamp() });
+    await addDoc(collection(db, COL), { ...d, createdAt: serverTimestamp() })
+      .catch(e => {
+        if (String(e?.code || '').includes('resource-exhausted') || String(e?.message || '').includes('rate')) {
+          console.warn('[DB] seedDeliveries rate-limited, pausing 1s...');
+          return new Promise(r => setTimeout(() => addDoc(collection(db, COL), { ...d, createdAt: serverTimestamp() }).then(r as any).catch(() => {}), 1000));
+        }
+        throw e;
+      });
   }
   console.log('[DB] Deliveries seeded.');
 }
 
 // ── Real-time listener ───────────────────────────────────────────────────────
 export function listenDeliveries(callback: (docs: DeliveryDoc[]) => void) {
-  return onSnapshot(collection(db, COL), (snap) => {
-    const items = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DeliveryDoc));
-    callback(items);
-  });
+  return onSnapshot(
+    collection(db, COL),
+    (snap) => {
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DeliveryDoc));
+      callback(items);
+    },
+    (error) => {
+      console.error('[DB] listenDeliveries error:', error?.code, error?.message);
+    }
+  );
 }
 
 // ── Add a new subscription delivery ─────────────────────────────────────────

@@ -48,10 +48,16 @@ export async function seedAgents() {
 
 // ── Real-time listener ────────────────────────────────────────────────────────
 export function listenAgents(callback: (docs: AgentDoc[]) => void) {
-  return onSnapshot(collection(db, COL), (snap) => {
-    const items = snap.docs.map((d) => ({ id: d.id, ...d.data() } as AgentDoc));
-    callback(items);
-  });
+  return onSnapshot(
+    collection(db, COL),
+    (snap) => {
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() } as AgentDoc));
+      callback(items);
+    },
+    (error) => {
+      console.error('[DB] listenAgents error:', error?.code, error?.message);
+    }
+  );
 }
 
 // ── Add agent ─────────────────────────────────────────────────────────────────

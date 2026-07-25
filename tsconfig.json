@@ -2,17 +2,50 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "skipLibCheck": true,
+    "noErrorTruncation": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "react-native",
+    "target": "ESNext",
+    "module": "preserve",
+    "moduleDetection": "force",
+    "lib": ["ESNext", "DOM"],
+    "moduleResolution": "bundler",
+    "customConditions": ["react-native"],
+    "isolatedModules": true,
+    "noEmit": true,
+    "forceConsistentCasingInFileNames": true,
+    "useUnknownInCatchVariables": false,
+    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "database/**/*.ts",
+    "utils/**/*.ts",
+    "assets/**/*.ts",
+    "assets/**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "babel.config.js",
+    "metro.config.js",
+    "restructure.js",
+    "tailwind.config.js",
+    "android",
+    "ios",
+    "web-build",
+    "dist"
   ]
 }

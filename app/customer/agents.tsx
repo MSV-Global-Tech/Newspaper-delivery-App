@@ -10,12 +10,27 @@ import { store } from '../../utils/store';
 import type { AgentDoc } from '../../utils/store';
 
 export default function AgentsScreen() {
+  const [user, setUser] = useState(store.getUser());
   const [agents, setAgents] = useState<AgentDoc[]>(store.getAgents());
 
   useEffect(() => {
-    const unsubscribe = store.subscribe(() => setAgents(store.getAgents()));
+    const u = store.getUser();
+    const admins = store.getAdminNumbers();
+    const isAdmin = u ? admins.some(a => a.phone === u.phone) : false;
+    if (!u || !isAdmin) {
+      router.replace('/customer/bottom_nav/home' as any);
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = store.subscribe(() => {
+      setUser(store.getUser());
+      setAgents(store.getAgents());
+    });
     return unsubscribe;
   }, []);
+
+  const isAdmin = user?.isAdmin || (user ? store.getAdminNumbers().some(a => a.phone === user.phone) : false);
 
   const handleCall = (phone: string, name: string) => {
     const url = `tel:${phone}`;
@@ -47,7 +62,7 @@ export default function AgentsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
       >
-        {agents.length === 0 ? (
+        {!isAdmin ? null : agents.length === 0 ? (
           <View style={styles.emptyBox}>
             <User size={40} color="#CBD5E1" />
             <Text style={styles.emptyText}>No agents listed yet.</Text>

@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet, Image } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ArrowLeft, Star, Clock, Heart } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,55 +6,47 @@ import { useState, useEffect } from 'react';
 import { store } from '../../../utils/store';
 import PaperLogo from '../../../components/PaperLogo';
 
-const NEWSPAPER_DATA: Record<string, any> = {
-  '1': {
-    name: 'Vijayavani',
-    language: 'Kannada Daily Newspaper',
-    price_day: 6,
-    price_month: 180,
-    rating: 4.6,
-    reviews: '2.5k',
-    about: 'Vijayavani is a leading Kannada daily newspaper with trusted news, insightful analysis and in-depth coverage.',
-    delivery_time: '5:30 AM - 6:30 AM',
-    tags: ['Kannada', 'Daily', 'Popular'],
-  },
-  '2': {
-    name: 'Prajavani',
-    language: 'Kannada Daily Newspaper',
-    price_day: 7,
-    price_month: 210,
-    rating: 4.5,
-    reviews: '1.8k',
-    about: 'Prajavani is one of the most widely read Kannada newspapers with comprehensive regional and national news coverage since 1948.',
-    delivery_time: '5:30 AM - 6:30 AM',
-    tags: ['Kannada', 'Daily'],
-  },
-  '3': {
-    name: 'The Hindu',
-    language: 'English Daily Newspaper',
-    price_day: 10,
-    price_month: 300,
-    rating: 4.7,
-    reviews: '3.1k',
-    about: 'The Hindu is a premier English daily known for its authoritative and in-depth coverage of national and international affairs.',
-    delivery_time: '6:00 AM - 7:00 AM',
-    tags: ['English', 'Daily', 'Popular'],
-  },
+const TAG_BY_LANGUAGE: Record<string, string[]> = {
+  'Kannada': ['Regional', 'Daily'],
+  'English': ['National', 'Daily'],
+  'Telugu': ['Regional', 'Daily'],
+  'Tamil': ['Regional', 'Daily'],
+  'Malayalam': ['Regional', 'Daily'],
+  'Hindi': ['National', 'Daily'],
+};
+
+const DEFAULT_ABOUT: Record<string, string> = {
+  Paper: 'A trusted daily newspaper delivering comprehensive news coverage, in-depth analysis, and up-to-date information from around the world.',
+  Magazine: 'A premium magazine featuring curated stories, expert columns, special features, and engaging lifestyle content.',
 };
 
 export default function NewspaperDetailScreen() {
   const { newspaper_id } = useLocalSearchParams<{ newspaper_id: string }>();
-  const paper = NEWSPAPER_DATA[newspaper_id as string] || NEWSPAPER_DATA['1'];
+  const [papers, setPapers] = useState(store.getPapers());
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
 
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
+      setPapers(store.getPapers());
       setDeliveries(store.getDeliveries());
     });
     return unsubscribe;
   }, []);
 
+  const paper = papers.find(p => p.id === newspaper_id) || papers[0] || {
+    id: '1',
+    name: 'Publication',
+    language: 'English',
+    category: 'Paper' as const,
+    priceDay: 0,
+    priceMonth: 0,
+    rating: 4.5,
+    src: null,
+  };
+
   const isSubscribed = deliveries.some(d => d.paperName === paper.name);
+  const tags = TAG_BY_LANGUAGE[paper.language] || ['Local', 'Popular'];
+  if (paper.category === 'Magazine') tags.unshift('Weekly / Monthly');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
@@ -76,23 +68,39 @@ export default function NewspaperDetailScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Large Logo Header */}
-        <View style={styles.logoBanner}>
-          <PaperLogo name={paper.name} id={newspaper_id as string} size="lg" />
+        <View style={[
+          styles.logoBanner,
+          { backgroundColor: paper.category === 'Paper' ? '#F8FAFC' : '#FAF5FF' }
+        ]}>
+          {paper.src ? (
+            <Image source={paper.src} style={{ width: 120, height: 120 }} resizeMode="contain" />
+          ) : (
+            <PaperLogo name={paper.name} id={newspaper_id as string} size="lg" />
+          )}
           <Text style={styles.paperName}>{paper.name}</Text>
-          <Text style={styles.paperSub}>{paper.language}</Text>
+          <Text style={styles.paperSub}>{paper.language} {paper.category}</Text>
 
           {/* Rating */}
           <View style={styles.ratingRow}>
             <Star size={14} color="#F59E0B" fill="#F59E0B" />
             <Text style={styles.ratingText}>{paper.rating}</Text>
-            <Text style={styles.reviewsText}>({paper.reviews})</Text>
+            <Text style={styles.reviewsText}>• {paper.language}</Text>
           </View>
 
           {/* Tags */}
           <View style={styles.tagRow}>
-            {paper.tags.map((tag: string) => (
-              <View key={tag} style={styles.tagPill}>
-                <Text style={styles.tagText}>{tag}</Text>
+            {tags.map((tag: string) => (
+              <View
+                key={tag}
+                style={[
+                  styles.tagPill,
+                  { backgroundColor: paper.category === 'Paper' ? '#EFF6FF' : '#FAF5FF' }
+                ]}
+              >
+                <Text style={[
+                  styles.tagText,
+                  { color: paper.category === 'Paper' ? '#2563EB' : '#9333EA' }
+                ]}>{tag}</Text>
               </View>
             ))}
           </View>
@@ -101,26 +109,32 @@ export default function NewspaperDetailScreen() {
         <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
           {/* About */}
           <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.aboutText}>{paper.about}</Text>
+          <Text style={styles.aboutText}>
+            {DEFAULT_ABOUT[paper.category as string]} {paper.name} brings you the latest updates from {paper.language}-speaking communities.
+          </Text>
 
           {/* Delivery Time Box */}
           <View style={styles.deliveryTimeCard}>
             <Clock size={16} color="#2563EB" />
             <View style={{ marginLeft: 10 }}>
               <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>Delivery Time</Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB', marginTop: 1 }}>{paper.delivery_time}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB', marginTop: 1 }}>
+                {paper.category === 'Magazine' ? 'As per schedule' : '5:30 AM - 6:30 AM'}
+              </Text>
             </View>
           </View>
 
           {/* Pricing Box */}
           <Text style={styles.sectionTitle}>Pricing</Text>
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-            <View style={styles.priceCard}>
-              <Text style={{ fontSize: 24, fontWeight: '900', color: '#0F172A' }}>₹{paper.price_day}</Text>
-              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2, fontWeight: '500' }}>Per Day</Text>
-            </View>
-            <View style={styles.priceCard}>
-              <Text style={{ fontSize: 24, fontWeight: '900', color: '#0F172A' }}>₹{paper.price_month}</Text>
+            {paper.priceDay > 0 && (
+              <View style={styles.priceCard}>
+                <Text style={{ fontSize: 24, fontWeight: '900', color: '#0F172A' }}>₹{paper.priceDay}</Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2, fontWeight: '500' }}>Per Day</Text>
+              </View>
+            )}
+            <View style={[styles.priceCard, paper.priceDay === 0 && { flex: 1 }]}>
+              <Text style={{ fontSize: 24, fontWeight: '900', color: '#0F172A' }}>₹{paper.priceMonth}</Text>
               <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2, fontWeight: '500' }}>Per Month</Text>
             </View>
           </View>
@@ -130,12 +144,16 @@ export default function NewspaperDetailScreen() {
       {/* Subscribe Bottom CTA */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
-          style={[styles.subscribeBtn, isSubscribed && { backgroundColor: '#16A34A' }]}
+          style={[
+            styles.subscribeBtn,
+            isSubscribed && { backgroundColor: '#16A34A' },
+            paper.category === 'Magazine' && !isSubscribed && { backgroundColor: '#9333EA' }
+          ]}
           onPress={() => !isSubscribed && router.push(`/customer/subscribe/${newspaper_id}`)}
           activeOpacity={isSubscribed ? 1 : 0.85}
         >
           <Text style={styles.subscribeBtnText}>
-            {isSubscribed ? 'Active' : 'Subscribe Now'}
+            {isSubscribed ? 'Active' : `Subscribe to ${paper.name}`}
           </Text>
         </TouchableOpacity>
       </View>

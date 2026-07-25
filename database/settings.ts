@@ -51,17 +51,23 @@ export async function seedSettings() {
 
 // ── Real-time listener for admin users ─────────────────────────────────────
 export function listenAdminNumbers(callback: (admins: AdminUserDoc[]) => void) {
-  return onSnapshot(SETTINGS_DOC, (snap) => {
-    const data = snap.data();
-    let admins: AdminUserDoc[] = data?.admins ?? INITIAL_ADMINS;
-    // Fallback merge just in case database representation lacks them
-    INITIAL_ADMINS.forEach(pAdmin => {
-      if (!admins.some(a => a.phone === pAdmin.phone)) {
-        admins = [...admins, pAdmin];
-      }
-    });
-    callback(admins);
-  });
+  return onSnapshot(
+    SETTINGS_DOC,
+    (snap) => {
+      const data = snap.data();
+      let admins: AdminUserDoc[] = data?.admins ?? INITIAL_ADMINS;
+      INITIAL_ADMINS.forEach(pAdmin => {
+        if (!admins.some(a => a.phone === pAdmin.phone)) {
+          admins = [...admins, pAdmin];
+        }
+      });
+      callback(admins);
+    },
+    (error) => {
+      console.error('[DB] listenAdminNumbers error:', error?.code, error?.message);
+      callback(INITIAL_ADMINS);
+    }
+  );
 }
 
 // ── Add an admin profile ──────────────────────────────────────────────────────

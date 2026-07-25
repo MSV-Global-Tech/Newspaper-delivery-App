@@ -48,7 +48,10 @@ const QUICK_ACTIONS: any[] = [
 
 const HOURS = new Date().getHours();
 const GREETING = HOURS < 12 ? 'Good Morning' : HOURS < 17 ? 'Good Afternoon' : 'Good Evening';
-const CARD_WIDTH = Dimensions.get('window').width - 32;
+const WINDOW_WIDTH = Dimensions.get('window').width;
+const CARD_WIDTH = WINDOW_WIDTH - 32;
+const LANG_GAP = 10;
+const LANG_TILE_W = Math.floor((CARD_WIDTH - LANG_GAP * 2) / 3);
 
 export default function HomeScreen() {
   const [user, setUser] = useState(store.getUser());
@@ -79,20 +82,29 @@ export default function HomeScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
   const adIndexRef = useRef(0);
+  const userTouchingRef = useRef(false);
 
   useEffect(() => {
-    if (currentDelivery || papers.length === 0) return;
+    const total = papers.length;
+    if (total <= 1) return;
 
-    const interval = setInterval(() => {
-      adIndexRef.current = (adIndexRef.current + 1) % papers.length;
-      scrollRef.current?.scrollTo({
-        x: adIndexRef.current * CARD_WIDTH,
+    const tick = () => {
+      if (userTouchingRef.current) return;
+      const next = (adIndexRef.current + 1) % total;
+      adIndexRef.current = next;
+      const refAny = scrollRef.current as any;
+      const node = refAny?.getNode ? refAny.getNode() : refAny;
+      node?.scrollTo({
+        x: next * CARD_WIDTH,
+        y: 0,
         animated: true,
+        duration: 350,
       });
-    }, 1500);
+    };
 
+    const interval = setInterval(tick, 1500);
     return () => clearInterval(interval);
-  }, [currentDelivery, papers.length]);
+  }, [papers.length]);
 
   const handleQuickAction = (action: any) => {
     if (action.id === 'call') {
@@ -211,9 +223,18 @@ export default function HomeScreen() {
                 ref={scrollRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                pagingEnabled
                 snapToInterval={CARD_WIDTH}
+                snapToAlignment="start"
                 decelerationRate="fast"
+                disableIntervalMomentum
+                onTouchStart={() => (userTouchingRef.current = true)}
+                onTouchEnd={() => {
+                  userTouchingRef.current = false;
+                }}
+                onMomentumScrollEnd={(e) => {
+                  const x = e.nativeEvent.contentOffset.x;
+                  adIndexRef.current = Math.max(0, Math.round(x / Math.max(1, CARD_WIDTH)));
+                }}
               >
                 {papers.map((paper, index) => (
                   <TouchableOpacity
@@ -332,48 +353,101 @@ export default function HomeScreen() {
             </>
           )}
 
-          {/* ── DELIVERY AGENTS ───────────────────────────────── */}
+          {/* ── DELIVERY AGENTS (ADMIN ONLY) ──────────────────── */}
+          {user?.isAdmin && (
+            <>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>Delivery Agents</Text>
+                  <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }}>Your neighbourhood paper-boys</Text>
+                </View>
+                <TouchableOpacity onPress={() => router.push('/customer/agents' as any)}>
+                  <Text style={styles.viewAll}>See All</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 4, paddingRight: 4 }} style={{ marginBottom: 24 }}>
+                {agents.slice(0, 5).map((agent) => (
+                  <TouchableOpacity
+                    key={agent.id}
+                    style={styles.agentChip}
+                    activeOpacity={0.85}
+                    onPress={() => router.push('/customer/agents' as any)}
+                  >
+                    <View style={styles.agentChipAvatar}>
+                      <Text style={styles.agentChipAvatarText}>
+                        {agent.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+                      </Text>
+                    </View>
+                    <Text style={styles.agentChipName} numberOfLines={1}>{agent.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                      <MapPin size={9} color="#94A3B8" />
+                      <Text style={styles.agentChipArea} numberOfLines={1}>{agent.area}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          {/* ── LANGUAGE FILTER BOX ───────────────────────────── */}
           <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Delivery Agents</Text>
-              <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }}>Your neighbourhood paper-boys</Text>
-            </View>
-            <TouchableOpacity onPress={() => router.push('/customer/agents' as any)}>
-              <Text style={styles.viewAll}>See All</Text>
+            <Text style={styles.sectionTitle}>Browse by Language</Text>
+            <TouchableOpacity onPress={() => router.push('/customer/newspapers' as any)}>
+              <Text style={styles.viewAll}>All Papers →</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 4, paddingRight: 4 }} style={{ marginBottom: 24 }}>
-            {agents.slice(0, 5).map((agent) => (
+          <View style={styles.langGrid}>
+            {[
+              { key: 'Kannada',   label: 'Kannada',   tint: '#F59E0B' },
+              { key: 'Hindi',     label: 'Hindi',     tint: '#EF4444' },
+              { key: 'Tamil',     label: 'Tamil',     tint: '#3B82F6' },
+              { key: 'Malayalam', label: 'Malayalam', tint: '#22C55E' },
+              { key: 'English',   label: 'English',   tint: '#6366F1' },
+              { key: 'All',       label: 'All',       tint: '#8B5CF6' },
+            ].map((lang) => (
               <TouchableOpacity
-                key={agent.id}
-                style={styles.agentChip}
+                key={lang.key}
                 activeOpacity={0.85}
-                onPress={() => router.push('/customer/agents' as any)}
+                style={[styles.langTile, { width: LANG_TILE_W }]}
+                onPress={() => router.push({
+                  pathname: '/customer/newspapers' as any,
+                  params: { lang: lang.key },
+                } as any)}
               >
-                <View style={styles.agentChipAvatar}>
-                  <Text style={styles.agentChipAvatarText}>
-                    {agent.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
-                  </Text>
-                </View>
-                <Text style={styles.agentChipName} numberOfLines={1}>{agent.name}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                  <MapPin size={9} color="#94A3B8" />
-                  <Text style={styles.agentChipArea} numberOfLines={1}>{agent.area}</Text>
-                </View>
+                {/* 2px tinted top accent stripe — the one detail that makes plain boxes look branded */}
+                <View style={[styles.langTileStripe, { backgroundColor: lang.tint }]} />
+                {/* Subtle tinted inner glow / surface wash */}
+                <View
+                  style={[
+                    styles.langTileGlow,
+                    { backgroundColor: `${lang.tint}10` },
+                  ]}
+                  pointerEvents="none"
+                />
+                <Text
+                  style={[
+                    styles.langTileText,
+                    { color: '#0F172A' },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {lang.label}
+                </Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
 
-          {/* ── POPULAR NEWSPAPERS ────────────────────────────── */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Popular Newspapers</Text>
-            <TouchableOpacity onPress={() => router.push('/customer/newspapers')}>
+          {/* ── RECOMMENDED (small, top 4 papers preview) ────── */}
+          <View style={[styles.sectionHeader, { marginTop: 4 }]}>
+            <Text style={styles.sectionTitle}>Recommended</Text>
+            <TouchableOpacity onPress={() => router.push('/customer/newspapers' as any)}>
               <Text style={styles.viewAll}>View All</Text>
             </TouchableOpacity>
           </View>
 
-          {papers.map((paper) => (
+          {papers.slice(0, 4).map((paper) => (
             <TouchableOpacity
               key={paper.id}
               style={styles.paperCard}
@@ -399,7 +473,7 @@ export default function HomeScreen() {
 
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                   <View>
-                    <Text style={styles.priceText}>₹{paper.priceDay} / day</Text>
+                    {paper.priceDay > 0 && <Text style={styles.priceText}>₹{paper.priceDay} / day</Text>}
                     <Text style={styles.priceText}>₹{paper.priceMonth} / month</Text>
                   </View>
 
@@ -577,4 +651,35 @@ const styles = StyleSheet.create({
   agentChipAvatarText: { fontSize: 15, fontWeight: '800', color: '#2563EB' },
   agentChipName: { fontSize: 12, fontWeight: '700', color: '#0F172A', textAlign: 'center' },
   agentChipArea: { fontSize: 10, color: '#94A3B8', fontWeight: '500', textAlign: 'center' },
+
+  /* Language filter tiles — minimal, clean, professional */
+  langGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: LANG_GAP,
+    rowGap: LANG_GAP,
+    marginBottom: 22,
+  },
+  langTile: {
+    minHeight: 60,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  langTileText: {
+    color: '#0F172A',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+    textAlign: 'center',
+  },
 });

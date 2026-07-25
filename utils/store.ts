@@ -3,8 +3,11 @@
  * In-memory state cache backed by Firebase Firestore.
  * All reads are synchronous (from local cache).
  * All writes go to both local cache and Firestore for instant UI + persistence.
+ *
+ * ⚠️ DO NOT EDIT paper names/prices/category/image in this file.
+ *    Edit 👉 database/papers_catalog.ts  (single source of truth)
  */
-import { IMAGES } from '../assets/images';
+import { resolvePaperImage } from '../assets/images';
 import {
   listenDeliveries,
   addDelivery,
@@ -12,6 +15,8 @@ import {
   seedDeliveries,
   listenPapers,
   addPaper as fbAddPaper,
+  updatePaper as fbUpdatePaper,
+  deletePaper as fbDeletePaper,
   seedPapers,
   listenAdminNumbers,
   addAdminNumber as fbAddAdminNumber,
@@ -22,6 +27,7 @@ import {
   addAgent as fbAddAgent,
   deleteAgent as fbDeleteAgent,
   seedAgents,
+  PAPERS_CATALOG_WITH_IDS,
 } from '../database';
 import type { AgentDoc, AdminUserDoc } from '../database';
 
@@ -56,38 +62,40 @@ export interface Newspaper {
   id: string;
   name: string;
   language: string;
+  category: 'Paper' | 'Magazine';
   priceDay: number;
   priceMonth: number;
   rating: number;
   src: any;
+  imageSrc?: string;
 }
 
-// ── Image key → require() mapping ────────────────────────────────────────────
-// Firestore can't store require() objects, so we store a string key and resolve here.
+// ── Image resolution ───────────────────────────────────────────────────────────────
+// imageSrc = exact filename (with extension) stored in Firestore.
+// resolvePaperImage() maps it to a React Native Image source.
 export function resolveImage(imageSrc: string): any {
-  switch (imageSrc) {
-    case 'vijayavani':    return IMAGES.vijayavani;
-    case 'prajavani':     return IMAGES.prajavani;
-    case 'the_hindu':     return IMAGES.theHindu;
-    case 'times_of_india':return IMAGES.timesOfIndia;
-    default:
-      // If it looks like a URL (Firebase Storage download URL), use it directly
-      if (imageSrc?.startsWith('http')) return { uri: imageSrc };
-      return IMAGES.vijayavani; // fallback
-  }
+  return resolvePaperImage(imageSrc);
 }
 
 // ── Local in-memory cache (initial values shown until Firebase responds) ──────
 let currentUser: User | null = null;
 
-let availablePapers: Newspaper[] = [
-  { id: '1', name: 'Vijayavani',     language: 'Kannada', priceDay: 6,  priceMonth: 180, rating: 4.6, src: IMAGES.vijayavani },
-  { id: '2', name: 'Prajavani',      language: 'Kannada', priceDay: 7,  priceMonth: 210, rating: 4.5, src: IMAGES.prajavani },
-  { id: '3', name: 'The Hindu',      language: 'English', priceDay: 10, priceMonth: 300, rating: 4.7, src: IMAGES.theHindu },
-  { id: '4', name: 'Times of India', language: 'English', priceDay: 8,  priceMonth: 240, rating: 4.3, src: IMAGES.timesOfIndia },
-  { id: '5', name: 'Dinamalar',      language: 'Tamil',   priceDay: 6,  priceMonth: 160, rating: 4.4, src: IMAGES.vijayavani },
-  { id: '6', name: 'Dainik Bhaskar', language: 'Hindi',   priceDay: 5,  priceMonth: 150, rating: 4.2, src: IMAGES.prajavani },
-];
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ availablePapers IS DERIVED AUTOMATICALLY FROM THE SINGLE SOURCE CATALOG.
+//    Any edit to database/papers_catalog.ts automatically updates this fallback.
+//    (same stable IDs, same mapping rules as Firestore seed — 0 duplication.)
+// ─────────────────────────────────────────────────────────────────────────────
+let availablePapers: Newspaper[] = PAPERS_CATALOG_WITH_IDS.map((c) => ({
+  id: c.stableId,
+  name: c.name,
+  language: c.language,
+  category: c.category,
+  priceDay: c.priceDay,
+  priceMonth: c.priceMonth,
+  rating: c.rating,
+  imageSrc: c.image ?? '',
+  src: resolvePaperImage(c.image ?? ''),
+}));
 
 let adminUsers: AdminUserDoc[] = [
   { name: 'System Admin', phone: '8123363394' },
@@ -107,6 +115,30 @@ let agents: AgentDoc[] = [
   },
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🧊 CATALOG NAME → IMAGE LUT (built ONCE).
+//    For every paper name that exists in the CATALOG:
+//       → image ALWAYS comes from the catalog, period.
+//    Old Firestore imageSrc values are COMPLETELY IGNORED for catalog papers.
+//    Non-catalog papers (custom admin-added later) still use doc.imageSrc
+//    because they aren't in the catalog at all.
+//    This GUARANTEES: no 1-second "flash to wrong logo" when Firebase connects,
+//    regardless of how stale the seeded `imageSrc` field in Firestore is.
+// ─────────────────────────────────────────────────────────────────────────────
+const CATALOG_NAME_TO_IMAGE: Map<string, string> = new Map(
+  PAPERS_CATALOG_WITH_IDS.map((c) => [c.name, c.image])
+);
+const CATALOG_PAPERNAME_TO_IMAGE = (paperName: string | null | undefined, fallbackSrc?: string | null): string => {
+  if (paperName != null) {
+    const fromCatalog = CATALOG_NAME_TO_IMAGE.get(paperName);
+    if (fromCatalog != null) return fromCatalog;
+  }
+  // Fall back to the document's imageSrc only for custom/admin papers.
+  // It can be a file:// / content:// URI for gallery images OR empty ''
+  // when no image has been picked yet — NEVER auto-assign a default logo.
+  return fallbackSrc ?? '';
+};
+
 const listeners = new Set<() => void>();
 
 // ── Pub/Sub ──────────────────────────────────────────────────────────────────
@@ -116,45 +148,69 @@ function notify() {
 
 // ── Bootstrap: seed Firestore + start real-time listeners ────────────────────
 async function bootstrap() {
+  // ═══════════════════════════════════════════════════════════════════
+  // STEP 1: START LISTENERS FIRST — critical!
+  // Listeners must ALWAYS be attached even if seeding fails or rate-limits.
+  // Otherwise the app stays stuck with static local data forever.
+  // ═══════════════════════════════════════════════════════════════════
   try {
-    await seedDeliveries();
-    await seedPapers();
-    await seedSettings();
-    await seedAgents();
-
-    // Listen to deliveries in real-time
     listenDeliveries((docs) => {
-      deliveries = docs.map((d) => ({
-        ...d,
-        src: resolveImage(d.imageSrc),
-      }));
+      deliveries = docs.map((d) => {
+        const finalImageSrc = CATALOG_PAPERNAME_TO_IMAGE(d.paperName, d.imageSrc);
+        return { ...d, imageSrc: finalImageSrc, src: resolveImage(finalImageSrc) };
+      });
       notify();
     });
 
-    // Listen to papers in real-time
     listenPapers((docs) => {
-      availablePapers = docs.map((d) => ({
-        ...d,
-        src: resolveImage(d.imageSrc),
-      }));
+      availablePapers = docs.map((d) => {
+        const finalImageSrc = CATALOG_PAPERNAME_TO_IMAGE(d.name, d.imageSrc);
+        return {
+          id: d.id,
+          name: d.name,
+          language: d.language,
+          category: (d as any).category ?? 'Paper',
+          priceDay: d.priceDay,
+          priceMonth: d.priceMonth,
+          rating: d.rating,
+          imageSrc: finalImageSrc,
+          src: resolveImage(finalImageSrc),
+        };
+      });
       notify();
     });
 
-    // Listen to admin numbers in real-time
     listenAdminNumbers((admins) => {
       adminUsers = admins;
       notify();
     });
 
-    // Listen to agents in real-time
     listenAgents((docs) => {
       agents = docs;
       notify();
     });
   } catch (e) {
-    console.warn('[Store] Firebase bootstrap error:', e);
-    // App still works with local in-memory data if Firebase fails
+    console.warn('[Store] Listener attach failed (continuing with local data):', e);
   }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // STEP 2: RUN SEEDS IN BACKGROUND (non-blocking, tolerant to failures)
+  // Each seed is wrapped in its own try/catch so one failure
+  // (e.g. rate limit on papers) doesn't prevent the others from running.
+  // ═══════════════════════════════════════════════════════════════════
+  try {
+    await seedSettings().catch(e => console.warn('[Store] seedSettings failed:', e?.code || e?.message));
+  } catch {}
+  try {
+    await seedAgents().catch(e => console.warn('[Store] seedAgents failed:', e?.code || e?.message));
+  } catch {}
+  try {
+    await seedDeliveries().catch(e => console.warn('[Store] seedDeliveries failed:', e?.code || e?.message));
+  } catch {}
+  try {
+    // Papers is the largest/most-likely to rate-limit, run it last
+    await seedPapers().catch(e => console.warn('[Store] seedPapers failed:', e?.code || e?.message));
+  } catch {}
 }
 
 bootstrap();
@@ -180,17 +236,65 @@ export const store = {
     return availablePapers;
   },
 
-  addPaper(paper: Omit<Newspaper, 'id' | 'rating'> & { imageKey?: string }) {
-    const imageSrc = paper.imageKey ?? 'vijayavani';
-    // Write to Firestore (real-time listener will update local cache)
-    fbAddPaper({
+  addPaper(paper: Omit<Newspaper, 'id' | 'rating' | 'src'> & { imageKey?: string }) {
+    const imageSrc = paper.imageKey ?? '';
+    const category = paper.category ?? 'Paper';
+    const tempId = `local-${Date.now()}`;
+    const newPaperLocal: Newspaper = {
+      id: tempId,
       name: paper.name,
       language: paper.language,
+      category,
       priceDay: paper.priceDay,
       priceMonth: paper.priceMonth,
       rating: 4.5,
       imageSrc,
-    }).catch(console.warn);
+      src: resolveImage(imageSrc),
+    };
+    availablePapers = [...availablePapers, newPaperLocal];
+    notify();
+    fbAddPaper({
+      name: paper.name,
+      language: paper.language,
+      category,
+      priceDay: paper.priceDay,
+      priceMonth: paper.priceMonth,
+      rating: 4.5,
+      imageSrc,
+    })
+      .then((firestoreId) => {
+        availablePapers = availablePapers.map((p) => (p.id === tempId ? { ...p, id: firestoreId } : p));
+        notify();
+      })
+      .catch(console.warn);
+  },
+
+  updatePaper(id: string, data: Partial<Omit<Newspaper, 'id' | 'src'>> & { imageKey?: string }) {
+    const imageSrc = data.imageKey;
+    const localData: Partial<Newspaper> = {
+      name: data.name,
+      language: data.language,
+      category: data.category,
+      priceDay: data.priceDay,
+      priceMonth: data.priceMonth,
+      rating: data.rating,
+    };
+    if (imageSrc !== undefined) {
+      localData.imageSrc = imageSrc;
+      localData.src = resolveImage(imageSrc);
+    }
+    availablePapers = availablePapers.map((p) => (p.id === id ? { ...p, ...localData } : p));
+    notify();
+    const fbData: any = { ...data };
+    delete fbData.imageKey;
+    if (imageSrc !== undefined) fbData.imageSrc = imageSrc;
+    fbUpdatePaper(id, fbData).catch(console.warn);
+  },
+
+  deletePaper(id: string) {
+    availablePapers = availablePapers.filter((p) => p.id !== id);
+    notify();
+    fbDeletePaper(id).catch(console.warn);
   },
 
   addSubscription(sub: {
@@ -205,7 +309,7 @@ export const store = {
     imageSrc?: string;
   }) {
     if (!currentUser) return;
-    const imageSrc = sub.imageSrc ?? 'vijayavani';
+    const imageSrc = sub.imageSrc ?? '';
     addDelivery({
       name: currentUser.name,
       phone: currentUser.phone,

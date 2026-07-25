@@ -1,36 +1,49 @@
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet, Linking, Image } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ArrowLeft, CheckCircle, Calendar, Check, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import PaperLogo from '../../../components/PaperLogo';
 import { store } from '../../../utils/store';
 import { IMAGES } from '../../../assets/images';
 
-const PAPER_DATA: Record<string, { name: string; language: string; priceDay: number; priceMonth: number; src: any }> = {
-  '1': { name: 'Vijayavani', language: 'Kannada Daily', priceDay: 6, priceMonth: 180, src: IMAGES.vijayavani },
-  '2': { name: 'Prajavani', language: 'Kannada Daily', priceDay: 7, priceMonth: 210, src: IMAGES.prajavani },
-  '3': { name: 'The Hindu', language: 'English Daily', priceDay: 10, priceMonth: 300, src: IMAGES.theHindu },
-  '4': { name: 'Times of India', language: 'English Daily', priceDay: 6, priceMonth: 180, src: IMAGES.onboarding },
-};
-
-const PLANS = [
-  { id: 'daily', label: 'Daily', price: 6, unit: '/day', badge: null },
-  { id: 'monthly', label: 'Monthly', price: 180, unit: '/month', badge: 'Popular' },
-  { id: 'yearly', label: 'Yearly', price: 1800, unit: '/year', badge: 'Save 17%', savings: 360 },
-];
-
 const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
 const STEP_LABELS = ['Plan', 'Schedule', 'Review', 'Payment'];
 
 export default function SubscribeScreen() {
   const { subscription_id } = useLocalSearchParams<{ subscription_id: string }>();
-  const paper = PAPER_DATA[subscription_id as string] || PAPER_DATA['1'];
+  const [papers, setPapers] = useState(store.getPapers());
+
+  useEffect(() => {
+    const unsubscribe = store.subscribe(() => {
+      setPapers(store.getPapers());
+    });
+    return unsubscribe;
+  }, []);
+
+  const paper = papers.find(p => p.id === subscription_id) || papers[0] || {
+    id: '1',
+    name: 'Publication',
+    language: 'English',
+    category: 'Paper' as const,
+    priceDay: 5,
+    priceMonth: 150,
+    rating: 4.5,
+    src: IMAGES.vijayavani,
+  };
+
+  // Generate dynamic plans based on actual paper prices
+  const PLANS = [
+    paper.priceDay > 0
+      ? { id: 'daily', label: 'Daily', price: paper.priceDay, unit: '/day', badge: null as string | null }
+      : null,
+    { id: 'monthly', label: 'Monthly', price: paper.priceMonth, unit: '/month', badge: paper.priceDay > 0 ? 'Popular' as const : null },
+    { id: 'yearly', label: 'Yearly', price: Math.round(paper.priceMonth * 10), unit: '/year', badge: 'Save 17%' as const, savings: Math.round(paper.priceMonth * 2) },
+  ].filter(Boolean) as Array<{ id: string; label: string; price: number; unit: string; badge: string | null; savings?: number }>;
 
   const [step, setStep] = useState(1);
-  const [selectedPlan, setSelectedPlan] = useState('monthly');
+  const [selectedPlan, setSelectedPlan] = useState<string>(PLANS.find(p => p.id === 'monthly') ? 'monthly' : PLANS[0]?.id || 'monthly');
   const [selectedDays, setSelectedDays] = useState(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
   const [skippedDates, setSkippedDates] = useState<string[]>([]);
   const [paymentMethod, setPaymentMethod] = useState('UPI');
@@ -60,6 +73,15 @@ export default function SubscribeScreen() {
     setSkippedDates((prev) => prev.filter((d) => d !== dateStr));
   };
 
+  const selectedPlanObj = PLANS.find((p) => p.id === selectedPlan) || PLANS[0];
+  const planLabel = selectedPlanObj?.label ?? 'Monthly';
+  const planPrice = selectedPlanObj?.price ?? paper.priceMonth;
+
+  const monthlyPrice =
+    selectedPlan === 'monthly' ? paper.priceMonth
+      : selectedPlan === 'yearly' ? Math.round(paper.priceMonth * 10 / 12)
+        : paper.priceDay * selectedDays.length * 4;
+
   const goNext = () => {
     if (step === 3) {
       const user = store.getUser();
@@ -80,9 +102,9 @@ export default function SubscribeScreen() {
       });
 
       // Send order details to Agent Akhil K S's WhatsApp
-      const message = `*New Newspaper Subscription!* 📰\n\n*Customer:* ${user?.name || 'Customer'}\n*Phone:* ${user?.phone || 'N/A'}\n*Address:* ${user?.address || 'Koramangala'}\n*Paper:* ${paper.name}\n*Plan:* ${planLabel}\n*Days:* ${selectedDays.join(', ')}\n*Start Date:* ${startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}\n\n_Sent via PaperFresh App_`;
+      const message = `*New ${paper.category} Subscription!* ${paper.category === 'Paper' ? '📰' : '📚'}\n\n*Customer:* ${user?.name || 'Customer'}\n*Phone:* ${user?.phone || 'N/A'}\n*Address:* ${user?.address || 'Koramangala'}\n*Publication:* ${paper.name} (${paper.language})\n*Plan:* ${planLabel} • ₹${planPrice}${selectedPlanObj?.unit || ''}\n*Days:* ${selectedDays.join(', ')}\n*Start Date:* ${startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}\n\n_Sent via PaperFresh App_`;
 
-      const adminPhone = '919972505709'; // Akhil K S (Agent)
+      const adminPhone = '919972505709';
       const url = `https://api.whatsapp.com/send?phone=${adminPhone}&text=${encodeURIComponent(message)}`;
 
       Linking.openURL(url).catch((err) => {
@@ -96,9 +118,6 @@ export default function SubscribeScreen() {
     if (step > 1) setStep(step - 1);
     else router.back();
   };
-
-  const monthlyPrice = selectedPlan === 'monthly' ? 180 : selectedPlan === 'yearly' ? 150 : 6 * selectedDays.length * 4;
-  const planLabel = PLANS.find((p) => p.id === selectedPlan)?.label ?? 'Monthly';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
@@ -116,7 +135,35 @@ export default function SubscribeScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      {/* Step Progress Bar (Screen 8 from reference) */}
+      {/* Mini paper banner under header */}
+      <View style={[
+        styles.miniBanner,
+        { backgroundColor: paper.category === 'Paper' ? '#EFF6FF' : '#FAF5FF' }
+      ]}>
+        <View style={styles.miniBannerImg}>
+          {paper.src ? (
+            <Image source={paper.src} style={{ width: 48, height: 48 }} resizeMode="contain" />
+          ) : (
+            <PaperLogo name={paper.name} id={paper.id} size="sm" />
+          )}
+        </View>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text style={styles.miniBannerName}>{paper.name}</Text>
+          <Text style={{
+            fontSize: 11,
+            color: paper.category === 'Paper' ? '#2563EB' : '#9333EA',
+            fontWeight: '700'
+          }}>{paper.language} • {paper.category}</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          {paper.priceDay > 0 && (
+            <Text style={{ fontSize: 11, color: '#475569', fontWeight: '600' }}>₹{paper.priceDay}/day</Text>
+          )}
+          <Text style={{ fontSize: 14, fontWeight: '900', color: '#0F172A' }}>₹{paper.priceMonth}/mo</Text>
+        </View>
+      </View>
+
+      {/* Step Progress Bar */}
       {step < 4 && (
         <View style={styles.stepBar}>
           {STEP_LABELS.map((label, i) => {
@@ -152,7 +199,7 @@ export default function SubscribeScreen() {
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
 
-          {/* ── STEP 1: CHOOSE PLAN (Screen 8) ────────────────── */}
+          {/* ── STEP 1: CHOOSE PLAN ────────────────── */}
           {step === 1 && (
             <>
               <Text style={styles.stepTitle}>Choose Plan</Text>
@@ -227,22 +274,28 @@ export default function SubscribeScreen() {
                 />
               )}
 
-              {/* Monthly Price Bar */}
+              {/* Summary Bar */}
               <View style={styles.monthlySummaryBar}>
-                <Text style={{ fontSize: 14, color: '#475569', fontWeight: '600' }}>Monthly Price</Text>
+                <Text style={{ fontSize: 14, color: '#475569', fontWeight: '600' }}>{planLabel} Plan</Text>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>₹{monthlyPrice}</Text>
-                  <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '600' }}>You Save ₹0</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>₹{planPrice}</Text>
+                  {selectedPlanObj?.savings && (
+                    <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '600' }}>Save ₹{selectedPlanObj.savings}</Text>
+                  )}
                 </View>
               </View>
             </>
           )}
 
-          {/* ── STEP 2: DELIVERY DAYS (Screen 9) ───────────────── */}
+          {/* ── STEP 2: DELIVERY DAYS ───────────────── */}
           {step === 2 && (
             <>
               <Text style={styles.stepTitle}>Delivery Days</Text>
-              <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 16, fontWeight: '500' }}>Select days you want delivery</Text>
+              <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 16, fontWeight: '500' }}>
+                {paper.category === 'Magazine'
+                  ? 'Select your preferred delivery days'
+                  : 'Select days you want delivery'}
+              </Text>
 
               {ALL_DAYS.map((day) => {
                 const checked = selectedDays.includes(day);
@@ -260,6 +313,18 @@ export default function SubscribeScreen() {
                   </TouchableOpacity>
                 );
               })}
+
+              <View style={[
+                styles.monthlySummaryBar,
+                { marginTop: 16 }
+              ]}>
+                <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600' }}>
+                  {selectedDays.length} day{selectedDays.length !== 1 ? 's' : ''} per week
+                </Text>
+                <Text style={{ fontSize: 13, color: '#0F172A', fontWeight: '800' }}>
+                  {selectedDays.length === 7 ? 'Everyday' : selectedDays.map(d => d.slice(0, 3)).join(', ')}
+                </Text>
+              </View>
             </>
           )}
 
@@ -270,11 +335,13 @@ export default function SubscribeScreen() {
 
               {/* Subscription Details Table */}
               <View style={styles.reviewCard}>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 14 }}>Subscription Details</Text>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 14 }}>
+                  {paper.category} Details
+                </Text>
 
                 {[
-                  { label: 'Newspaper', value: paper.name },
-                  { label: 'Plan', value: planLabel },
+                  { label: paper.category, value: `${paper.name} (${paper.language})` },
+                  { label: 'Plan', value: `${planLabel} • ₹${planPrice}${selectedPlanObj?.unit || ''}` },
                   { label: 'Start Date', value: startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) },
                   {
                     label: 'Delivery Days',
@@ -322,7 +389,7 @@ export default function SubscribeScreen() {
             </>
           )}
 
-          {/* ── STEP 4: SUCCESS (Screen 10 from reference) ─────── */}
+          {/* ── STEP 4: SUCCESS ─────── */}
           {step === 4 && (
             <View style={{ alignItems: 'center', paddingTop: 20 }}>
               <View style={styles.successCircle}>
@@ -336,8 +403,10 @@ export default function SubscribeScreen() {
               {/* Next Delivery Card */}
               <View style={styles.nextDeliveryCard}>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B' }}>NEXT DELIVERY</Text>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: '#16A34A', marginTop: 4 }}>Tomorrow, 26 Jul 2025</Text>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2, fontWeight: '500' }}>Between 5:30 AM - 6:30 AM</Text>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#16A34A', marginTop: 4 }}>Tomorrow</Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2, fontWeight: '500' }}>
+                  {paper.category === 'Magazine' ? 'As per schedule' : 'Between 5:30 AM - 6:30 AM'}
+                </Text>
               </View>
 
               <TouchableOpacity
@@ -360,7 +429,10 @@ export default function SubscribeScreen() {
       {step < 4 && (
         <View style={styles.bottomCtaBar}>
           <TouchableOpacity
-            style={[styles.nextBtn, step === 3 && { backgroundColor: '#EA580C' }]}
+            style={[
+              styles.nextBtn,
+              step === 3 && (paper.category === 'Magazine' ? { backgroundColor: '#9333EA' } : { backgroundColor: '#EA580C' })
+            ]}
             onPress={goNext}
             activeOpacity={0.85}
           >
@@ -403,6 +475,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     fontWeight: '500',
+  },
+  miniBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  miniBannerImg: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
+  },
+  miniBannerName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
   },
 
   stepBar: {

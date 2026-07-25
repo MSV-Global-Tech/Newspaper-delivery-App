@@ -8,6 +8,7 @@ import {
   TextInput,
   Image,
   Modal,
+  Alert,
 } from 'react-native';
 import {
   Users,
@@ -28,12 +29,15 @@ import {
   Phone,
   Trash2,
   UserPlus,
+  BookOpen,
+  Shield,
+  Truck,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { IMAGES } from '../../assets/images';
+import { IMAGES, resolvePaperImage } from '../../assets/images';
 import { store } from '../../utils/store';
 import { uploadNewspaperLogo } from '../../database';
 
@@ -50,7 +54,22 @@ export default function AdminScreen() {
   // Add Paper State
   const [isAddingPaper, setIsAddingPaper] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [newPaper, setNewPaper] = useState({ name: '', language: '', priceDay: '', priceMonth: '', imageUrl: '' });
+  const [newPaper, setNewPaper] = useState({ name: '', language: '', category: 'Paper' as 'Paper' | 'Magazine', priceDay: '', priceMonth: '', imageUrl: '' });
+
+  // Edit Paper State
+  const [isEditingPaper, setIsEditingPaper] = useState(false);
+  const [isEditingUploading, setIsEditingUploading] = useState(false);
+  const [editingPaper, setEditingPaper] = useState<{
+    id: string;
+    name: string;
+    language: string;
+    category: 'Paper' | 'Magazine';
+    priceDay: string;
+    priceMonth: string;
+    rating: string;
+    imageUrl: string;
+    currentImageSrc: string;
+  } | null>(null);
 
   // Add Agent State
   const [isAddingAgent, setIsAddingAgent] = useState(false);
@@ -97,29 +116,116 @@ export default function AdminScreen() {
   };
 
   const handleAddPaper = async () => {
-    if (!newPaper.name || !newPaper.language || !newPaper.priceDay || !newPaper.priceMonth) return;
+    if (!newPaper.name || !newPaper.language || !newPaper.priceMonth) return;
+    if (!newPaper.imageUrl) {
+      Alert.alert('Image Required', 'Please select a publication logo from the gallery before saving.', [
+        { text: 'OK', style: 'default' },
+      ]);
+      return;
+    }
     setIsUploading(true);
     try {
-      let imageSrc = 'vijayavani'; // default fallback key
-      if (newPaper.imageUrl) {
-        // Upload to Firebase Storage and get download URL
-        imageSrc = await uploadNewspaperLogo(newPaper.imageUrl, newPaper.name);
-      }
+      const imageSrc = newPaper.imageUrl
+        ? await uploadNewspaperLogo(newPaper.imageUrl, newPaper.name)
+        : '';
       store.addPaper({
         name: newPaper.name,
         language: newPaper.language,
-        priceDay: parseFloat(newPaper.priceDay),
-        priceMonth: parseFloat(newPaper.priceMonth),
-        src: IMAGES.vijayavani,
+        category: newPaper.category,
+        priceDay: newPaper.priceDay ? parseFloat(newPaper.priceDay) : 0,
+        priceMonth: newPaper.priceMonth ? parseFloat(newPaper.priceMonth) : 0,
         imageKey: imageSrc,
       });
-      setNewPaper({ name: '', language: '', priceDay: '', priceMonth: '', imageUrl: '' });
+      setNewPaper({ name: '', language: '', category: 'Paper', priceDay: '', priceMonth: '', imageUrl: '' });
       setIsAddingPaper(false);
     } catch (e) {
       console.warn('[Admin] Upload failed:', e);
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const openEditPaper = (paper: any) => {
+    setEditingPaper({
+      id: paper.id,
+      name: paper.name ?? '',
+      language: paper.language ?? '',
+      category: paper.category ?? 'Paper',
+      priceDay: paper.priceDay != null ? String(paper.priceDay) : '',
+      priceMonth: paper.priceMonth != null ? String(paper.priceMonth) : '',
+      rating: paper.rating != null ? String(paper.rating) : '4.5',
+      imageUrl: '',
+      currentImageSrc: (paper as any).imageSrc ?? '',
+    });
+    setIsEditingPaper(true);
+  };
+
+  const pickEditImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && editingPaper) {
+      setEditingPaper({ ...editingPaper, imageUrl: result.assets[0].uri });
+    }
+  };
+
+  const handleSaveEditPaper = async () => {
+    if (!editingPaper) return;
+    if (!editingPaper.name || !editingPaper.language || !editingPaper.priceMonth) return;
+    const finalImage = editingPaper.imageUrl || editingPaper.currentImageSrc;
+    if (!finalImage) {
+      Alert.alert('Image Required', 'Please select a publication logo before saving.', [
+        { text: 'OK', style: 'default' },
+      ]);
+      return;
+    }
+    setIsEditingUploading(true);
+    try {
+      let imageSrc = editingPaper.currentImageSrc;
+      if (editingPaper.imageUrl) {
+        imageSrc = await uploadNewspaperLogo(editingPaper.imageUrl, editingPaper.name);
+      }
+      const ratingNum = parseFloat(editingPaper.rating);
+      store.updatePaper(editingPaper.id, {
+        name: editingPaper.name.trim(),
+        language: editingPaper.language.trim(),
+        category: editingPaper.category,
+        priceDay: editingPaper.priceDay ? parseFloat(editingPaper.priceDay) : 0,
+        priceMonth: editingPaper.priceMonth ? parseFloat(editingPaper.priceMonth) : 0,
+        rating: isNaN(ratingNum) ? 4.5 : ratingNum,
+        imageKey: imageSrc,
+      });
+      setIsEditingPaper(false);
+      setEditingPaper(null);
+    } catch (e) {
+      console.warn('[Admin] Edit paper save failed:', e);
+    } finally {
+      setIsEditingUploading(false);
+    }
+  };
+
+  const handleDeletePaper = () => {
+    if (!editingPaper) return;
+    Alert.alert(
+      'Delete Publication?',
+      `Are you sure you want to delete "${editingPaper.name}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            store.deletePaper(editingPaper.id);
+            setIsEditingPaper(false);
+            setEditingPaper(null);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const handleUpdateStatus = (id: string, newStatus: 'Delivered' | 'Skipped') => {
@@ -175,21 +281,28 @@ export default function AdminScreen() {
           contentContainerStyle={styles.tabBar}
         >
           {([
-            { key: 'overview',   label: 'Overview' },
-            { key: 'deliveries', label: 'Deliveries' },
-            { key: 'papers',     label: 'Papers' },
-            { key: 'agents',     label: 'Agents' },
-            { key: 'access',     label: 'Access' },
-          ] as const).map(({ key, label }) => {
+            { key: 'overview',   label: 'Overview', icon: TrendingUp },
+            { key: 'deliveries', label: 'Deliveries', icon: Truck },
+            { key: 'papers',     label: 'Papers', icon: BookOpen },
+            { key: 'agents',     label: 'Agents', icon: Users },
+            { key: 'access',     label: 'Access', icon: Shield },
+          ] as const).map(({ key, label, icon: Icon }) => {
             const isActive = activeTab === key;
             return (
               <TouchableOpacity
                 key={key}
                 onPress={() => setActiveTab(key)}
                 style={[styles.tab, isActive && styles.tabActive]}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Icon
+                    size={13}
+                    color={isActive ? '#2563EB' : '#64748B'}
+                    strokeWidth={2.2}
+                  />
+                  <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -363,25 +476,89 @@ export default function AdminScreen() {
         {activeTab === 'papers' && (
           <View style={styles.container}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Manage Publications</Text>
+              <View>
+                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Manage Publications</Text>
+                <Text style={{ fontSize: 12, color: '#94A3B8', fontWeight: '500', marginTop: 2 }}>
+                  {papersList.filter(p => p.category === 'Paper').length} Papers • {papersList.filter(p => p.category === 'Magazine').length} Magazines
+                </Text>
+              </View>
               <TouchableOpacity style={styles.addPaperBtn} onPress={() => setIsAddingPaper(true)}>
                 <PlusCircle size={16} color="#FFFFFF" />
                 <Text style={styles.addPaperBtnText}>Add New</Text>
               </TouchableOpacity>
             </View>
 
-            {papersList.map((paper) => (
-              <View key={paper.id} style={styles.paperCatalogItem}>
-                <Image source={paper.src} style={{ width: 64, height: 64 }} resizeMode="contain" />
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.custName}>{paper.name}</Text>
-                  <Text style={styles.custAddress}>{paper.language}  •  ₹{paper.priceMonth}/mo</Text>
+            {(['Paper', 'Magazine'] as const).map((cat) => {
+              const catItems = papersList.filter(p => p.category === cat);
+              if (catItems.length === 0) return null;
+
+              const languages = Array.from(new Set(catItems.map(p => p.language)));
+
+              return (
+                <View key={cat} style={{ marginBottom: 20 }}>
+                  <View style={styles.categoryHeader}>
+                    <View style={[styles.categoryDot, { backgroundColor: cat === 'Paper' ? '#2563EB' : '#9333EA' }]} />
+                    <Text style={styles.categoryTitle}>{cat === 'Paper' ? '📰 NEWSPAPERS' : '📚 MAGAZINES'}</Text>
+                    <Text style={styles.categoryCount}>{catItems.length}</Text>
+                  </View>
+
+                  {languages.map(lang => {
+                    const langItems = catItems.filter(p => p.language === lang);
+                    return (
+                      <View key={lang} style={{ marginBottom: 12 }}>
+                        <View style={styles.languageHeader}>
+                          <Text style={styles.languageName}>{lang}</Text>
+                          <View style={styles.languageBadge}>
+                            <Text style={styles.languageBadgeText}>{langItems.length}</Text>
+                          </View>
+                        </View>
+
+                        {langItems.map((paper) => (
+                          <View key={paper.id} style={styles.paperCatalogItem}>
+                            <View style={[
+                              styles.paperImageBox,
+                              !paper.src && { borderWidth: 2, borderStyle: 'dashed', borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
+                              { backgroundColor: !paper.src ? '#FEF2F2' : (cat === 'Paper' ? '#EFF6FF' : '#FAF5FF') }
+                            ]}>
+                              {paper.src ? (
+                                <Image source={paper.src} style={{ width: 44, height: 44 }} resizeMode="contain" />
+                              ) : (
+                                <View style={{ alignItems: 'center', justifyContent: 'center', width: 44, height: 44 }}>
+                                  <ImageIcon size={18} color="#EF4444" />
+                                </View>
+                              )}
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                              <Text style={styles.custName}>{paper.name}</Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, flexWrap: 'wrap', gap: 8 }}>
+                                <Text style={[
+                                  styles.langChip,
+                                  { backgroundColor: cat === 'Paper' ? '#EFF6FF' : '#FAF5FF', color: cat === 'Paper' ? '#2563EB' : '#9333EA' }
+                                ]}>
+                                  {lang}
+                                </Text>
+                                <Text style={styles.custAddress}>
+                                  {paper.priceDay > 0 ? `₹${paper.priceDay}/day` : ''}
+                                  {paper.priceDay > 0 && paper.priceMonth > 0 ? ' • ' : ''}
+                                  {paper.priceMonth > 0 ? `₹${paper.priceMonth}/mo` : ''}
+                                </Text>
+                              </View>
+                            </View>
+                            <TouchableOpacity
+                              style={styles.editBtn}
+                              onPress={() => openEditPaper(paper)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.editBtnText}>Edit</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    );
+                  })}
                 </View>
-                <TouchableOpacity style={styles.editBtn}>
-                  <Text style={styles.editBtnText}>Edit</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -576,13 +753,41 @@ export default function AdminScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={styles.modalTitle}>Add New Newspaper</Text>
+              <Text style={styles.modalTitle}>Add New Publication</Text>
               <TouchableOpacity onPress={() => setIsAddingPaper(false)}>
                 <X size={24} color="#64748B" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>Newspaper Name</Text>
+            <Text style={styles.inputLabel}>Category</Text>
+            <View style={styles.categorySelector}>
+              {(['Paper', 'Magazine'] as const).map((cat) => {
+                const isActive = newPaper.category === cat;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setNewPaper({ ...newPaper, category: cat })}
+                    style={[
+                      styles.categoryOption,
+                      isActive && (cat === 'Paper' ? styles.catOptionActivePaper : styles.catOptionActiveMag),
+                    ]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontSize: 14, marginRight: 6 }}>
+                      {cat === 'Paper' ? '📰' : '📚'}
+                    </Text>
+                    <Text style={[
+                      styles.categoryOptionText,
+                      isActive && styles.categoryOptionTextActive,
+                    ]}>
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.inputLabel}>Publication Name</Text>
             <TextInput
               style={styles.modalInput}
               placeholder="e.g. Times of India"
@@ -597,6 +802,18 @@ export default function AdminScreen() {
               value={newPaper.language}
               onChangeText={text => setNewPaper({ ...newPaper, language: text })}
             />
+            <View style={styles.languageChipsWrap}>
+              {['Kannada', 'English', 'Telugu', 'Tamil', 'Malayalam', 'Hindi'].map((lang) => (
+                <TouchableOpacity
+                  key={lang}
+                  style={styles.langQuickChip}
+                  onPress={() => setNewPaper({ ...newPaper, language: lang })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.langQuickChipText}>{lang}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>
@@ -621,7 +838,10 @@ export default function AdminScreen() {
               </View>
             </View>
 
-            <Text style={styles.inputLabel}>Newspaper Image</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={styles.inputLabel}>Publication Image</Text>
+              <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 12, marginLeft: 4 }}>REQUIRED</Text>
+            </View>
             {newPaper.imageUrl ? (
               <View style={{ alignItems: 'center', marginBottom: 16 }}>
                 <Image source={{ uri: newPaper.imageUrl }} style={{ width: 80, height: 80, borderRadius: 12 }} />
@@ -630,10 +850,18 @@ export default function AdminScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
-                <ImageIcon size={20} color="#64748B" />
-                <Text style={styles.imagePickerText}>Select from Gallery</Text>
-              </TouchableOpacity>
+              <View style={{ marginBottom: 8 }}>
+                <TouchableOpacity
+                  style={[styles.imagePickerBtn, { borderColor: '#EF4444', borderWidth: 2, borderStyle: 'dashed', backgroundColor: '#FEF2F2' }]}
+                  onPress={pickImage}
+                >
+                  <ImageIcon size={20} color="#EF4444" />
+                  <Text style={[styles.imagePickerText, { color: '#EF4444', fontWeight: '700' }]}>Select from Gallery</Text>
+                </TouchableOpacity>
+                <Text style={{ marginTop: 6, color: '#B91C1C', fontSize: 11, fontWeight: '600', textAlign: 'center' }}>
+                  ⚠️ You must choose a logo before you can save this publication
+                </Text>
+              </View>
             )}
 
             <TouchableOpacity
@@ -644,9 +872,183 @@ export default function AdminScreen() {
               {isUploading ? (
                 <Text style={styles.saveBtnText}>Uploading... ⏳</Text>
               ) : (
-                <Text style={styles.saveBtnText}>Save Newspaper</Text>
+                <Text style={styles.saveBtnText}>Save {newPaper.category}</Text>
               )}
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Edit Paper Modal ── */}
+      <Modal visible={isEditingPaper} transparent animationType="slide" onRequestClose={() => setIsEditingPaper(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View>
+                <Text style={styles.modalTitle}>Edit Publication</Text>
+                <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600', marginTop: 2 }}>
+                  Update details or remove this publication
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => { setIsEditingPaper(false); setEditingPaper(null); }}>
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {editingPaper && (
+              <>
+                <Text style={styles.inputLabel}>Category</Text>
+                <View style={styles.categorySelector}>
+                  {(['Paper', 'Magazine'] as const).map((cat) => {
+                    const isActive = editingPaper.category === cat;
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        onPress={() => setEditingPaper({ ...editingPaper, category: cat })}
+                        style={[
+                          styles.categoryOption,
+                          isActive && (cat === 'Paper' ? styles.catOptionActivePaper : styles.catOptionActiveMag),
+                        ]}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={{ fontSize: 14, marginRight: 6 }}>
+                          {cat === 'Paper' ? '📰' : '📚'}
+                        </Text>
+                        <Text style={[
+                          styles.categoryOptionText,
+                          isActive && styles.categoryOptionTextActive,
+                        ]}>
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.inputLabel}>Publication Name</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. Times of India"
+                  value={editingPaper.name}
+                  onChangeText={text => setEditingPaper({ ...editingPaper, name: text })}
+                />
+
+                <Text style={styles.inputLabel}>Language</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. English"
+                  value={editingPaper.language}
+                  onChangeText={text => setEditingPaper({ ...editingPaper, language: text })}
+                />
+                <View style={styles.languageChipsWrap}>
+                  {['Kannada', 'English', 'Telugu', 'Tamil', 'Malayalam', 'Hindi'].map((lang) => (
+                    <TouchableOpacity
+                      key={lang}
+                      style={styles.langQuickChip}
+                      onPress={() => setEditingPaper({ ...editingPaper, language: lang })}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.langQuickChipText}>{lang}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Daily Price (₹)</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="e.g. 5"
+                      keyboardType="numeric"
+                      value={editingPaper.priceDay}
+                      onChangeText={text => setEditingPaper({ ...editingPaper, priceDay: text })}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Monthly Price (₹)</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="e.g. 150"
+                      keyboardType="numeric"
+                      value={editingPaper.priceMonth}
+                      onChangeText={text => setEditingPaper({ ...editingPaper, priceMonth: text })}
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.inputLabel}>Rating (1.0 – 5.0)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. 4.5"
+                  keyboardType="numeric"
+                  value={editingPaper.rating}
+                  onChangeText={text => setEditingPaper({ ...editingPaper, rating: text })}
+                />
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={styles.inputLabel}>Publication Image</Text>
+                  {!editingPaper.currentImageSrc && !editingPaper.imageUrl && (
+                    <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 12, marginLeft: 4 }}>REQUIRED</Text>
+                  )}
+                </View>
+                {editingPaper.imageUrl ? (
+                  <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                    <Image source={{ uri: editingPaper.imageUrl }} style={{ width: 80, height: 80, borderRadius: 12 }} />
+                    <TouchableOpacity onPress={() => setEditingPaper({ ...editingPaper, imageUrl: '' })} style={{ marginTop: 8 }}>
+                      <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 12 }}>Remove New Image</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : editingPaper.currentImageSrc ? (
+                  <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                    <Image
+                      source={resolvePaperImage(editingPaper.currentImageSrc) || undefined}
+                      defaultSource={IMAGES['vijayavani.png'] as any}
+                      style={{ width: 80, height: 80, borderRadius: 12 }}
+                      resizeMode="contain"
+                    />
+                    <TouchableOpacity style={styles.imagePickerBtn} onPress={pickEditImage}>
+                      <ImageIcon size={18} color="#2563EB" />
+                      <Text style={[styles.imagePickerText, { color: '#2563EB', fontWeight: '700' }]}>Replace Image</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={{ marginBottom: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.imagePickerBtn, { borderColor: '#EF4444', borderWidth: 2, borderStyle: 'dashed', backgroundColor: '#FEF2F2' }]}
+                      onPress={pickEditImage}
+                    >
+                      <ImageIcon size={20} color="#EF4444" />
+                      <Text style={[styles.imagePickerText, { color: '#EF4444', fontWeight: '700' }]}>Select from Gallery</Text>
+                    </TouchableOpacity>
+                    <Text style={{ marginTop: 6, color: '#B91C1C', fontSize: 11, fontWeight: '600', textAlign: 'center' }}>
+                      ⚠️ This publication has no logo yet — please select one before saving
+                    </Text>
+                  </View>
+                )}
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    style={[styles.deleteBtn, isEditingUploading && { opacity: 0.6 }]}
+                    onPress={handleDeletePaper}
+                    disabled={isEditingUploading}
+                  >
+                    <Trash2 size={16} color="#EF4444" />
+                    <Text style={styles.deleteBtnText}>Delete</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.saveBtn, { flex: 1, marginTop: 8 }, isEditingUploading && { opacity: 0.6 }]}
+                    onPress={handleSaveEditPaper}
+                    disabled={isEditingUploading}
+                  >
+                    {isEditingUploading ? (
+                      <Text style={styles.saveBtnText}>Saving... ⏳</Text>
+                    ) : (
+                      <Text style={styles.saveBtnText}>Save Changes</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -696,31 +1098,33 @@ const styles = StyleSheet.create({
   tabBarContainer: {
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    padding: 4,
-    gap: 2,
+    gap: 8,
+    paddingVertical: 2,
   },
   tab: {
-    flex: 1,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
   tabActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#0F172A',
+    backgroundColor: '#EFF6FF',
+    borderColor: '#2563EB',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   tabText: { fontSize: 11, fontWeight: '700', color: '#64748B' },
   tabTextActive: { color: '#2563EB', fontWeight: '800' },
@@ -845,11 +1249,135 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  paperImageBox: {
+    width: 56,
+    height: 56,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#F1F5F9',
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  categoryDot: {
+    width: 6,
+    height: 24,
+    borderRadius: 3,
+    marginRight: 10,
+  },
+  categoryTitle: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: 0.5,
+  },
+  categoryCount: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#94A3B8',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  languageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    marginBottom: 8,
+    paddingLeft: 16,
+  },
+  languageName: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.3,
+  },
+  languageBadge: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  languageBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94A3B8',
+  },
+  langChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    fontSize: 10,
+    fontWeight: '800',
+    overflow: 'hidden',
+  },
+  categorySelector: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  categoryOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  catOptionActivePaper: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#2563EB',
+  },
+  catOptionActiveMag: {
+    backgroundColor: '#FAF5FF',
+    borderColor: '#9333EA',
+  },
+  categoryOptionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  categoryOptionTextActive: {
+    color: '#0F172A',
+    fontWeight: '800',
+  },
+  languageChipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 16,
+    marginTop: -4,
+  },
+  langQuickChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+  },
+  langQuickChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
   },
   editBtn: {
     backgroundColor: '#F1F5F9',
@@ -938,6 +1466,23 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: '#FFFFFF',
     fontSize: 15,
+    fontWeight: '700',
+  },
+  deleteBtn: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  deleteBtnText: {
+    color: '#EF4444',
+    fontSize: 14,
     fontWeight: '700',
   },
   imagePickerBtn: {
