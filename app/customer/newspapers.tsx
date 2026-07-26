@@ -167,9 +167,8 @@ function PaperCard({ item, deliveries, requireAuth }: any) {
     >
       <View style={[
         styles.logoTile,
-        { backgroundColor: item.category === 'Paper' ? '#F8FAFC' : '#FAF5FF' },
       ]}>
-        <Image source={item.src} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+        <Image source={item.src} style={{ width: '100%', height: '100%', borderRadius: 13 }} resizeMode="cover" />
       </View>
 
       <View style={{ flex: 1, marginLeft: 16, height: 110, justifyContent: 'space-between' }}>
@@ -280,14 +279,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03, shadowRadius: 6, elevation: 2,
   },
   logoTile: {
-    width: 108,
-    height: 118,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    width: 120,
+    height: 120,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    padding: 6,
+    padding: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },

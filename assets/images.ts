@@ -31,15 +31,25 @@
  */
 export const IMAGES: Record<string, any> = {
   // ── App UI images ──
-  'onboarding.png': require('./onboarding.png'),
+  'onboarding.webp': require('./onboarding.webp'),
   'logo.png':       require('./logo.png'),
 
-  // ── Newspaper / magazine logos ──
-  'vijayavani.png':     require('./vijayavani.png'),
-  'prajavani.png':      require('./prajavani.png'),
-  'the_hindu.png':      require('./the_hindu.png'),
-  'times_of_india.png': require('./the_hindu.png'),
-  'hindu.webp':         require('./hindu.webp'),
+  // ── Kannada newspaper logos (10 listed by user) ──
+  'vijayavani.webp':       require('./vijayavani.webp'),
+  'prajavani.webp':        require('./prajavani.webp'),
+  'kannadaprabha.webp':    require('./kannadaprabha.webp'),
+  'kolaravani.webp':       require('./kolaravani.webp'),
+  'prajapragathi.webp':    require('./prajapragathi.webp'),
+  'pravasiprapancha.webp': require('./pravasiprapancha.webp'),
+  'udayavani.webp':        require('./udayavani.webp'),
+  'vijaykarnataka.webp':   require('./vijaykarnataka.webp'),
+  'vishwavaaradhi.webp':   require('./vishwavaaradhi.webp'),
+  'vishwavani.webp':       require('./vishwavani.webp'),
+
+  // ── English / other language newspaper logos ──
+  'the_hindu.webp':      require('./hindu.webp'),
+  'times_of_india.webp': require('./hindu.webp'),
+  'hindu.webp':          require('./hindu.webp'),
 };
 
 /**
@@ -54,32 +64,102 @@ export const IMAGES: Record<string, any> = {
  *   - URL passthrough (http://, https://, file:// — admin-uploaded logos)
  */
 const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
-  // ── Vijayavani group ( Kannada papers ) ──
-  'vijayavani':   'vijayavani.png',
-  'vijayavani.png': 'vijayavani.png',
-  'VIJAYAVANI':   'vijayavani.png',
-  'Vijayavani':   'vijayavani.png',
+  // ── App logos (recently WEBP → PNG migration) ──
+  'logo':                   'logo.png',
+  'logo.webp':              'logo.png',
+  'logo.png':               'logo.png',
+  'logo_foreground':        'logo.png',
+  'logo_foreground.webp':   'logo.png',
+  'logo_foreground.png':    'logo.png',
+  'LOGO':                   'logo.png',
 
-  // ── Prajavani group ──
-  'prajavani':    'prajavani.png',
-  'prajavani.png': 'prajavani.png',
+  // ── Vijayavani ──
+  'vijayavani':             'vijayavani.webp',
+  'vijayavani.png':         'vijayavani.webp',
+  'vijayavani.webp':        'vijayavani.webp',
+  'VIJAYAVANI':             'vijayavani.webp',
+  'Vijayavani':             'vijayavani.webp',
+
+  // ── Kannada Prabha (new: kannadaprabha.webp) ──
+  'kannadaprabha':          'kannadaprabha.webp',
+  'kannadaprabha.webp':     'kannadaprabha.webp',
+  'kannada prabha':         'kannadaprabha.webp',
+  'Kannada Prabha':         'kannadaprabha.webp',
+  'kannada_prabha':         'kannadaprabha.webp',
+  'kannadaprabha.png':      'kannadaprabha.webp',
+
+  // ── Kolaravani (new: kolaravani.webp) ──
+  'kolaravani':             'kolaravani.webp',
+  'kolaravani.webp':        'kolaravani.webp',
+  'kolaravani.png':         'kolaravani.webp',
+  'Kolaravani':             'kolaravani.webp',
+
+  // ── Prajapragathi (new: prajapragathi.webp) ──
+  'prajapragathi':          'prajapragathi.webp',
+  'prajapragathi.webp':     'prajapragathi.webp',
+  'prajapragathi.png':      'prajapragathi.webp',
+  'Prajapragathi':          'prajapragathi.webp',
+
+  // ── Prajavani ──
+  'prajavani':              'prajavani.webp',
+  'prajavani.png':          'prajavani.webp',
+  'prajavani.webp':         'prajavani.webp',
+  'Prajavani':              'prajavani.webp',
+
+  // ── Pravasi Prapancha (new: pravasiprapancha.webp) ──
+  'pravasiprapancha':       'pravasiprapancha.webp',
+  'pravasiprapancha.webp':  'pravasiprapancha.webp',
+  'pravasiprapancha.png':   'pravasiprapancha.webp',
+  'pravasi prapancha':      'pravasiprapancha.webp',
+  'Pravasi Prapancha':      'pravasiprapancha.webp',
+  'pravasi_prapancha':      'pravasiprapancha.webp',
+
+  // ── Udayavani (new: udayavani.webp) ──
+  'udayavani':              'udayavani.webp',
+  'udayavani.webp':         'udayavani.webp',
+  'udayavani.png':          'udayavani.webp',
+  'Udayavani':              'udayavani.webp',
+
+  // ── Vijay Karnataka (new: vijaykarnataka.webp) ──
+  'vijaykarnataka':         'vijaykarnataka.webp',
+  'vijaykarnataka.webp':    'vijaykarnataka.webp',
+  'vijaykarnataka.png':     'vijaykarnataka.webp',
+  'vijay karnataka':        'vijaykarnataka.webp',
+  'Vijay Karnataka':        'vijaykarnataka.webp',
+  'vijay_karnataka':        'vijaykarnataka.webp',
+
+  // ── Vishwa Vaaridhi (new: vishwavaaradhi.webp) ──
+  'vishwavaaradhi':         'vishwavaaradhi.webp',
+  'vishwavaaradhi.webp':    'vishwavaaradhi.webp',
+  'vishwavaaradhi.png':     'vishwavaaradhi.webp',
+  'vishwa vaaridhi':        'vishwavaaradhi.webp',
+  'Vishwa Vaaridhi':        'vishwavaaradhi.webp',
+  'vishwa_vaaridhi':        'vishwavaaradhi.webp',
+  'vishwavaridhi':          'vishwavaaradhi.webp',
+
+  // ── Vishwavani (new: vishwavani.webp) ──
+  'vishwavani':             'vishwavani.webp',
+  'vishwavani.webp':        'vishwavani.webp',
+  'vishwavani.png':         'vishwavani.webp',
+  'Vishwavani':             'vishwavani.webp',
 
   // ── The Hindu group (various aliases used over time) ──
-  'theHindu':     'the_hindu.png',
-  'the_hindu':    'the_hindu.png',
-  'the_hindu.png':'the_hindu.png',
-  'hindu':        'the_hindu.png',
-  'HINDU':        'the_hindu.png',
-  'Hindu':        'the_hindu.png',
-  // Your explicit separate hindu.webp — if you typed it, return the webp
-  'hindu.webp':   'hindu.webp',
+  'theHindu':               'the_hindu.webp',
+  'the_hindu':              'the_hindu.webp',
+  'the_hindu.png':          'the_hindu.webp',
+  'the_hindu.webp':         'the_hindu.webp',
+  'hindu':                  'the_hindu.webp',
+  'HINDU':                  'the_hindu.webp',
+  'Hindu':                  'the_hindu.webp',
+  'hindu.webp':             'hindu.webp',
 
   // ── Times group ──
-  'timesOfIndia': 'times_of_india.png',
-  'times_of_india':'times_of_india.png',
-  'times_of_india.png':'times_of_india.png',
-  'times':        'times_of_india.png',
-  'toi':          'times_of_india.png',
+  'timesOfIndia':           'times_of_india.webp',
+  'times_of_india':         'times_of_india.webp',
+  'times_of_india.png':     'times_of_india.webp',
+  'times_of_india.webp':    'times_of_india.webp',
+  'times':                  'times_of_india.webp',
+  'toi':                    'times_of_india.webp',
 };
 
 export function resolvePaperImage(image: string | null | undefined): any {
@@ -87,13 +167,15 @@ export function resolvePaperImage(image: string | null | undefined): any {
   if (!image || image.trim().length === 0) return null;
 
   // 1) URLs / paths: admin-uploaded via Firebase Storage, gallery file://,
-  //    Expo ImagePicker assets-library/content://, or raw absolute paths
-  //    (Android sometimes returns /data/...  without any scheme).
+  //    Expo ImagePicker assets-library/content://, inline base64 data:,
+  //    or raw absolute paths (Android sometimes returns /data/...  without
+  //    any scheme).
   if (typeof image === 'string' &&
-      (/^(https?:|file:|content:|assets-library:)/i.test(image) ||
+      (/^(https?:|file:|content:|assets-library:|data:)/i.test(image) ||
        image.startsWith('/') ||
        image.startsWith('content://') ||
-       image.startsWith('file://'))) {
+       image.startsWith('file://') ||
+       image.startsWith('data:'))) {
     return { uri: image };
   }
 

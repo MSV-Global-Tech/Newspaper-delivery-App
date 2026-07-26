@@ -39,7 +39,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { IMAGES, resolvePaperImage } from '../../assets/images';
 import { store } from '../../utils/store';
-import { uploadNewspaperLogo } from '../../database';
+import { uploadNewspaperLogo, deleteImage } from '../../database';
 
 export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState<'overview' | 'deliveries' | 'papers' | 'agents' | 'access'>('overview');
@@ -103,15 +103,30 @@ export default function AdminScreen() {
   };
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setNewPaper({ ...newPaper, imageUrl: result.assets[0].uri });
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          'Photo Access Required',
+          'We need permission to access your photo library so you can choose a newspaper logo. Please enable it in Settings.',
+          [{ text: 'OK', style: 'default' }],
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setNewPaper({ ...newPaper, imageUrl: result.assets[0].uri });
+      }
+    } catch (e: any) {
+      console.warn('[Admin] pickImage failed:', e);
+      Alert.alert('Could Not Open Gallery', String(e?.message || e) || 'Please try again.', [
+        { text: 'OK', style: 'default' },
+      ]);
     }
   };
 
@@ -128,6 +143,9 @@ export default function AdminScreen() {
       const imageSrc = newPaper.imageUrl
         ? await uploadNewspaperLogo(newPaper.imageUrl, newPaper.name)
         : '';
+      if (!imageSrc) {
+        throw new Error('Image upload returned an empty URL — check Firebase Storage rules or your internet connection.');
+      }
       store.addPaper({
         name: newPaper.name,
         language: newPaper.language,
@@ -138,8 +156,17 @@ export default function AdminScreen() {
       });
       setNewPaper({ name: '', language: '', category: 'Paper', priceDay: '', priceMonth: '', imageUrl: '' });
       setIsAddingPaper(false);
-    } catch (e) {
-      console.warn('[Admin] Upload failed:', e);
+      Alert.alert('Published ✅', `"${newPaper.name}" has been added and is visible to all customers.`, [
+        { text: 'Great', style: 'default' },
+      ]);
+    } catch (e: any) {
+      console.warn('[Admin] Add paper / upload failed:', e);
+      const msg = e?.code
+        ? `${e.code}: ${e.message || 'Upload failed'}`
+        : String(e?.message || e) || 'Something went wrong while uploading the image.';
+      Alert.alert('Could Not Save Publication', msg, [
+        { text: 'Try Again', style: 'default' },
+      ]);
     } finally {
       setIsUploading(false);
     }
@@ -161,14 +188,30 @@ export default function AdminScreen() {
   };
 
   const pickEditImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && editingPaper) {
-      setEditingPaper({ ...editingPaper, imageUrl: result.assets[0].uri });
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          'Photo Access Required',
+          'We need permission to access your photo library so you can choose a newspaper logo. Please enable it in Settings.',
+          [{ text: 'OK', style: 'default' }],
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0 && editingPaper) {
+        setEditingPaper({ ...editingPaper, imageUrl: result.assets[0].uri });
+      }
+    } catch (e: any) {
+      console.warn('[Admin] pickEditImage failed:', e);
+      Alert.alert('Could Not Open Gallery', String(e?.message || e) || 'Please try again.', [
+        { text: 'OK', style: 'default' },
+      ]);
     }
   };
 
@@ -185,8 +228,20 @@ export default function AdminScreen() {
     setIsEditingUploading(true);
     try {
       let imageSrc = editingPaper.currentImageSrc;
+      const oldCloudUrl =
+        editingPaper.currentImageSrc && /^https?:\/\//i.test(editingPaper.currentImageSrc)
+          ? editingPaper.currentImageSrc
+          : null;
+
       if (editingPaper.imageUrl) {
-        imageSrc = await uploadNewspaperLogo(editingPaper.imageUrl, editingPaper.name);
+        const uploaded = await uploadNewspaperLogo(editingPaper.imageUrl, editingPaper.name);
+        if (!uploaded) {
+          throw new Error('Image upload returned an empty URL — check Firebase Storage rules or your internet connection.');
+        }
+        imageSrc = uploaded;
+        if (oldCloudUrl) {
+          deleteImage(oldCloudUrl).catch(() => {});
+        }
       }
       const ratingNum = parseFloat(editingPaper.rating);
       store.updatePaper(editingPaper.id, {
@@ -200,8 +255,17 @@ export default function AdminScreen() {
       });
       setIsEditingPaper(false);
       setEditingPaper(null);
-    } catch (e) {
+      Alert.alert('Saved ✅', `"${editingPaper.name}" has been updated.`, [
+        { text: 'OK', style: 'default' },
+      ]);
+    } catch (e: any) {
       console.warn('[Admin] Edit paper save failed:', e);
+      const msg = e?.code
+        ? `${e.code}: ${e.message || 'Save failed'}`
+        : String(e?.message || e) || 'Something went wrong while saving.';
+      Alert.alert('Could Not Save Changes', msg, [
+        { text: 'Got It', style: 'default' },
+      ]);
     } finally {
       setIsEditingUploading(false);
     }
@@ -218,6 +282,9 @@ export default function AdminScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
+            if (editingPaper.currentImageSrc && /^https?:\/\//i.test(editingPaper.currentImageSrc)) {
+              deleteImage(editingPaper.currentImageSrc).catch(() => {});
+            }
             store.deletePaper(editingPaper.id);
             setIsEditingPaper(false);
             setEditingPaper(null);
@@ -388,7 +455,7 @@ export default function AdminScreen() {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <View style={styles.paperLogoBox}>
-                      <Image source={item.src} style={{ width: 44, height: 44 }} resizeMode="contain" />
+                      <Image source={item.src} style={{ width: '100%', height: '100%', borderRadius: 13 }} resizeMode="cover" />
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={styles.custName}>{item.name}</Text>
@@ -521,7 +588,7 @@ export default function AdminScreen() {
                               { backgroundColor: !paper.src ? '#FEF2F2' : (cat === 'Paper' ? '#EFF6FF' : '#FAF5FF') }
                             ]}>
                               {paper.src ? (
-                                <Image source={paper.src} style={{ width: 44, height: 44 }} resizeMode="contain" />
+                                <Image source={paper.src} style={{ width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden' }} resizeMode="cover" />
                               ) : (
                                 <View style={{ alignItems: 'center', justifyContent: 'center', width: 44, height: 44 }}>
                                   <ImageIcon size={18} color="#EF4444" />
@@ -1002,7 +1069,7 @@ export default function AdminScreen() {
                   <View style={{ alignItems: 'center', marginBottom: 16 }}>
                     <Image
                       source={resolvePaperImage(editingPaper.currentImageSrc) || undefined}
-                      defaultSource={IMAGES['vijayavani.png'] as any}
+                      defaultSource={IMAGES['vijayavani.webp'] as any}
                       style={{ width: 80, height: 80, borderRadius: 12 }}
                       resizeMode="contain"
                     />
@@ -1200,12 +1267,14 @@ const styles = StyleSheet.create({
   paperLogoBox: {
     width: 56,
     height: 56,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+    padding: 0,
+    overflow: 'hidden',
   },
   custName: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
   custAddress: { fontSize: 12, color: '#64748B', flex: 1 },
@@ -1258,12 +1327,14 @@ const styles = StyleSheet.create({
   paperImageBox: {
     width: 56,
     height: 56,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 0,
+    overflow: 'hidden',
   },
   categoryHeader: {
     flexDirection: 'row',

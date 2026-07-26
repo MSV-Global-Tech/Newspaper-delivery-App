@@ -73,7 +73,19 @@ export default function NewspaperDetailScreen() {
           { backgroundColor: paper.category === 'Paper' ? '#F8FAFC' : '#FAF5FF' }
         ]}>
           {paper.src ? (
-            <Image source={paper.src} style={{ width: 120, height: 120 }} resizeMode="contain" />
+            <View style={{
+              width: 170, height: 170, borderRadius: 22,
+              backgroundColor: '#FFFFFF',
+              alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden',
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.06, shadowRadius: 10,
+              elevation: 2,
+            }}>
+              <Image source={paper.src} style={{ width: '100%', height: '100%', borderRadius: 21 }} resizeMode="cover" />
+            </View>
           ) : (
             <PaperLogo name={paper.name} id={newspaper_id as string} size="lg" />
           )}
@@ -191,10 +203,9 @@ const styles = StyleSheet.create({
 
   logoBanner: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 28,
     backgroundColor: '#F8FAFC',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomWidth: 0,
   },
   paperName: {
     fontSize: 22,

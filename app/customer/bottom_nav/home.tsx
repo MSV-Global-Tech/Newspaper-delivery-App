@@ -22,6 +22,7 @@ import {
   SkipForward,
   CreditCard,
   Phone,
+  BookOpen,
 } from 'lucide-react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -212,7 +213,7 @@ export default function HomeScreen() {
               <View style={styles.todayLogoCard}>
                 <Image
                   source={currentDelivery.src}
-                  style={{ width: 86, height: 86 }}
+                  style={{ width: 86, height: 86, borderRadius: 8 }}
                   resizeMode="contain"
                 />
               </View>
@@ -273,8 +274,8 @@ export default function HomeScreen() {
                         Stay informed daily with the best {paper.language} newspaper, delivered right to your door.
                       </Text>
                     </View>
-                    <View style={[styles.todayLogoCard, { padding: 12, borderRadius: 16 }]}>
-                      <Image source={paper.src} style={{ width: 72, height: 72 }} resizeMode="contain" />
+                    <View style={[styles.todayLogoCard, { padding: 10, borderRadius: 16 }]}>
+                      <Image source={paper.src} style={{ width: 72, height: 72, borderRadius: 8 }} resizeMode="contain" />
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -330,7 +331,7 @@ export default function HomeScreen() {
                     activeOpacity={0.8}
                   >
                     <View style={styles.logoWrapper}>
-                      <Image source={delivery.src} style={{ width: 64, height: 64 }} resizeMode="contain" />
+                      <Image source={delivery.src} style={{ width: '100%', height: '100%', borderRadius: 13 }} resizeMode="cover" />
                     </View>
                     <View style={{ flex: 1, marginLeft: 14 }}>
                       <Text style={styles.activeName}>{delivery.paperName}</Text>
@@ -400,40 +401,85 @@ export default function HomeScreen() {
 
           <View style={styles.langGrid}>
             {[
-              { key: 'Kannada',   label: 'Kannada',   tint: '#F59E0B' },
-              { key: 'Hindi',     label: 'Hindi',     tint: '#EF4444' },
-              { key: 'Tamil',     label: 'Tamil',     tint: '#3B82F6' },
-              { key: 'Malayalam', label: 'Malayalam', tint: '#22C55E' },
-              { key: 'English',   label: 'English',   tint: '#6366F1' },
-              { key: 'All',       label: 'All',       tint: '#8B5CF6' },
+              {
+                key: 'Kannada',
+                native: 'ಕನ್ನಡ',
+                english: 'Kannada',
+                tintDark: '#B45309',
+                tintSoft: '#FFF7ED',
+                borderTint: '#FED7AA',
+              },
+              {
+                key: 'Hindi',
+                native: 'हिन्दी',
+                english: 'Hindi',
+                tintDark: '#B91C1C',
+                tintSoft: '#FEF2F2',
+                borderTint: '#FECACA',
+              },
+              {
+                key: 'Tamil',
+                native: 'தமிழ்',
+                english: 'Tamil',
+                tintDark: '#1D4ED8',
+                tintSoft: '#EFF6FF',
+                borderTint: '#BFDBFE',
+              },
+              {
+                key: 'Malayalam',
+                native: 'മലയാളം',
+                english: 'Malayalam',
+                tintDark: '#15803D',
+                tintSoft: '#F0FDF4',
+                borderTint: '#BBF7D0',
+              },
+              {
+                key: 'English',
+                native: 'English',
+                english: 'English',
+                tintDark: '#4338CA',
+                tintSoft: '#EEF2FF',
+                borderTint: '#C7D2FE',
+              },
+              {
+                key: 'All',
+                native: 'All',
+                english: 'Languages',
+                tintDark: '#6D28D9',
+                tintSoft: '#F5F3FF',
+                borderTint: '#DDD6FE',
+              },
             ].map((lang) => (
               <TouchableOpacity
                 key={lang.key}
-                activeOpacity={0.85}
-                style={[styles.langTile, { width: LANG_TILE_W }]}
+                activeOpacity={0.75}
+                style={[
+                  styles.langTile,
+                  {
+                    width: LANG_TILE_W,
+                    backgroundColor: lang.tintSoft,
+                    borderColor: lang.borderTint,
+                  },
+                ]}
                 onPress={() => router.push({
                   pathname: '/customer/newspapers' as any,
                   params: { lang: lang.key },
                 } as any)}
               >
-                {/* 2px tinted top accent stripe — the one detail that makes plain boxes look branded */}
-                <View style={[styles.langTileStripe, { backgroundColor: lang.tint }]} />
-                {/* Subtle tinted inner glow / surface wash */}
-                <View
-                  style={[
-                    styles.langTileGlow,
-                    { backgroundColor: `${lang.tint}10` },
-                  ]}
-                  pointerEvents="none"
-                />
                 <Text
                   style={[
-                    styles.langTileText,
-                    { color: '#0F172A' },
+                    styles.langNativeText,
+                    { color: lang.tintDark },
                   ]}
                   numberOfLines={1}
                 >
-                  {lang.label}
+                  {lang.native}
+                </Text>
+                <Text
+                  style={styles.langEnglishText}
+                  numberOfLines={1}
+                >
+                  {lang.english}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -456,7 +502,7 @@ export default function HomeScreen() {
             >
               {/* Logo area — styled as portrait vertical newspaper cover */}
               <View style={styles.paperLogoArea}>
-                <Image source={paper.src} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                <Image source={paper.src} style={{ width: '100%', height: '100%', borderRadius: 13 }} resizeMode="cover" />
               </View>
 
               <View style={{ flex: 1, marginLeft: 16, height: 110, justifyContent: 'space-between' }}>
@@ -550,7 +596,9 @@ const styles = StyleSheet.create({
   },
   confirmedText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
   todayLogoCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 8,
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1, shadowRadius: 6, elevation: 2,
   },
@@ -584,10 +632,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03, shadowRadius: 6, elevation: 2,
   },
   logoWrapper: {
-    width: 76, height: 76,
-    backgroundColor: '#F8FAFC', borderRadius: 12, padding: 6,
-    borderWidth: 1, borderColor: '#F1F5F9',
+    width: 80, height: 80,
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 0,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     justifyContent: 'center', alignItems: 'center',
+    overflow: 'hidden',
   },
   activeName: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
   activeMeta: { fontSize: 12, color: '#64748B', marginTop: 2 },
@@ -606,14 +656,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03, shadowRadius: 6, elevation: 2,
   },
   paperLogoArea: {
-    width: 108,
-    height: 118,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    width: 120,
+    height: 120,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    padding: 6,
+    padding: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -652,7 +702,7 @@ const styles = StyleSheet.create({
   agentChipName: { fontSize: 12, fontWeight: '700', color: '#0F172A', textAlign: 'center' },
   agentChipArea: { fontSize: 10, color: '#94A3B8', fontWeight: '500', textAlign: 'center' },
 
-  /* Language filter tiles — minimal, clean, professional */
+  /* Language filter tiles — minimal tinted boxes */
   langGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -661,25 +711,26 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   langTile: {
-    minHeight: 60,
-    backgroundColor: '#FFFFFF',
+    minHeight: 74,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
+    elevation: 0,
+    shadowOpacity: 0,
   },
-  langTileText: {
-    color: '#0F172A',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: -0.1,
-    textAlign: 'center',
+  langNativeText: {
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: -0.2,
+    includeFontPadding: false,
+  },
+  langEnglishText: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    letterSpacing: 0.2,
   },
 });

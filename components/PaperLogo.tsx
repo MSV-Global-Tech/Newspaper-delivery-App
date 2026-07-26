@@ -43,10 +43,10 @@ export default function PaperLogo({
     typeof size === 'number'
       ? { width: size, height: size }
       : size === 'lg'
-      ? { width: 200, height: 70 }
+      ? { width: 160, height: 160 }
       : size === 'sm'
-      ? { width: 80, height: 36 }
-      : { width: 120, height: 48 };
+      ? { width: 60, height: 60 }
+      : { width: 100, height: 100 };
 
   const resolved = resolvedSrc ? resolvePaperImage(resolvedSrc) : null;
   // Legacy IMAGES map fallback for the four well-known catalog names ONLY
@@ -74,8 +74,8 @@ export default function PaperLogo({
           height: dims.height,
           borderRadius: rounded,
           backgroundColor: hasImage ? (backgroundColor ?? '#FFFFFF') : '#FEF2F2',
-          borderWidth: hasImage ? 0 : 2,
-          borderColor: hasImage ? 'transparent' : '#EF4444',
+          borderWidth: hasImage ? 1 : 2,
+          borderColor: hasImage ? '#E2E8F0' : '#EF4444',
           borderStyle: hasImage ? 'solid' : 'dashed',
         },
       ]}
@@ -83,8 +83,8 @@ export default function PaperLogo({
       {hasImage ? (
         <Image
           source={finalSource}
-          style={[styles.img, dims, { borderRadius: rounded }]}
-          resizeMode="contain"
+          style={[styles.img, { width: '100%', height: '100%', borderRadius: rounded }]}
+          resizeMode="cover"
         />
       ) : (
         <View style={styles.emptyState}>
@@ -101,13 +101,14 @@ export default function PaperLogo({
 const styles = StyleSheet.create({
   wrapper: {
     shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 1,
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 0,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    borderWidth: 0,
   },
   img: {},
   emptyState: {
