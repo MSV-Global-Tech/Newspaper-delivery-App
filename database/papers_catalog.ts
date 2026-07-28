@@ -53,7 +53,7 @@ export const PAPERS_CATALOG: CatalogEntry[] = [
   { name: 'Kannada Prabha',      language: 'Kannada',  category: 'Paper', priceDay: 7, priceMonth: 200, rating: 4.5, image: 'kannadaprabha.webp'     },
   { name: 'Prajavani',           language: 'Kannada',  category: 'Paper', priceDay: 7, priceMonth: 210, rating: 4.5, image: 'prajavani.webp'        },
   { name: 'Vijay Karnataka',     language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'vijaykarnataka.webp'   },
-  { name: 'Prathinidhi',         language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'vijayavani.webp'       },
+  { name: 'Prathinidhi',         language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'prathinidhi.webp'      },
   { name: 'Kolaravani',          language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'kolaravani.webp'       },
   { name: 'Prajapragathi',       language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'prajapragathi.webp'    },
   { name: 'Vishwavani',          language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'vishwavani.webp'       },
@@ -64,49 +64,49 @@ export const PAPERS_CATALOG: CatalogEntry[] = [
   { name: 'Samyuktha Karnataka', language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 170, rating: 4.3, image: 'vijayavani.webp'       },
 
   // ─── ENGLISH PAPERS ───
-  { name: 'The Hindu',           language: 'English',  category: 'Paper', priceDay: 10, priceMonth: 300, rating: 4.7, image: 'hindu.webp'      },
-  { name: 'Times of India',      language: 'English',  category: 'Paper', priceDay: 8,  priceMonth: 240, rating: 4.3, image: 'times_of_india.webp' },
-  { name: 'Economic Times',      language: 'English',  category: 'Paper', priceDay: 9,  priceMonth: 270, rating: 4.5, image: 'the_hindu.webp'      },
-  { name: 'Deccan Herald',       language: 'English',  category: 'Paper', priceDay: 8,  priceMonth: 240, rating: 4.4, image: 'times_of_india.webp' },
-  { name: 'Bangalore Mirror',    language: 'English',  category: 'Paper', priceDay: 5,  priceMonth: 150, rating: 4.2, image: 'times_of_india.webp' },
-  { name: 'Indian Express',      language: 'English',  category: 'Paper', priceDay: 8,  priceMonth: 240, rating: 4.4, image: 'the_hindu.webp'      },
-  { name: 'Wealth',              language: 'English',  category: 'Paper', priceDay: 10, priceMonth: 300, rating: 4.7, image: 'the_hindu.webp'      },
+  { name: 'The Hindu',           language: 'English',  category: 'Paper', priceDay: 10, priceMonth: 300, rating: 4.7, image: 'hindu.webp'          },
+  { name: 'Times of India',      language: 'English',  category: 'Paper', priceDay: 8,  priceMonth: 240, rating: 4.3, image: 'timesofindia.webp'    },
+  { name: 'Economic Times',      language: 'English',  category: 'Paper', priceDay: 9,  priceMonth: 270, rating: 4.5, image: 'economictimes.webp'  },
+  { name: 'Deccan Herald',       language: 'English',  category: 'Paper', priceDay: 8,  priceMonth: 240, rating: 4.4, image: 'deccanherald.webp'   },
+  { name: 'Bangalore Mirror',    language: 'English',  category: 'Paper', priceDay: 5,  priceMonth: 150, rating: 4.2, image: 'bangloremirror.webp' },
+  { name: 'Indian Express',      language: 'English',  category: 'Paper', priceDay: 8,  priceMonth: 240, rating: 4.4, image: 'indianexpress.webp'  },
+  { name: 'Wealth',              language: 'English',  category: 'Paper', priceDay: 10, priceMonth: 300, rating: 4.7, image: 'hindu.webp'          },
 
   // ─── TELUGU PAPERS ───
-  { name: 'Sakshi',              language: 'Telugu',   category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'vijayavani.webp'     },
-  { name: 'Andra Jyothi',        language: 'Telugu',   category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'vijayavani.webp'     },
-  { name: 'Eenadu',              language: 'Telugu',   category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.5, image: 'prajavani.webp'      },
+  { name: 'Sakshi',              language: 'Telugu',   category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'sakshi.webp'        },
+  { name: 'Andra Jyothi',        language: 'Telugu',   category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'andrajyothy.webp'    },
+  { name: 'Eenadu',              language: 'Telugu',   category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.5, image: 'eenadu.webp'        },
 
   // ─── TAMIL PAPERS ───
-  { name: 'Dinakaran',           language: 'Tamil',    category: 'Paper', priceDay: 6, priceMonth: 170, rating: 4.4, image: 'vijayavani.webp'     },
-  { name: 'Dinamalar',           language: 'Tamil',    category: 'Paper', priceDay: 6, priceMonth: 160, rating: 4.4, image: 'vijayavani.webp'     },
-  { name: 'Thanthi (Daily)',     language: 'Tamil',    category: 'Paper', priceDay: 6, priceMonth: 170, rating: 4.5, image: 'prajavani.webp'      },
+  { name: 'Dinakaran',           language: 'Tamil',    category: 'Paper', priceDay: 6, priceMonth: 170, rating: 4.4, image: 'dinakar.webp'       },
+  { name: 'Dinamalar',           language: 'Tamil',    category: 'Paper', priceDay: 6, priceMonth: 160, rating: 4.4, image: 'dinamalar.webp'     },
+  { name: 'Thanthi (Daily)',     language: 'Tamil',    category: 'Paper', priceDay: 6, priceMonth: 170, rating: 4.5, image: 'thanti.webp'        },
 
   // ─── MALAYALAM PAPERS ───
   { name: 'Malayala Manorama (Malabar)',  language: 'Malayalam', category: 'Paper', priceDay: 7, priceMonth: 200, rating: 4.5, image: 'prajavani.webp'  },
   { name: 'Malayala Manorama (Kottayam)', language: 'Malayalam', category: 'Paper', priceDay: 7, priceMonth: 200, rating: 4.5, image: 'vijayavani.webp' },
 
   // ─── HINDI PAPERS ───
-  { name: 'Rajasthan Patrika',   language: 'Hindi',    category: 'Paper', priceDay: 5, priceMonth: 150, rating: 4.2, image: 'prajavani.webp'      },
+  { name: 'Rajasthan Patrika',   language: 'Hindi',    category: 'Paper', priceDay: 5, priceMonth: 150, rating: 4.2, image: 'rajasthanpatrika.webp' },
 
   // ─── KANNADA MAGAZINES ───
-  { name: 'Kasturi',             language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 40, rating: 4.5, image: 'vijayavani.webp' },
-  { name: 'Karmaveera',          language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 50, rating: 4.6, image: 'vijayavani.webp' },
-  { name: 'Taranga',             language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.5, image: 'prajavani.webp'  },
-  { name: 'Sudha',               language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 50, rating: 4.4, image: 'prajavani.webp'  },
-  { name: 'Mayura',              language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.5, image: 'vijayavani.webp' },
-  { name: 'Gruhasobha',          language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 70, rating: 4.3, image: 'vijayavani.webp' },
-  { name: 'Priyanka',            language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 45, rating: 4.3, image: 'prajavani.webp'  },
+  { name: 'Kasturi',             language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 40, rating: 4.5, image: 'kasturi.webp'     },
+  { name: 'Karmaveera',          language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 50, rating: 4.6, image: 'karmaveera.webp' },
+  { name: 'Taranga',             language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.5, image: 'taranga.webp'     },
+  { name: 'Sudha',               language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 50, rating: 4.4, image: 'sudha.webp'        },
+  { name: 'Mayura',              language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.5, image: 'mayura.png'       },
+  { name: 'Gruhasobha',          language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 70, rating: 4.3, image: 'gruhashobha.webp' },
+  { name: 'Priyanka',            language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 45, rating: 4.3, image: 'priyanka.webp'     },
 
   // ─── ENGLISH MAGAZINES ───
-  { name: 'Frontline',           language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 80,  rating: 4.6, image: 'the_hindu.webp'      },
-  { name: 'Sportstar',           language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 60,  rating: 4.5, image: 'times_of_india.webp' },
-  { name: 'India Today',         language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 90,  rating: 4.6, image: 'the_hindu.webp'      },
-  { name: "Reader's Digest",     language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 100, rating: 4.5, image: 'times_of_india.webp' },
-  { name: 'The Week',            language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 80,  rating: 4.4, image: 'the_hindu.webp'      },
+  { name: 'Frontline',           language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 80,  rating: 4.6, image: 'frontline.webp'      },
+  { name: 'Sportstar',           language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 60,  rating: 4.5, image: 'sportsstar.webp'     },
+  { name: 'India Today',         language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 90,  rating: 4.6, image: 'indiatoday.webp'     },
+  { name: "Reader's Digest",     language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 100, rating: 4.5, image: 'readersdigest.webp'  },
+  { name: 'The Week',            language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 80,  rating: 4.4, image: 'theweak.webp'       },
 
   // ─── TAMIL MAGAZINES ───
-  { name: 'Thuglak',             language: 'Tamil',    category: 'Magazine', priceDay: 0, priceMonth: 40, rating: 4.6, image: 'prajavani.webp'  },
+  { name: 'Thuglak',             language: 'Tamil',    category: 'Magazine', priceDay: 0, priceMonth: 40, rating: 4.6, image: 'thuglak.png'     },
 
   // ─── MALAYALAM MAGAZINES ───
   { name: 'Malayalam Book',      language: 'Malayalam', category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.3, image: 'vijayavani.webp' },

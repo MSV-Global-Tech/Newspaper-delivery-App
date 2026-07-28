@@ -35,7 +35,15 @@ export default function NewspapersScreen() {
     return unsubscribe;
   }, []);
 
-  const LANGUAGES = ['All', ...Array.from(new Set(papers.map(p => p.language)))];
+  const papersForLanguage =
+    activeCategory === 'All' ? papers : papers.filter((p) => p.category === activeCategory);
+  const LANGUAGES = ['All', ...Array.from(new Set(papersForLanguage.map((p) => p.language)))];
+
+  useEffect(() => {
+    if (activeLanguage !== 'All' && !LANGUAGES.includes(activeLanguage)) {
+      setActiveLanguage('All');
+    }
+  }, [activeCategory, papers]);
 
   const filtered = papers.filter(
     (n) =>

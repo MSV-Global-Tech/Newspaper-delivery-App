@@ -49,16 +49,13 @@ export default function PaperLogo({
       : { width: 100, height: 100 };
 
   const resolved = resolvedSrc ? resolvePaperImage(resolvedSrc) : null;
-  // Legacy IMAGES map fallback for the four well-known catalog names ONLY
-  // (kept for backwards compatibility with callers that only pass `name`).
-  // We still treat `resolved` as authoritative.
   let legacySrc: any = null;
   if (!resolved && name) {
     const lc = name.toLowerCase();
-    if (lc.includes('vijayavani')) legacySrc = IMAGES.vijayavani;
-    else if (lc.includes('prajavani')) legacySrc = IMAGES.prajavani;
-    else if (lc.includes('hindu')) legacySrc = IMAGES.theHindu;
-    else if (lc.includes('times')) legacySrc = IMAGES.timesOfIndia;
+    if (lc.includes('vijayavani')) legacySrc = IMAGES['vijayavani.webp'];
+    else if (lc.includes('prajavani')) legacySrc = IMAGES['prajavani.webp'];
+    else if (lc.includes('hindu')) legacySrc = IMAGES['hindu.webp'];
+    else if (lc.includes('times')) legacySrc = IMAGES['timesofindia.webp'];
   }
 
   const finalSource = resolved ?? legacySrc;

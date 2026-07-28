@@ -870,7 +870,10 @@ export default function AdminScreen() {
               onChangeText={text => setNewPaper({ ...newPaper, language: text })}
             />
             <View style={styles.languageChipsWrap}>
-              {['Kannada', 'English', 'Telugu', 'Tamil', 'Malayalam', 'Hindi'].map((lang) => (
+              {(newPaper.category === 'Magazine'
+                ? ['Kannada', 'English', 'Tamil', 'Malayalam']
+                : ['Kannada', 'English', 'Telugu', 'Tamil', 'Malayalam', 'Hindi']
+              ).map((lang) => (
                 <TouchableOpacity
                   key={lang}
                   style={styles.langQuickChip}
@@ -1008,7 +1011,10 @@ export default function AdminScreen() {
                   onChangeText={text => setEditingPaper({ ...editingPaper, language: text })}
                 />
                 <View style={styles.languageChipsWrap}>
-                  {['Kannada', 'English', 'Telugu', 'Tamil', 'Malayalam', 'Hindi'].map((lang) => (
+                  {(editingPaper.category === 'Magazine'
+                    ? ['Kannada', 'English', 'Tamil', 'Malayalam']
+                    : ['Kannada', 'English', 'Telugu', 'Tamil', 'Malayalam', 'Hindi']
+                  ).map((lang) => (
                     <TouchableOpacity
                       key={lang}
                       style={styles.langQuickChip}

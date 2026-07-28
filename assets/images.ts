@@ -45,11 +45,43 @@ export const IMAGES: Record<string, any> = {
   'vijaykarnataka.webp':   require('./vijaykarnataka.webp'),
   'vishwavaaradhi.webp':   require('./vishwavaaradhi.webp'),
   'vishwavani.webp':       require('./vishwavani.webp'),
+  'prathinidhi.webp':      require('./prathinidhi.webp'),
 
-  // ── English / other language newspaper logos ──
-  'the_hindu.webp':      require('./hindu.webp'),
-  'times_of_india.webp': require('./hindu.webp'),
-  'hindu.webp':          require('./hindu.webp'),
+  // ── English newspaper logos ──
+  'hindu.webp':           require('./hindu.webp'),
+  'timesofindia.webp':    require('./timesofindia.webp'),
+  'economictimes.webp':   require('./economictimes.webp'),
+  'deccanherald.webp':    require('./deccanherald.webp'),
+  'bangloremirror.webp':  require('./bangloremirror.webp'),
+  'indianexpress.webp':   require('./indianexpress.webp'),
+
+  // ── Telugu newspaper logos ──
+  'sakshi.webp':         require('./sakshi.webp'),
+  'andrajyothy.webp':    require('./andrajyothy.webp'),
+  'eenadu.webp':         require('./eenadu.webp'),
+
+  // ── Tamil newspaper logos ──
+  'dinakar.webp':        require('./dinakar.webp'),
+  'dinamalar.webp':      require('./dinamalar.webp'),
+  'thanti.webp':         require('./thanti.webp'),
+
+  // ── Hindi newspaper logos ──
+  'rajasthanpatrika.webp': require('./rajasthanpatrika.webp'),
+
+  // ── Kannada magazine logos ──
+  'karmaveera.webp':      require('./magzines/karmaveera.webp'),
+  'taranga.webp':         require('./magzines/taranga.webp'),
+  'sudha.webp':           require('./magzines/sudha.webp'),
+  'kasturi.webp':        require('./magzines/kasturi.webp'),
+  'mayura.png':         require('./magzines/mayura.png'),
+  'priyanka.webp':       require('./magzines/priyanka.webp'),
+  'gruhashobha.webp':    require('./magzines/gruhashobha.webp'),
+  'frontline.webp':      require('./magzines/frontline.webp'),
+  'indiatoday.webp':     require('./magzines/indiatoday.webp'),
+  'sportsstar.webp':     require('./magzines/sportsstar.webp'),
+  'readersdigest.webp':  require('./magzines/readersdigest.webp'),
+  'theweak.webp':        require('./magzines/theweak.webp'),
+  'thuglak.png':         require('./magzines/thuglak.png'),
 };
 
 /**
@@ -144,22 +176,196 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'Vishwavani':             'vishwavani.webp',
 
   // ── The Hindu group (various aliases used over time) ──
-  'theHindu':               'the_hindu.webp',
-  'the_hindu':              'the_hindu.webp',
-  'the_hindu.png':          'the_hindu.webp',
-  'the_hindu.webp':         'the_hindu.webp',
-  'hindu':                  'the_hindu.webp',
-  'HINDU':                  'the_hindu.webp',
-  'Hindu':                  'the_hindu.webp',
+  'theHindu':               'hindu.webp',
+  'the_hindu':              'hindu.webp',
+  'the_hindu.png':          'hindu.webp',
+  'the_hindu.webp':         'hindu.webp',
+  'hindu':                  'hindu.webp',
+  'HINDU':                  'hindu.webp',
+  'Hindu':                  'hindu.webp',
   'hindu.webp':             'hindu.webp',
 
   // ── Times group ──
-  'timesOfIndia':           'times_of_india.webp',
-  'times_of_india':         'times_of_india.webp',
-  'times_of_india.png':     'times_of_india.webp',
-  'times_of_india.webp':    'times_of_india.webp',
-  'times':                  'times_of_india.webp',
-  'toi':                    'times_of_india.webp',
+  'timesOfIndia':           'timesofindia.webp',
+  'times_of_india':         'timesofindia.webp',
+  'times_of_india.png':     'timesofindia.webp',
+  'times_of_india.webp':    'timesofindia.webp',
+  'timesofindia':           'timesofindia.webp',
+  'timesofindia.webp':      'timesofindia.webp',
+  'Times of India':         'timesofindia.webp',
+  'times':                  'timesofindia.webp',
+  'toi':                    'timesofindia.webp',
+
+  // ── Economic Times ──
+  'economictimes':          'economictimes.webp',
+  'economictimes.webp':     'economictimes.webp',
+  'economictimes.png':      'economictimes.webp',
+  'Economic Times':         'economictimes.webp',
+  'economic_times':         'economictimes.webp',
+  'et':                     'economictimes.webp',
+
+  // ── Deccan Herald ──
+  'deccanherald':           'deccanherald.webp',
+  'deccanherald.webp':      'deccanherald.webp',
+  'deccanherald.png':       'deccanherald.webp',
+  'Deccan Herald':          'deccanherald.webp',
+  'deccan_herald':          'deccanherald.webp',
+
+  // ── Bangalore Mirror ──
+  'bangloremirror':         'bangloremirror.webp',
+  'bangloremirror.webp':    'bangloremirror.webp',
+  'bangloremirror.png':     'bangloremirror.webp',
+  'Bangalore Mirror':       'bangloremirror.webp',
+  'bangalore_mirror':       'bangloremirror.webp',
+
+  // ── Indian Express ──
+  'indianexpress':          'indianexpress.webp',
+  'indianexpress.webp':     'indianexpress.webp',
+  'indianexpress.png':      'indianexpress.webp',
+  'Indian Express':         'indianexpress.webp',
+  'indian_express':         'indianexpress.webp',
+  'The Indian Express':     'indianexpress.webp',
+
+  // ── Sakshi (Telugu) ──
+  'sakshi':                 'sakshi.webp',
+  'sakshi.webp':            'sakshi.webp',
+  'sakshi.png':             'sakshi.webp',
+  'Sakshi':                 'sakshi.webp',
+
+  // ── Andra Jyothi (Telugu) ──
+  'andrajyothy':            'andrajyothy.webp',
+  'andrajyothy.webp':       'andrajyothy.webp',
+  'andrajyothy.png':        'andrajyothy.webp',
+  'Andra Jyothi':           'andrajyothy.webp',
+  'andra_jyothi':           'andrajyothy.webp',
+  'andhra jyothy':          'andrajyothy.webp',
+  'Andhra Jyothi':          'andrajyothy.webp',
+
+  // ── Eenadu (Telugu) ──
+  'eenadu':                 'eenadu.webp',
+  'eenadu.webp':            'eenadu.webp',
+  'eenadu.png':             'eenadu.webp',
+  'Eenadu':                 'eenadu.webp',
+
+  // ── Dinakaran (Tamil) ──
+  'dinakar':                'dinakar.webp',
+  'dinakar.webp':           'dinakar.webp',
+  'dinakar.png':            'dinakar.webp',
+  'Dinakaran':              'dinakar.webp',
+  'dinakaran':              'dinakar.webp',
+  'dinakaran.webp':         'dinakar.webp',
+
+  // ── Dinamalar (Tamil) ──
+  'dinamalar':              'dinamalar.webp',
+  'dinamalar.webp':         'dinamalar.webp',
+  'dinamalar.png':          'dinamalar.webp',
+  'Dinamalar':              'dinamalar.webp',
+
+  // ── Thanthi (Tamil) ──
+  'thanti':                 'thanti.webp',
+  'thanti.webp':            'thanti.webp',
+  'thanti.png':             'thanti.webp',
+  'Thanthi':                'thanti.webp',
+  'thanthi':                'thanti.webp',
+  'thanthi.webp':           'thanti.webp',
+  'Thanthi (Daily)':        'thanti.webp',
+  'daily thanthi':          'thanti.webp',
+  'Daily Thanthi':          'thanti.webp',
+
+  // ── Rajasthan Patrika (Hindi) ──
+  'rajasthanpatrika':       'rajasthanpatrika.webp',
+  'rajasthanpatrika.webp':  'rajasthanpatrika.webp',
+  'rajasthanpatrika.png':   'rajasthanpatrika.webp',
+  'Rajasthan Patrika':      'rajasthanpatrika.webp',
+  'rajasthan_patrika':      'rajasthanpatrika.webp',
+
+  // ── Karmaveera (Kannada magazine) ──
+  'karmaveera':             'karmaveera.webp',
+  'karmaveera.webp':        'karmaveera.webp',
+  'karmaveera.png':         'karmaveera.webp',
+  'Karmaveera':             'karmaveera.webp',
+
+  // ── Taranga (Kannada magazine) ──
+  'taranga':                'taranga.webp',
+  'taranga.webp':           'taranga.webp',
+  'taranga.png':            'taranga.webp',
+  'Taranga':                'taranga.webp',
+
+  // ── Sudha (Kannada magazine) ──
+  'sudha':                  'sudha.webp',
+  'sudha.webp':             'sudha.webp',
+  'sudha.png':              'sudha.webp',
+  'Sudha':                  'sudha.webp',
+
+  // ── Kasturi (Kannada magazine) ──
+  'kasturi':                'kasturi.webp',
+  'kasturi.webp':           'kasturi.webp',
+  'kasturi.png':            'kasturi.webp',
+  'Kasturi':                'kasturi.webp',
+
+  // ── Mayura (Kannada magazine) ──
+  'mayura':                 'mayura.png',
+  'mayura.png':             'mayura.png',
+  'mayura.webp':            'mayura.png',
+  'Mayura':                 'mayura.png',
+
+  // ── Priyanka (Kannada magazine) ──
+  'priyanka':               'priyanka.webp',
+  'priyanka.webp':          'priyanka.webp',
+  'priyanka.png':           'priyanka.webp',
+  'Priyanka':               'priyanka.webp',
+
+  // ── Gruhasobha (Kannada magazine) ──
+  'gruhashobha':            'gruhashobha.webp',
+  'gruhashobha.webp':       'gruhashobha.webp',
+  'gruhashobha.png':        'gruhashobha.webp',
+  'Gruhasobha':             'gruhashobha.webp',
+
+  // ── Frontline (English magazine) ──
+  'frontline':              'frontline.webp',
+  'frontline.webp':         'frontline.webp',
+  'frontline.png':          'frontline.webp',
+  'Frontline':              'frontline.webp',
+
+  // ── India Today (English magazine) ──
+  'indiatoday':             'indiatoday.webp',
+  'indiatoday.webp':        'indiatoday.webp',
+  'indiatoday.png':         'indiatoday.webp',
+  'India Today':            'indiatoday.webp',
+  'india_today':            'indiatoday.webp',
+
+  'sportsstar':             'sportsstar.webp',
+  'sportsstar.webp':        'sportsstar.webp',
+  'sportsstar.png':         'sportsstar.webp',
+  'Sportsstar':             'sportsstar.webp',
+  'sportstar':              'sportsstar.webp',
+  'sportstar.webp':         'sportsstar.webp',
+  'sportstar.png':          'sportsstar.webp',
+  'sports star':            'sportsstar.webp',
+  'sports star.webp':       'sportsstar.webp',
+  'sports star.png':        'sportsstar.webp',
+
+  'readersdigest':          'readersdigest.webp',
+  'readersdigest.webp':     'readersdigest.webp',
+  'readersdigest.png':      'readersdigest.webp',
+  'Readers Digest':         'readersdigest.webp',
+  'readers digest':         'readersdigest.webp',
+  'readers digest.webp':    'readersdigest.webp',
+  'readers digest.png':     'readersdigest.webp',
+
+  'the week':               'theweak.webp',
+  'theweek':                'theweak.webp',
+  'theweek.webp':           'theweak.webp',
+  'theweek.png':            'theweak.webp',
+  'the weak':               'theweak.webp',
+  'theweak':                'theweak.webp',
+  'theweak.webp':           'theweak.webp',
+  'theweak.png':            'theweak.webp',
+
+  'thuglak':                'thuglak.png',
+  'thuglak.webp':           'thuglak.png',
+  'thuglak.png':            'thuglak.png',
+  'Thuglak':                'thuglak.png',
 };
 
 export function resolvePaperImage(image: string | null | undefined): any {
