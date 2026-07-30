@@ -4,6 +4,8 @@ import { ArrowLeft, CheckCircle, Calendar, Check, X } from 'lucide-react-native'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { WebView } from 'react-native-webview';
+import { Modal } from 'react-native';
 import PaperLogo from '../../../components/PaperLogo';
 import { store } from '../../../utils/store';
 import { IMAGES } from '../../../assets/images';
@@ -52,6 +54,8 @@ export default function SubscribeScreen() {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showRazorpay, setShowRazorpay] = useState(false);
+  const [showFeeNote, setShowFeeNote] = useState(false);
 
   const onStartDateChange = (event: any, selectedDate?: Date) => {
     setShowStartPicker(false);
@@ -89,31 +93,93 @@ export default function SubscribeScreen() {
         router.push('/customer/login');
         return;
       }
-      // Add subscription to shared store
-      store.addSubscription({
-        paperName: paper.name,
-        plan: planLabel,
-        priceDay: paper.priceDay,
-        priceMonth: paper.priceMonth,
-        startDate: startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-        days: selectedDays,
-        imageSource: paper.src,
-        paymentMethod: paymentMethod,
-      });
-
-      // Send order details to Agent Akhil K S's WhatsApp
-      const message = `*New ${paper.category} Subscription!* ${paper.category === 'Paper' ? '📰' : '📚'}\n\n*Customer:* ${user?.name || 'Customer'}\n*Phone:* ${user?.phone || 'N/A'}\n*Address:* ${user?.address || 'Koramangala'}\n*Publication:* ${paper.name} (${paper.language})\n*Plan:* ${planLabel} • ₹${planPrice}${selectedPlanObj?.unit || ''}\n*Days:* ${selectedDays.join(', ')}\n*Start Date:* ${startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}\n\n_Sent via PaperFresh App_`;
-
-      const adminPhone = '919972505709';
-      const url = `https://api.whatsapp.com/send?phone=${adminPhone}&text=${encodeURIComponent(message)}`;
-
-      Linking.openURL(url).catch((err) => {
-        console.warn('Could not launch WhatsApp:', err);
-      });
+      
+      // Open the Razorpay WebView Modal
+      setShowRazorpay(true);
+    } else if (step === 2) {
+      setStep(3);
+      setShowFeeNote(true);
+    } else if (step < 4) {
+      setStep(step + 1);
     }
-
-    if (step < 4) setStep(step + 1);
   };
+
+  const handlePaymentSuccess = (paymentId: string) => {
+    setShowRazorpay(false);
+    const user = store.getUser();
+    
+    store.addSubscription({
+      paperName: paper.name,
+      plan: planLabel,
+      priceDay: paper.priceDay,
+      priceMonth: paper.priceMonth,
+      startDate: startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+      days: selectedDays,
+      imageSource: paper.src,
+      paymentMethod: paymentMethod, 
+    });
+
+    const message = `*New ${paper.category} Subscription!* ${paper.category === 'Paper' ? '📰' : '📚'}
+
+*Customer:* ${user?.name || 'Customer'}
+*Phone:* ${user?.phone || 'N/A'}
+*Address:* ${user?.address || 'Koramangala'}
+*Publication:* ${paper.name} (${paper.language})
+*Plan:* ${planLabel} • ₹${planPrice}${selectedPlanObj?.unit || ''}
+*Days:* ${selectedDays.join(', ')}
+*Start Date:* ${startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+*Fee Paid:* ₹50 (Razorpay ID: ${paymentId})
+
+_Sent via PaperFresh App_`;
+
+    const adminPhone = '919972505709';
+    const url = `https://api.whatsapp.com/send?phone=${adminPhone}&text=${encodeURIComponent(message)}`;
+
+    Linking.openURL(url).catch((err) => {
+      console.warn('Could not launch WhatsApp:', err);
+    });
+
+    setStep(step + 1);
+  };
+
+  const razorpayHtml = `
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+      </head>
+      <body style="background-color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;">
+        <h3 style="font-family: sans-serif; color: #64748B;">Loading Payment Gateway...</h3>
+        <script>
+          var options = {
+            "key": "rzp_test_SuVuCcW1RgCWJ2",
+            "amount": "5000",
+            "currency": "INR",
+            "name": "PaperFresh Delivery",
+            "description": "One-time Order Fee",
+            "image": "https://i.imgur.com/3g7nmJC.png",
+            "handler": function (response){
+                window.ReactNativeWebView.postMessage(JSON.stringify({ status: 'success', paymentId: response.razorpay_payment_id }));
+            },
+            "prefill": {
+                "name": "${store.getUser()?.name || 'Customer'}",
+                "email": "test@example.com",
+                "contact": "${store.getUser()?.phone || '9999999999'}"
+            },
+            "theme": {
+                "color": "#2563EB"
+            }
+          };
+          var rzp1 = new Razorpay(options);
+          rzp1.on('payment.failed', function (response){
+              window.ReactNativeWebView.postMessage(JSON.stringify({ status: 'failed', error: response.error.description }));
+          });
+          rzp1.open();
+        </script>
+      </body>
+    </html>
+  `;
+
   const goBack = () => {
     if (step > 1) setStep(step - 1);
     else router.back();
@@ -361,16 +427,13 @@ export default function SubscribeScreen() {
 
                 <View style={styles.totalRow}>
                   <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>One-time Order Fee</Text>
-                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#2563EB' }}>₹20</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#2563EB' }}>₹50</Text>
                 </View>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8, fontStyle: 'italic', lineHeight: 18 }}>
-                  * The monthly subscription cost will be collected directly by your delivery vendor. You only pay a one-time ₹20 fee now to place this order.
-                </Text>
               </View>
 
               {/* Payment Method */}
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 10 }}>Pay Order Fee (₹20)</Text>
-              {['UPI', 'Card'].map((method) => {
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 10 }}>Pay Order Fee (₹50)</Text>
+              {['UPI'].map((method) => {
                 const isSelected = paymentMethod === method;
                 return (
                   <TouchableOpacity
@@ -404,9 +467,6 @@ export default function SubscribeScreen() {
               <View style={styles.nextDeliveryCard}>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B' }}>NEXT DELIVERY</Text>
                 <Text style={{ fontSize: 15, fontWeight: '800', color: '#16A34A', marginTop: 4 }}>Tomorrow</Text>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2, fontWeight: '500' }}>
-                  {paper.category === 'Magazine' ? 'As per schedule' : 'Between 5:30 AM - 6:30 AM'}
-                </Text>
               </View>
 
               <TouchableOpacity
@@ -437,11 +497,70 @@ export default function SubscribeScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.nextBtnText}>
-              {step === 3 ? `Pay ₹20` : 'Next'}
+              {step === 3 ? `Pay ₹50` : 'Next'}
             </Text>
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Fee Explanation Modal */}
+      <Modal transparent={true} visible={showFeeNote} animationType="fade" onRequestClose={() => setShowFeeNote(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 20, width: '100%', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 }}>
+            <View style={{ backgroundColor: '#EFF6FF', padding: 24, borderBottomWidth: 1, borderBottomColor: '#DBEAFE', alignItems: 'center' }}>
+              <Text style={{ fontSize: 32, marginBottom: 12 }}>ℹ️</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E40AF', textAlign: 'center' }}>Important Note</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#1E40AF', textAlign: 'center', marginTop: 4 }}>ಪ್ರಮುಖ ಸೂಚನೆ</Text>
+            </View>
+            <View style={{ padding: 24 }}>
+              <Text style={{ fontSize: 14, color: '#334155', lineHeight: 22, textAlign: 'center', marginBottom: 16 }}>
+                The <Text style={{ fontWeight: '800', color: '#2563EB' }}>₹50 fee</Text> is a one-time booking charge to schedule your daily delivery. The actual monthly subscription cost will be collected directly by your vendor.
+              </Text>
+              <Text style={{ fontSize: 14, color: '#475569', lineHeight: 22, textAlign: 'center', fontStyle: 'italic', marginBottom: 24 }}>
+                ನಿಮ್ಮ ದೈನಂದಿನ ವಿತರಣೆಯನ್ನು ನಿಗದಿಪಡಿಸಲು <Text style={{ fontWeight: '800', color: '#2563EB' }}>₹50 ಶುಲ್ಕವು</Text> ಒಂದು ಬಾರಿಯ ಬುಕಿಂಗ್ ಶುಲ್ಕವಾಗಿದೆ. ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ ವೆಚ್ಚವನ್ನು ನಿಮ್ಮ ವಿತರಕರು ನೇರವಾಗಿ ಸಂಗ್ರಹಿಸುತ್ತಾರೆ.
+              </Text>
+              
+              <TouchableOpacity 
+                style={{ backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 12, alignItems: 'center' }}
+                onPress={() => setShowFeeNote(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>I Understand / ಸರಿ</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Razorpay WebView Modal */}
+      <Modal visible={showRazorpay} animationType="slide" onRequestClose={() => setShowRazorpay(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', flexDirection: 'row', alignItems: 'center' }}>
+             <TouchableOpacity onPress={() => setShowRazorpay(false)} style={{ padding: 4 }}>
+               <X size={20} color="#0F172A" />
+             </TouchableOpacity>
+             <Text style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '800', marginRight: 24 }}>Secure Payment</Text>
+          </View>
+          <WebView 
+            source={{ html: razorpayHtml }} 
+            style={{ flex: 1 }}
+            javaScriptEnabled={true}
+            onMessage={(event) => {
+              try {
+                const data = JSON.parse(event.nativeEvent.data);
+                if (data.status === 'success') {
+                  handlePaymentSuccess(data.paymentId);
+                } else if (data.status === 'failed') {
+                  setShowRazorpay(false);
+                  alert(`Payment failed: ${data.error || 'User cancelled'}`);
+                }
+              } catch (e) {
+                console.error(e);
+              }
+            }}
+          />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }

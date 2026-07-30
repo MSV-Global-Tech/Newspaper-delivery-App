@@ -5,7 +5,7 @@ import {
 import { ArrowLeft, Search, Star, BookOpen, Newspaper } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { IMAGES } from '../../assets/images';
 import { store } from '../../utils/store';
 
@@ -19,6 +19,25 @@ export default function NewspapersScreen() {
   const [papers, setPapers] = useState(store.getPapers());
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [user, setUser] = useState(store.getUser());
+
+  const categoryScrollRef = useRef<any>(null);
+  const languageScrollRef = useRef<any>(null);
+  const categoryChipX = useRef<Record<string, number>>({});
+  const languageChipX = useRef<Record<string, number>>({});
+
+  const scrollToCategory = (cat: string) => {
+    const x = categoryChipX.current[cat];
+    if (typeof x === 'number') {
+      categoryScrollRef.current?.scrollTo({ x: Math.max(0, x - 16), animated: true });
+    }
+  };
+
+  const scrollToLanguage = (lang: string) => {
+    const x = languageChipX.current[lang];
+    if (typeof x === 'number') {
+      languageScrollRef.current?.scrollTo({ x: Math.max(0, x - 16), animated: true });
+    }
+  };
 
   useEffect(() => {
     if (params.lang && params.lang !== activeLanguage) {
@@ -45,12 +64,31 @@ export default function NewspapersScreen() {
     }
   }, [activeCategory, papers]);
 
+  useEffect(() => {
+    scrollToCategory(activeCategory);
+  }, [activeCategory]);
+
+  useEffect(() => {
+    scrollToLanguage(activeLanguage);
+  }, [activeLanguage, activeCategory, papers.length]);
+
   const filtered = papers.filter(
     (n) =>
       (activeLanguage === 'All' || n.language === activeLanguage) &&
       (activeCategory === 'All' || n.category === activeCategory) &&
       n.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const shownPapersCount = filtered.filter((p) => p.category === 'Paper').length;
+  const shownMagazinesCount = filtered.filter((p) => p.category === 'Magazine').length;
+
+  const languageLabel = activeLanguage === 'All' ? 'All languages' : activeLanguage;
+  const headerSubtitle =
+    activeCategory === 'Paper'
+      ? `${languageLabel} • ${shownPapersCount} Papers`
+      : activeCategory === 'Magazine'
+        ? `${languageLabel} • ${shownMagazinesCount} Magazines`
+        : `${languageLabel} • ${shownPapersCount} Papers • ${shownMagazinesCount} Magazines`;
 
   const requireAuth = (callback: () => void) => {
     if (!user) {
@@ -70,8 +108,8 @@ export default function NewspapersScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Publications</Text>
-          <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500', marginTop: 1 }}>
-            {papers.filter(p => p.category === 'Paper').length} Papers • {papers.filter(p => p.category === 'Magazine').length} Magazines
+          <Text style={styles.headerSubtitle}>
+            {headerSubtitle}
           </Text>
         </View>
       </View>
@@ -90,8 +128,14 @@ export default function NewspapersScreen() {
       </View>
 
       {/* Category Filter */}
-      <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
-        <View style={styles.catRow}>
+      <View style={{ paddingBottom: 10 }}>
+        <ScrollView
+          ref={categoryScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+          onContentSizeChange={() => scrollToCategory(activeCategory)}
+        >
           {CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat;
             return (
@@ -100,6 +144,7 @@ export default function NewspapersScreen() {
                 onPress={() => setActiveCategory(cat)}
                 style={[styles.catChip, isActive && styles.catChipActive]}
                 activeOpacity={0.8}
+                onLayout={(e) => { categoryChipX.current[cat] = e.nativeEvent.layout.x; }}
               >
                 {cat !== 'All' && (cat === 'Paper'
                   ? <Newspaper size={13} color={isActive ? '#FFFFFF' : '#64748B'} />
@@ -111,17 +156,24 @@ export default function NewspapersScreen() {
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
       </View>
 
       <View style={{ paddingBottom: 10 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+        <ScrollView
+          ref={languageScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+          onContentSizeChange={() => scrollToLanguage(activeLanguage)}
+        >
           {LANGUAGES.map((lang) => (
             <TouchableOpacity
               key={lang}
               onPress={() => setActiveLanguage(lang)}
               style={[styles.chip, activeLanguage === lang && styles.chipActive]}
               activeOpacity={0.8}
+              onLayout={(e) => { languageChipX.current[lang] = e.nativeEvent.layout.x; }}
             >
               <Text style={[styles.chipText, activeLanguage === lang && styles.chipTextActive]}>{lang}</Text>
             </TouchableOpacity>
@@ -236,6 +288,7 @@ const styles = StyleSheet.create({
     marginRight: 12, borderWidth: 1, borderColor: '#E2E8F0',
   },
   headerTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  headerSubtitle: { fontSize: 11, color: '#64748B', fontWeight: '500', marginTop: 1 },
   searchPad: { paddingHorizontal: 16, paddingVertical: 12 },
   searchBox: {
     flexDirection: 'row', alignItems: 'center',
@@ -338,8 +391,8 @@ const styles = StyleSheet.create({
   },
   priceText: { fontSize: 13, color: '#1E293B', fontWeight: '600', marginTop: 2 },
   subBtn: {
-    backgroundColor: '#2563EB', paddingHorizontal: 16,
-    paddingVertical: 8, borderRadius: 8,
+    backgroundColor: '#2563EB', paddingHorizontal: 12,
+    paddingVertical: 6, borderRadius: 7,
   },
-  subBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  subBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
 });

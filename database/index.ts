@@ -15,8 +15,12 @@ export type { UserDoc } from './users';
 export { uploadNewspaperLogo, uploadImage, deleteImage } from './storageHelper';
 export { listenAgents, addAgent, updateAgent, deleteAgent, seedAgents } from './agents';
 export type { AgentDoc } from './agents';
+export { listenPayments, addPayment, updatePayment } from './payments';
+export type { PaymentDoc } from './payments';
 export {
   PAPERS_CATALOG,
   PAPERS_CATALOG_WITH_IDS,
 } from './papers_catalog';
 export type { CatalogEntry, CatalogCategory } from './papers_catalog';
+export { placeOrder, listenCustomerOrders } from './orders';
+export type { OrderDoc } from './orders';

@@ -112,11 +112,7 @@ export default function DeliveryDetailScreen() {
               <Text style={styles.detailValue}>{delivery.startDate || 'N/A'}</Text>
             </View>
             
-            <View style={styles.detailBox}>
-              <Clock size={16} color="#2563EB" />
-              <Text style={styles.detailLabel}>Delivery Time</Text>
-              <Text style={styles.detailValue}>{delivery.time || '6:00 AM'}</Text>
-            </View>
+
             
             <View style={[styles.detailBox, { width: '100%' }]}>
               <Package size={16} color="#2563EB" />
@@ -128,7 +124,7 @@ export default function DeliveryDetailScreen() {
 
         {/* Payment Info Card */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Order Fee (₹20)</Text>
+          <Text style={styles.sectionTitle}>Order Fee (₹50)</Text>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
             <Text style={{ fontSize: 14, color: '#64748B', fontWeight: '500' }}>Paid Via</Text>
             <Text style={{ fontSize: 14, color: '#0F172A', fontWeight: '700' }}>{delivery.paymentMethod || 'UPI'}</Text>

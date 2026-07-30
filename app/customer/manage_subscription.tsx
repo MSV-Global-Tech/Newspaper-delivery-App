@@ -18,7 +18,7 @@ export default function ManageSubscriptionScreen() {
     return unsubscribe;
   }, []);
 
-  const customerDeliveries = deliveries.filter((d) => d.name === user?.name);
+  const customerDeliveries = deliveries.filter((d) => d.name === user?.name && d.plan !== 'One-time');
 
   if (customerDeliveries.length === 0) {
     return (

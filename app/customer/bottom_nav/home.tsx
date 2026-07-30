@@ -2,6 +2,7 @@ import {
   View,
   Text,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   StatusBar,
   StyleSheet,
@@ -17,18 +18,13 @@ import {
   CheckCircle2,
   Star,
   ChevronRight,
-  Calendar,
   PauseCircle,
   SkipForward,
-  CreditCard,
-  Phone,
-  BookOpen,
 } from 'lucide-react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect, useRef } from 'react';
-import { IMAGES } from '../../../assets/images';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { store } from '../../../utils/store';
 
 
@@ -47,6 +43,34 @@ const QUICK_ACTIONS: any[] = [
   },
 ];
 
+const HOME_CATEGORIES: any[] = [
+  {
+    id: 'newspapers',
+    label: 'Newspapers',
+    subtitle: 'Daily papers\ndelivered',
+    src: require('../../../assets/Milk/newspaper.webp'),
+    bg: '#F5F5F0',
+    route: '/customer/newspapers',
+  },
+  {
+    id: 'milk',
+    label: 'Milk',
+    subtitle: 'Fresh milk\nat your door',
+    src: require('../../../assets/Milk/milk.webp'),
+    bg: '#F0FAF1',
+    route: '/customer/milk',
+  },
+  {
+    id: 'water_cans',
+    label: 'Water Cans',
+    subtitle: 'Pure water\ndelivered',
+    src: require('../../../assets/Milk/water.webp'),
+    bg: '#F0F6FF',
+    route: '/customer/water_cans',
+  },
+];
+
+
 const HOURS = new Date().getHours();
 const GREETING = HOURS < 12 ? 'Good Morning' : HOURS < 17 ? 'Good Afternoon' : 'Good Evening';
 const WINDOW_WIDTH = Dimensions.get('window').width;
@@ -59,6 +83,7 @@ export default function HomeScreen() {
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [papers, setPapers] = useState(store.getPapers());
   const [agents, setAgents] = useState(store.getAgents());
+  const [bannerReady, setBannerReady] = useState(false);
 
   const contactAgent = () => {
     Linking.openURL('tel:9972505709');
@@ -78,34 +103,66 @@ export default function HomeScreen() {
     return unsubscribe;
   }, []);
 
-  const customerDeliveries = deliveries.filter((d) => d.name === user?.name);
+  const customerDeliveries = deliveries.filter((d) => d.name === user?.name && d.plan !== 'One-time');
   const currentDelivery = customerDeliveries[0] || null;
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<FlatList<any>>(null);
   const adIndexRef = useRef(0);
   const userTouchingRef = useRef(false);
 
+  const bannerItems = useMemo(() => {
+    const byLanguage = new Map<string, { paper?: any; magazine?: any }>();
+
+    const score = (p: any) => {
+      const rating = Number(p?.rating);
+      return Number.isFinite(rating) ? rating : 0;
+    };
+
+    for (const p of papers) {
+      const lang = String(p?.language || 'Other');
+      const entry = byLanguage.get(lang) ?? {};
+
+      if (p?.category === 'Magazine') {
+        if (!entry.magazine || score(p) > score(entry.magazine)) {
+          entry.magazine = p;
+        }
+      } else {
+        if (!entry.paper || score(p) > score(entry.paper)) {
+          entry.paper = p;
+        }
+      }
+
+      byLanguage.set(lang, entry);
+    }
+
+    const papersOnly: any[] = [];
+    const magazinesOnly: any[] = [];
+
+    for (const entry of byLanguage.values()) {
+      if (entry.paper) papersOnly.push(entry.paper);
+      if (entry.magazine) magazinesOnly.push(entry.magazine);
+    }
+
+    return [...papersOnly, ...magazinesOnly];
+  }, [papers]);
+
   useEffect(() => {
-    const total = papers.length;
-    if (total <= 1) return;
+    const total = bannerItems.length;
+    if (total <= 1 || !bannerReady) return;
 
     const tick = () => {
       if (userTouchingRef.current) return;
       const next = (adIndexRef.current + 1) % total;
       adIndexRef.current = next;
-      const refAny = scrollRef.current as any;
-      const node = refAny?.getNode ? refAny.getNode() : refAny;
-      node?.scrollTo({
-        x: next * CARD_WIDTH,
-        y: 0,
+      scrollRef.current?.scrollToOffset({
+        offset: next * CARD_WIDTH,
         animated: true,
-        duration: 350,
       });
     };
 
     const interval = setInterval(tick, 1500);
     return () => clearInterval(interval);
-  }, [papers.length]);
+  }, [bannerItems.length, bannerReady]);
 
   const handleQuickAction = (action: any) => {
     if (action.id === 'call') {
@@ -164,13 +221,23 @@ export default function HomeScreen() {
       </View>
 
       {/* Location row */}
-      <View style={styles.locationRow}>
+      <TouchableOpacity
+        style={styles.locationRow}
+        activeOpacity={0.75}
+        onPress={() => {
+          if (!user) {
+            router.push('/customer/login');
+            return;
+          }
+          router.push('/customer/bottom_nav/profile');
+        }}
+      >
         <MapPin size={14} color="#2563EB" />
         <Text style={styles.locationText} numberOfLines={1}>
           {user?.address || 'Set your delivery location'}
         </Text>
         <ChevronDown size={13} color="#2563EB" />
-      </View>
+      </TouchableOpacity>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -199,9 +266,6 @@ export default function HomeScreen() {
                 <Text style={styles.todayTitle}>
                   {currentDelivery.paperName}
                 </Text>
-                <Text style={styles.todayTime}>
-                  Delivery by {currentDelivery.time || '5:30 AM'}
-                </Text>
                 <View style={styles.confirmedBadge}>
                   <CheckCircle2 size={12} color="#fff" />
                   <Text style={styles.confirmedText}>
@@ -210,36 +274,38 @@ export default function HomeScreen() {
                 </View>
               </View>
               {/* Logo sits on white mini card */}
-              <View style={styles.todayLogoCard}>
+              <View style={styles.bannerMediaCard}>
                 <Image
                   source={currentDelivery.src}
-                  style={{ width: 86, height: 86, borderRadius: 8 }}
+                  style={styles.bannerMediaImage}
                   resizeMode="contain"
                 />
               </View>
             </View>
           ) : (
             <View style={[styles.todayCard, { paddingVertical: 24, paddingHorizontal: 0, overflow: 'hidden', minHeight: 180 }]}>
-              <ScrollView
+              <FlatList
                 ref={scrollRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
+                data={bannerItems}
+                keyExtractor={(item, index) => String(item?.id ?? index)}
                 snapToInterval={CARD_WIDTH}
                 snapToAlignment="start"
                 decelerationRate="fast"
                 disableIntervalMomentum
-                onTouchStart={() => (userTouchingRef.current = true)}
-                onTouchEnd={() => {
+                onLayout={() => setBannerReady(true)}
+                onScrollBeginDrag={() => (userTouchingRef.current = true)}
+                onScrollEndDrag={() => {
                   userTouchingRef.current = false;
                 }}
                 onMomentumScrollEnd={(e) => {
                   const x = e.nativeEvent.contentOffset.x;
                   adIndexRef.current = Math.max(0, Math.round(x / Math.max(1, CARD_WIDTH)));
+                  userTouchingRef.current = false;
                 }}
-              >
-                {papers.map((paper, index) => (
+                renderItem={({ item: paper }) => (
                   <TouchableOpacity
-                    key={index}
                     activeOpacity={0.9}
                     onPress={() => requireAuth(() => router.push(`/customer/newspaper/${paper.id}` as any))}
                     style={{
@@ -252,7 +318,7 @@ export default function HomeScreen() {
                   >
                     <View style={{ flex: 1, paddingRight: 16 }}>
                       <Text style={{ color: '#93C5FD', fontSize: 12, fontWeight: '800', letterSpacing: 0.5, marginBottom: 4 }}>
-                        FEATURED PAPER
+                        FEATURED {paper.category === 'Magazine' ? 'MAGAZINE' : 'PAPER'}
                       </Text>
                       <Text style={styles.todayTitle} numberOfLines={1}>
                         {paper.name}
@@ -271,15 +337,15 @@ export default function HomeScreen() {
                       </View>
 
                       <Text style={{ color: '#E0E7FF', fontSize: 13, marginTop: 12, lineHeight: 18 }}>
-                        Stay informed daily with the best {paper.language} newspaper, delivered right to your door.
+                        Explore the best {paper.language} {paper.category === 'Magazine' ? 'magazine' : 'newspaper'}, delivered right to your door.
                       </Text>
                     </View>
-                    <View style={[styles.todayLogoCard, { padding: 10, borderRadius: 16 }]}>
-                      <Image source={paper.src} style={{ width: 72, height: 72, borderRadius: 8 }} resizeMode="contain" />
+                    <View style={styles.bannerMediaCard}>
+                      <Image source={paper.src} style={styles.bannerMediaImage} resizeMode="contain" />
                     </View>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                )}
+              />
             </View>
           )}
 
@@ -312,88 +378,34 @@ export default function HomeScreen() {
             ))}
           </View>
 
-          {/* ── ACTIVE SUBSCRIPTION ───────────────────────────── */}
-          {user && (
-            <>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Active Subscription</Text>
-                <TouchableOpacity onPress={() => router.push('/customer/bottom_nav/papers')}>
-                  <Text style={styles.viewAll}>View All</Text>
-                </TouchableOpacity>
-              </View>
-
-              {customerDeliveries.length > 0 ? (
-                customerDeliveries.map((delivery, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.activeCard}
-                    onPress={() => router.push('/customer/manage_subscription')}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.logoWrapper}>
-                      <Image source={delivery.src} style={{ width: '100%', height: '100%', borderRadius: 13 }} resizeMode="cover" />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 14 }}>
-                      <Text style={styles.activeName}>{delivery.paperName}</Text>
-                      <Text style={styles.activeMeta}>₹{delivery.priceMonth}/mo  •  {delivery.plan || 'Monthly'}</Text>
-                      <Text style={styles.activeNext}>Next Delivery: Tomorrow</Text>
-                    </View>
-                    <View>
-                      <View style={styles.activeBadge}>
-                        <Text style={styles.activeBadgeText}>
-                          {delivery.status === 'Delivered' ? 'Delivered' : 'Active'}
-                        </Text>
-                      </View>
-                      <ChevronRight size={16} color="#CBD5E1" style={{ marginTop: 10, alignSelf: 'flex-end' }} />
-                    </View>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <Text style={{ color: '#64748B', marginBottom: 20 }}>No active subscriptions yet.</Text>
-              )}
-            </>
-          )}
-
-          {/* ── DELIVERY AGENTS (ADMIN ONLY) ──────────────────── */}
-          {user?.isAdmin && (
-            <>
-              <View style={styles.sectionHeader}>
-                <View>
-                  <Text style={styles.sectionTitle}>Delivery Agents</Text>
-                  <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }}>Your neighbourhood paper-boys</Text>
+          {/* ── CATEGORY TILES (Card style like reference) ── */}
+          <View style={styles.homeCategoryRow}>
+            {HOME_CATEGORIES.map((c) => (
+              <TouchableOpacity
+                key={c.id}
+                style={[styles.homeCategoryCard, { backgroundColor: c.bg }]}
+                activeOpacity={0.75}
+                onPress={() => router.push(c.route)}
+              >
+                {/* Product image — top */}
+                <Image
+                  source={c.src}
+                  style={styles.homeCatImage}
+                  resizeMode="contain"
+                />
+                {/* Text — below image */}
+                <Text style={styles.homeCatLabel}>{c.label}</Text>
+                <View style={styles.homeCatSubRow}>
+                  <Text style={styles.homeCatSub}>{c.subtitle}</Text>
+                  <ChevronRight size={11} color="#94A3B8" />
                 </View>
-                <TouchableOpacity onPress={() => router.push('/customer/agents' as any)}>
-                  <Text style={styles.viewAll}>See All</Text>
-                </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 4, paddingRight: 4 }} style={{ marginBottom: 24 }}>
-                {agents.slice(0, 5).map((agent) => (
-                  <TouchableOpacity
-                    key={agent.id}
-                    style={styles.agentChip}
-                    activeOpacity={0.85}
-                    onPress={() => router.push('/customer/agents' as any)}
-                  >
-                    <View style={styles.agentChipAvatar}>
-                      <Text style={styles.agentChipAvatarText}>
-                        {agent.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
-                      </Text>
-                    </View>
-                    <Text style={styles.agentChipName} numberOfLines={1}>{agent.name}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                      <MapPin size={9} color="#94A3B8" />
-                      <Text style={styles.agentChipArea} numberOfLines={1}>{agent.area}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </>
-          )}
-
-          {/* ── LANGUAGE FILTER BOX ───────────────────────────── */}
+          {/* ── LANGUAGE FILTER BOX ────────────────────────────── */}
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Browse by Language</Text>
+            <Text style={[styles.sectionTitle, { fontSize: 15 }]}>Browse Newspapers by Language</Text>
             <TouchableOpacity onPress={() => router.push('/customer/newspapers' as any)}>
               <Text style={styles.viewAll}>All Papers →</Text>
             </TouchableOpacity>
@@ -484,8 +496,84 @@ export default function HomeScreen() {
               </TouchableOpacity>
             ))}
           </View>
+          {/* ── ACTIVE SUBSCRIPTION ───────────────────────────── */}
+          {user && (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Active Subscription</Text>
+                <TouchableOpacity onPress={() => router.push('/customer/bottom_nav/papers')}>
+                  <Text style={styles.viewAll}>View All</Text>
+                </TouchableOpacity>
+              </View>
 
-          {/* ── RECOMMENDED (small, top 4 papers preview) ────── */}
+              {customerDeliveries.length > 0 ? (
+                customerDeliveries.map((delivery, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.activeCard}
+                    onPress={() => router.push('/customer/manage_subscription')}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.logoWrapper}>
+                      <Image source={delivery.src} style={{ width: '100%', height: '100%', borderRadius: 13 }} resizeMode="cover" />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 14 }}>
+                      <Text style={styles.activeName}>{delivery.paperName}</Text>
+                      <Text style={styles.activeMeta}>₹{delivery.priceMonth}/mo  •  {delivery.plan || 'Monthly'}</Text>
+                      <Text style={styles.activeNext}>Next Delivery: Tomorrow</Text>
+                    </View>
+                    <View>
+                      <View style={styles.activeBadge}>
+                        <Text style={styles.activeBadgeText}>
+                          {delivery.status === 'Delivered' ? 'Delivered' : 'Active'}
+                        </Text>
+                      </View>
+                      <ChevronRight size={16} color="#CBD5E1" style={{ marginTop: 10, alignSelf: 'flex-end' }} />
+                    </View>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={{ color: '#64748B', marginBottom: 20 }}>No active subscriptions yet.</Text>
+              )}
+            </>
+          )}
+
+          {/* ── DELIVERY AGENTS (ADMIN ONLY) ──────────────────── */}
+          {user?.isAdmin && (
+            <>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>Delivery Agents</Text>
+                  <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }}>Your neighbourhood paper-boys</Text>
+                </View>
+                <TouchableOpacity onPress={() => router.push('/customer/agents' as any)}>
+                  <Text style={styles.viewAll}>See All</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 4, paddingRight: 4 }} style={{ marginBottom: 24 }}>
+                {agents.slice(0, 5).map((agent) => (
+                  <TouchableOpacity
+                    key={agent.id}
+                    style={styles.agentChip}
+                    activeOpacity={0.85}
+                    onPress={() => router.push('/customer/agents' as any)}
+                  >
+                    <View style={styles.agentChipAvatar}>
+                      <Text style={styles.agentChipAvatarText}>
+                        {agent.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+                      </Text>
+                    </View>
+                    <Text style={styles.agentChipName} numberOfLines={1}>{agent.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                      <MapPin size={9} color="#94A3B8" />
+                      <Text style={styles.agentChipArea} numberOfLines={1}>{agent.area}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
+          )}
           <View style={[styles.sectionHeader, { marginTop: 4 }]}>
             <Text style={styles.sectionTitle}>Recommended</Text>
             <TouchableOpacity onPress={() => router.push('/customer/newspapers' as any)}>
@@ -602,6 +690,20 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1, shadowRadius: 6, elevation: 2,
   },
+  bannerMediaCard: {
+    width: 104,
+    height: 104,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    borderWidth: 0,
+    overflow: 'visible',
+    padding: 0,
+  },
+  bannerMediaImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 11,
+  },
 
   sectionTitle: { fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 12 },
   quickRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
@@ -617,6 +719,52 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', marginBottom: 6,
   },
   quickLabel: { fontSize: 11, fontWeight: '600', color: '#475569', textAlign: 'center' },
+
+  /* ── CATEGORY TILES (Card style) ───────── */
+  homeCategoryRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 22,
+  },
+  homeCategoryCard: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingTop: 12,
+    paddingBottom: 10,
+    minHeight: 110,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  homeCatImage: {
+    width: 80,
+    height: 90,
+    marginBottom: 8,
+  },
+  homeCatSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 2,
+  },
+  homeCatLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    textAlign: 'center',
+  },
+  homeCatSub: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: '#64748B',
+    lineHeight: 13,
+    textAlign: 'center',
+  },
 
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
@@ -671,10 +819,10 @@ const styles = StyleSheet.create({
   paperLang: { fontSize: 12, color: '#64748B', marginTop: 1 },
   priceText: { fontSize: 13, color: '#1E293B', fontWeight: '600', marginTop: 2 },
   subBtn: {
-    backgroundColor: '#2563EB', paddingHorizontal: 16,
-    paddingVertical: 8, borderRadius: 8,
+    backgroundColor: '#2563EB', paddingHorizontal: 12,
+    paddingVertical: 6, borderRadius: 7,
   },
-  subBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  subBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
 
   /* Agent chip (horizontal scroll) */
   agentChip: {

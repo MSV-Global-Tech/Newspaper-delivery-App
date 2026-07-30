@@ -46,6 +46,7 @@ export default function ProfileScreen() {
   const [user, setUser] = useState(store.getUser());
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [loadingGps, setLoadingGps] = useState(false);
 
@@ -259,15 +260,6 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>Monthly Cost</Text>
           </View>
 
-          <View style={styles.statDivider} />
-
-          <View style={styles.statBox}>
-            <View style={[styles.statIconCircle, { backgroundColor: '#FEF3C7' }]}>
-              <Clock size={18} color="#D97706" />
-            </View>
-            <Text style={styles.statNumber}>5:30 AM</Text>
-            <Text style={styles.statLabel}>Delivery Slot</Text>
-          </View>
         </View>
 
         {/* ── CURRENT DETAILS CARD ── */}
@@ -389,7 +381,7 @@ export default function ProfileScreen() {
 
           <View style={styles.itemSeparator} />
 
-          <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuRow} activeOpacity={0.7} onPress={() => setIsTermsModalOpen(true)}>
             <View style={[styles.menuIconContainer, { backgroundColor: '#F1F5F9' }]}>
               <Shield size={18} color="#475569" />
             </View>
@@ -407,7 +399,12 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Log Out from Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.versionFooter}>PaperFresh Customer App • v1.0.4</Text>
+        <View style={{ alignItems: 'center', marginTop: 20 }}>
+          <Text style={styles.versionFooter}>PaperFresh Customer App • v1.0.4</Text>
+          <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '800', marginTop: 4 }}>
+            Developed by MSV Global Tech
+          </Text>
+        </View>
       </ScrollView>
 
       {/* ── SLIDE-UP EDIT MODAL SHEET ── */}
@@ -501,6 +498,57 @@ export default function ProfileScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── SLIDE-UP TERMS MODAL SHEET ── */}
+      <Modal
+        visible={isTermsModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsTermsModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Shield size={18} color="#2563EB" />
+                <Text style={styles.modalTitle}>Terms & Conditions</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setIsTermsModalOpen(false)}
+                activeOpacity={0.7}
+              >
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>1. Acceptance of Terms</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>By accessing and using the PaperFresh application, you agree to comply with and be bound by these terms and conditions.</Text>
+              
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>2. Subscription & Billing</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>A one-time booking fee of ₹50 is required to initiate a subscription. Your monthly newspaper/magazine bills are generated at the end of each month and collected directly by your delivery vendor. Failure to pay may result in suspension of deliveries.</Text>
+              
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>3. Deliveries</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>Deliveries are typically completed between 5:30 AM and 7:00 AM daily. We are not responsible for delays caused by extreme weather, strikes, or supply chain issues.</Text>
+              
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>4. Vacation Pauses & Skips</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>You can pause or skip deliveries using the app. You will not be billed for days that are successfully skipped prior to the delivery cutoff time (usually 9:00 PM the previous day).</Text>
+
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>5. Privacy Policy</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>We collect your name, phone number, and address strictly for the purpose of managing your deliveries. Your data is not shared with third parties for marketing purposes.</Text>
+            </ScrollView>
+            <View style={{ paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9', marginTop: 10 }}>
+              <TouchableOpacity
+                style={[styles.modalDoneBtn, { width: '100%' }]}
+                onPress={() => setIsTermsModalOpen(false)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalDoneText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );

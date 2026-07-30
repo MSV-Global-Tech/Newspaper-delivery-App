@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet, Image } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ArrowLeft, Star, Clock, Heart } from 'lucide-react-native';
+import { ArrowLeft, Star, Heart } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { store } from '../../../utils/store';
@@ -124,17 +124,6 @@ export default function NewspaperDetailScreen() {
           <Text style={styles.aboutText}>
             {DEFAULT_ABOUT[paper.category as string]} {paper.name} brings you the latest updates from {paper.language}-speaking communities.
           </Text>
-
-          {/* Delivery Time Box */}
-          <View style={styles.deliveryTimeCard}>
-            <Clock size={16} color="#2563EB" />
-            <View style={{ marginLeft: 10 }}>
-              <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>Delivery Time</Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB', marginTop: 1 }}>
-                {paper.category === 'Magazine' ? 'As per schedule' : '5:30 AM - 6:30 AM'}
-              </Text>
-            </View>
-          </View>
 
           {/* Pricing Box */}
           <Text style={styles.sectionTitle}>Pricing</Text>
@@ -264,14 +253,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '500',
   },
-  deliveryTimeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderRadius: 14,
-    padding: 14,
-    marginVertical: 16,
-  },
   priceCard: {
     flex: 1,
     backgroundColor: '#F8FAFC',
@@ -292,8 +273,8 @@ const styles = StyleSheet.create({
   },
   subscribeBtn: {
     backgroundColor: '#2563EB',
-    borderRadius: 16,
-    paddingVertical: 16,
+    borderRadius: 14,
+    paddingVertical: 12,
     alignItems: 'center',
     shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 6 },
@@ -303,7 +284,7 @@ const styles = StyleSheet.create({
   },
   subscribeBtnText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
   },
 });

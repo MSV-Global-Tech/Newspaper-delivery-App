@@ -57,11 +57,11 @@ export const PAPERS_CATALOG: CatalogEntry[] = [
   { name: 'Kolaravani',          language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'kolaravani.webp'       },
   { name: 'Prajapragathi',       language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'prajapragathi.webp'    },
   { name: 'Vishwavani',          language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'vishwavani.webp'       },
-  { name: 'Vidyarthi Mitra',     language: 'Kannada',  category: 'Paper', priceDay: 5, priceMonth: 150, rating: 4.3, image: 'prajavani.webp'        },
+  { name: 'Vidyarthi Mitra',     language: 'Kannada',  category: 'Paper', priceDay: 5, priceMonth: 150, rating: 4.3, image: 'vidyarthimitra.webp'   },
   { name: 'Udayavani',           language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'udayavani.webp'        },
   { name: 'Vishwa Vaaridhi',     language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'vishwavaaradhi.webp'    },
   { name: 'Pravasi Prapancha',   language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'pravasiprapancha.webp'  },
-  { name: 'Samyuktha Karnataka', language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 170, rating: 4.3, image: 'vijayavani.webp'       },
+  { name: 'Samyuktha Karnataka', language: 'Kannada',  category: 'Paper', priceDay: 6, priceMonth: 170, rating: 4.3, image: 'samyuktha.webp'        },
 
   // ─── ENGLISH PAPERS ───
   { name: 'The Hindu',           language: 'English',  category: 'Paper', priceDay: 10, priceMonth: 300, rating: 4.7, image: 'hindu.webp'          },
@@ -70,7 +70,7 @@ export const PAPERS_CATALOG: CatalogEntry[] = [
   { name: 'Deccan Herald',       language: 'English',  category: 'Paper', priceDay: 8,  priceMonth: 240, rating: 4.4, image: 'deccanherald.webp'   },
   { name: 'Bangalore Mirror',    language: 'English',  category: 'Paper', priceDay: 5,  priceMonth: 150, rating: 4.2, image: 'bangloremirror.webp' },
   { name: 'Indian Express',      language: 'English',  category: 'Paper', priceDay: 8,  priceMonth: 240, rating: 4.4, image: 'indianexpress.webp'  },
-  { name: 'Wealth',              language: 'English',  category: 'Paper', priceDay: 10, priceMonth: 300, rating: 4.7, image: 'hindu.webp'          },
+  { name: 'Wealth',              language: 'English',  category: 'Paper', priceDay: 10, priceMonth: 300, rating: 4.7, image: 'wealth.webp'          },
 
   // ─── TELUGU PAPERS ───
   { name: 'Sakshi',              language: 'Telugu',   category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'sakshi.webp'        },

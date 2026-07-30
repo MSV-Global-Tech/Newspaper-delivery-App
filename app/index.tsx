@@ -1,50 +1,144 @@
-import { View, Text, TouchableOpacity, StatusBar, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, StyleSheet, Image, FlatList, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight } from 'lucide-react-native';
 import { IMAGES } from '../assets/images';
+import { getHasSeenOnboarding, getLastRoute, getSessionUser, setHasSeenOnboarding } from '../utils/session';
+import { store } from '../utils/store';
+import { useEffect, useRef, useState } from 'react';
+
+type Slide = {
+  title: string;
+  subtitle: string;
+  accent?: string;
+  bg: string;
+  image: keyof typeof IMAGES;
+};
+
+const SLIDES: Slide[] = [
+  {
+    title: 'Your Daily News\nDelivered',
+    accent: 'Fresh',
+    subtitle: 'Subscribe to your favorite newspapers and get them delivered to your doorstep every morning.',
+    bg: '#F8F8F6',
+    image: 'splash1.webp',
+  },
+  {
+    title: 'Pick Papers\nThat You Love',
+    subtitle: 'Choose from multiple languages and manage your subscriptions anytime.',
+    bg: '#F8F8F6',
+    image: 'splash2.webp',
+  },
+];
 
 export default function OnboardingScreen() {
+  const listRef = useRef<FlatList<Slide>>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  // null = still deciding (render nothing → no onboarding flash on re-open)
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+  const width = Dimensions.get('window').width;
+
+  // Boot gate: decide BEFORE rendering anything.
+  // Onboarding tour is shown ONLY on first install (never seen before).
+  // Returning users are routed straight in without seeing this screen.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const [hasSeenOnboarding, sessionUser, lastRoute] = await Promise.all([
+        getHasSeenOnboarding(),
+        getSessionUser(),
+        getLastRoute(),
+      ]);
+
+      if (sessionUser) store.setUser(sessionUser as any);
+      if (!mounted) return;
+
+      if (!hasSeenOnboarding) {
+        setShowOnboarding(true);
+        return;
+      }
+
+      if (sessionUser) {
+        router.replace((lastRoute ?? '/customer/bottom_nav/home') as any);
+        return;
+      }
+
+      router.replace('/customer/login');
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const goNext = () => {
+    const next = Math.min(activeIndex + 1, SLIDES.length - 1);
+    listRef.current?.scrollToIndex({ index: next, animated: true });
+    setActiveIndex(next);
+  };
+
+  const onGetStarted = async () => {
+    await setHasSeenOnboarding(true);
+    router.replace('/customer/bottom_nav/home');
+  };
+
+  // While deciding (or while redirecting), show a plain white screen that
+  // blends with the native splash — no onboarding flash.
+  if (showOnboarding !== true) {
+    return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Illustration top section */}
-      <View style={styles.illustrationContainer}>
-        <Image
-          source={IMAGES.onboarding}
-          style={styles.illustrationImage}
-          resizeMode="contain"
-        />
-      </View>
+      <FlatList
+        ref={listRef}
+        style={{ flex: 1 }}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        data={SLIDES}
+        keyExtractor={(_, idx) => String(idx)}
+        getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+        onMomentumScrollEnd={(e) => {
+          const x = e.nativeEvent.contentOffset.x;
+          const idx = Math.round(x / width);
+          setActiveIndex(Math.max(0, Math.min(idx, SLIDES.length - 1)));
+        }}
+        renderItem={({ item: s }) => (
+          <View style={{ width, flex: 1 }}>
+            <View style={[styles.illustrationContainer, { backgroundColor: s.bg }]}>
+              <Image source={IMAGES[s.image]} style={styles.illustrationImage} resizeMode="contain" />
+            </View>
 
-      {/* Content */}
-      <View style={styles.contentContainer}>
-        <Text style={styles.title}>
-          Your Daily News{'\n'}Delivered <Text style={{ color: '#2563EB' }}>Fresh</Text>
-        </Text>
+            <View style={styles.contentContainer}>
+              <Text style={styles.title}>
+                {s.title}
+                {s.accent ? ' ' : ''}
+                {s.accent ? <Text style={{ color: '#2563EB' }}>{s.accent}</Text> : null}
+              </Text>
 
-        <Text style={styles.subtitle}>
-          Subscribe to your favorite newspapers and get them delivered to your doorstep every morning.
-        </Text>
+              <Text style={styles.subtitle}>{s.subtitle}</Text>
 
-        {/* Dot indicators */}
-        <View style={styles.indicatorRow}>
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-        </View>
-      </View>
+              <View style={styles.indicatorRow}>
+                {SLIDES.map((_, dotIdx) => {
+                  const isActive = dotIdx === activeIndex;
+                  return <View key={dotIdx} style={[styles.dot, isActive && styles.dotActive]} />;
+                })}
+              </View>
+            </View>
+          </View>
+        )}
+      />
 
-      {/* Get Started CTA */}
       <View style={styles.bottomContainer}>
         <TouchableOpacity
           style={styles.primaryBtn}
-          onPress={() => router.replace('/customer/bottom_nav/home')}
+          onPress={activeIndex === SLIDES.length - 1 ? onGetStarted : goNext}
           activeOpacity={0.85}
         >
-          <Text style={styles.btnText}>Get Started</Text>
-          <ChevronRight size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
+          <Text style={styles.btnText}>{activeIndex === SLIDES.length - 1 ? 'Get Started' : 'Next'}</Text>
+          <ChevronRight size={18} color="#FFFFFF" style={{ marginLeft: 6, opacity: activeIndex === SLIDES.length - 1 ? 1 : 0.9 }} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

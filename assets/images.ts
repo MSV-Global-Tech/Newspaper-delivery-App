@@ -1,40 +1,18 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // assets/images.ts
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔴 SECOND FILE YOU MAY NEED TO EDIT (only for asset file swaps).
-//
-//    RULE: Key = exact filename (case-sensitive, WITH extension).
-//          Value = require('./that_exact_filename.ext')
-//
-//    ── Common edits: ──
-//
-//    ✅ Add a new image (e.g. sakshi.webp):
-//       - Drop sakshi.webp in /assets/
-//       - Add 1 line:  'sakshi.webp': require('./sakshi.webp'),
-//       - In papers_catalog.ts set `image: 'sakshi.webp'` on the paper
-//
-//    ✅ Swap PNG → WEBP for existing image (e.g. vijayavani.png → vijayavani.webp):
-//       - Delete vijayavani.png, add vijayavani.webp in /assets/
-//       - Change this line (same key in map, update require path):
-//             'vijayavani.webp': require('./vijayavani.webp'),
-//       - In papers_catalog.ts change `image: 'vijayavani.png'` → `'vijayavani.webp'`
-//       - Done. 2 lines total, both trivial.
-//
-//    ✅ Change case sensitivity matters, but resolvePaperImage() will try
-//       case-insensitive fallback if exact key not found.
-// ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * 👉 ONE LINE PER ASSET.
- *    Key = filename with extension.
- *    Value = require('./filename.ext').
- */
 export const IMAGES: Record<string, any> = {
   // ── App UI images ──
-  'onboarding.webp': require('./onboarding.webp'),
+  'onboarding.webp': require('./splash1.webp'),
+  'splash1.webp':    require('./splash1.webp'),
+  'splash2.webp':    require('./splash2.webp'),
   'logo.png':       require('./logo.png'),
+  'milk.webp':      require('./Milk/milk.webp'),
+  'water.webp':     require('./Milk/water.webp'),
+  'newspaper.webp': require('./Milk/newspaper.webp'),
 
-  // ── Kannada newspaper logos (10 listed by user) ──
+  // ── Kannada newspaper logos ──
   'vijayavani.webp':       require('./vijayavani.webp'),
   'prajavani.webp':        require('./prajavani.webp'),
   'kannadaprabha.webp':    require('./kannadaprabha.webp'),
@@ -46,6 +24,8 @@ export const IMAGES: Record<string, any> = {
   'vishwavaaradhi.webp':   require('./vishwavaaradhi.webp'),
   'vishwavani.webp':       require('./vishwavani.webp'),
   'prathinidhi.webp':      require('./prathinidhi.webp'),
+  'vidyarthimitra.webp':   require('./vidyarthimitra.webp'),
+  'samyuktha.webp':        require('./samyuktha.webp'),
 
   // ── English newspaper logos ──
   'hindu.webp':           require('./hindu.webp'),
@@ -54,6 +34,7 @@ export const IMAGES: Record<string, any> = {
   'deccanherald.webp':    require('./deccanherald.webp'),
   'bangloremirror.webp':  require('./bangloremirror.webp'),
   'indianexpress.webp':   require('./indianexpress.webp'),
+  'wealth.webp':          require('./wealth.webp'),
 
   // ── Telugu newspaper logos ──
   'sakshi.webp':         require('./sakshi.webp'),
@@ -84,19 +65,8 @@ export const IMAGES: Record<string, any> = {
   'thuglak.png':         require('./magzines/thuglak.png'),
 };
 
-/**
- * Resolves any image string (filename with extension, or URL) to a React Native
- * Image source. Handles:
- *   - exact filename key lookup in IMAGES
- *   - LEGACY ALIASES (every old imageSrc we've ever stored in Firestore, mapped
- *     to the current canonical asset — kills the "flash to wrong image" bug when
- *     Firebase connects with stale seed data).
- *   - case-insensitive fallback (covers caps/small typos)
- *   - strip-extension fallback (if someone forgot .png/.webp)
- *   - URL passthrough (http://, https://, file:// — admin-uploaded logos)
- */
 const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
-  // ── App logos (recently WEBP → PNG migration) ──
+  // ── App logos ──
   'logo':                   'logo.png',
   'logo.webp':              'logo.png',
   'logo.png':               'logo.png',
@@ -105,14 +75,13 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'logo_foreground.png':    'logo.png',
   'LOGO':                   'logo.png',
 
-  // ── Vijayavani ──
+  // ── Kannada ──
   'vijayavani':             'vijayavani.webp',
   'vijayavani.png':         'vijayavani.webp',
   'vijayavani.webp':        'vijayavani.webp',
   'VIJAYAVANI':             'vijayavani.webp',
   'Vijayavani':             'vijayavani.webp',
 
-  // ── Kannada Prabha (new: kannadaprabha.webp) ──
   'kannadaprabha':          'kannadaprabha.webp',
   'kannadaprabha.webp':     'kannadaprabha.webp',
   'kannada prabha':         'kannadaprabha.webp',
@@ -120,25 +89,21 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'kannada_prabha':         'kannadaprabha.webp',
   'kannadaprabha.png':      'kannadaprabha.webp',
 
-  // ── Kolaravani (new: kolaravani.webp) ──
   'kolaravani':             'kolaravani.webp',
   'kolaravani.webp':        'kolaravani.webp',
   'kolaravani.png':         'kolaravani.webp',
   'Kolaravani':             'kolaravani.webp',
 
-  // ── Prajapragathi (new: prajapragathi.webp) ──
   'prajapragathi':          'prajapragathi.webp',
   'prajapragathi.webp':     'prajapragathi.webp',
   'prajapragathi.png':      'prajapragathi.webp',
   'Prajapragathi':          'prajapragathi.webp',
 
-  // ── Prajavani ──
   'prajavani':              'prajavani.webp',
   'prajavani.png':          'prajavani.webp',
   'prajavani.webp':         'prajavani.webp',
   'Prajavani':              'prajavani.webp',
 
-  // ── Pravasi Prapancha (new: pravasiprapancha.webp) ──
   'pravasiprapancha':       'pravasiprapancha.webp',
   'pravasiprapancha.webp':  'pravasiprapancha.webp',
   'pravasiprapancha.png':   'pravasiprapancha.webp',
@@ -146,13 +111,11 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'Pravasi Prapancha':      'pravasiprapancha.webp',
   'pravasi_prapancha':      'pravasiprapancha.webp',
 
-  // ── Udayavani (new: udayavani.webp) ──
   'udayavani':              'udayavani.webp',
   'udayavani.webp':         'udayavani.webp',
   'udayavani.png':          'udayavani.webp',
   'Udayavani':              'udayavani.webp',
 
-  // ── Vijay Karnataka (new: vijaykarnataka.webp) ──
   'vijaykarnataka':         'vijaykarnataka.webp',
   'vijaykarnataka.webp':    'vijaykarnataka.webp',
   'vijaykarnataka.png':     'vijaykarnataka.webp',
@@ -160,7 +123,6 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'Vijay Karnataka':        'vijaykarnataka.webp',
   'vijay_karnataka':        'vijaykarnataka.webp',
 
-  // ── Vishwa Vaaridhi (new: vishwavaaradhi.webp) ──
   'vishwavaaradhi':         'vishwavaaradhi.webp',
   'vishwavaaradhi.webp':    'vishwavaaradhi.webp',
   'vishwavaaradhi.png':     'vishwavaaradhi.webp',
@@ -169,13 +131,22 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'vishwa_vaaridhi':        'vishwavaaradhi.webp',
   'vishwavaridhi':          'vishwavaaradhi.webp',
 
-  // ── Vishwavani (new: vishwavani.webp) ──
   'vishwavani':             'vishwavani.webp',
   'vishwavani.webp':        'vishwavani.webp',
   'vishwavani.png':         'vishwavani.webp',
   'Vishwavani':             'vishwavani.webp',
+  
+  'vidyarthimitra':         'vidyarthimitra.webp',
+  'vidyarthimitra.webp':    'vidyarthimitra.webp',
+  'vidyarthi mitra':        'vidyarthimitra.webp',
+  'Vidyarthi Mitra':        'vidyarthimitra.webp',
 
-  // ── The Hindu group (various aliases used over time) ──
+  'samyuktha':              'samyuktha.webp',
+  'samyuktha.webp':         'samyuktha.webp',
+  'samyuktha karnataka':    'samyuktha.webp',
+  'Samyuktha Karnataka':    'samyuktha.webp',
+
+  // ── English ──
   'theHindu':               'hindu.webp',
   'the_hindu':              'hindu.webp',
   'the_hindu.png':          'hindu.webp',
@@ -185,7 +156,6 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'Hindu':                  'hindu.webp',
   'hindu.webp':             'hindu.webp',
 
-  // ── Times group ──
   'timesOfIndia':           'timesofindia.webp',
   'times_of_india':         'timesofindia.webp',
   'times_of_india.png':     'timesofindia.webp',
@@ -196,7 +166,6 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'times':                  'timesofindia.webp',
   'toi':                    'timesofindia.webp',
 
-  // ── Economic Times ──
   'economictimes':          'economictimes.webp',
   'economictimes.webp':     'economictimes.webp',
   'economictimes.png':      'economictimes.webp',
@@ -204,35 +173,35 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'economic_times':         'economictimes.webp',
   'et':                     'economictimes.webp',
 
-  // ── Deccan Herald ──
   'deccanherald':           'deccanherald.webp',
   'deccanherald.webp':      'deccanherald.webp',
   'deccanherald.png':       'deccanherald.webp',
   'Deccan Herald':          'deccanherald.webp',
   'deccan_herald':          'deccanherald.webp',
 
-  // ── Bangalore Mirror ──
   'bangloremirror':         'bangloremirror.webp',
   'bangloremirror.webp':    'bangloremirror.webp',
   'bangloremirror.png':     'bangloremirror.webp',
   'Bangalore Mirror':       'bangloremirror.webp',
   'bangalore_mirror':       'bangloremirror.webp',
 
-  // ── Indian Express ──
   'indianexpress':          'indianexpress.webp',
   'indianexpress.webp':     'indianexpress.webp',
   'indianexpress.png':      'indianexpress.webp',
   'Indian Express':         'indianexpress.webp',
   'indian_express':         'indianexpress.webp',
   'The Indian Express':     'indianexpress.webp',
+  
+  'wealth':                 'wealth.webp',
+  'wealth.webp':            'wealth.webp',
+  'Wealth':                 'wealth.webp',
 
-  // ── Sakshi (Telugu) ──
+  // ── Telugu ──
   'sakshi':                 'sakshi.webp',
   'sakshi.webp':            'sakshi.webp',
   'sakshi.png':             'sakshi.webp',
   'Sakshi':                 'sakshi.webp',
 
-  // ── Andra Jyothi (Telugu) ──
   'andrajyothy':            'andrajyothy.webp',
   'andrajyothy.webp':       'andrajyothy.webp',
   'andrajyothy.png':        'andrajyothy.webp',
@@ -241,13 +210,12 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'andhra jyothy':          'andrajyothy.webp',
   'Andhra Jyothi':          'andrajyothy.webp',
 
-  // ── Eenadu (Telugu) ──
   'eenadu':                 'eenadu.webp',
   'eenadu.webp':            'eenadu.webp',
   'eenadu.png':             'eenadu.webp',
   'Eenadu':                 'eenadu.webp',
 
-  // ── Dinakaran (Tamil) ──
+  // ── Tamil ──
   'dinakar':                'dinakar.webp',
   'dinakar.webp':           'dinakar.webp',
   'dinakar.png':            'dinakar.webp',
@@ -255,13 +223,11 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'dinakaran':              'dinakar.webp',
   'dinakaran.webp':         'dinakar.webp',
 
-  // ── Dinamalar (Tamil) ──
   'dinamalar':              'dinamalar.webp',
   'dinamalar.webp':         'dinamalar.webp',
   'dinamalar.png':          'dinamalar.webp',
   'Dinamalar':              'dinamalar.webp',
 
-  // ── Thanthi (Tamil) ──
   'thanti':                 'thanti.webp',
   'thanti.webp':            'thanti.webp',
   'thanti.png':             'thanti.webp',
@@ -272,62 +238,54 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'daily thanthi':          'thanti.webp',
   'Daily Thanthi':          'thanti.webp',
 
-  // ── Rajasthan Patrika (Hindi) ──
+  // ── Hindi ──
   'rajasthanpatrika':       'rajasthanpatrika.webp',
   'rajasthanpatrika.webp':  'rajasthanpatrika.webp',
   'rajasthanpatrika.png':   'rajasthanpatrika.webp',
   'Rajasthan Patrika':      'rajasthanpatrika.webp',
   'rajasthan_patrika':      'rajasthanpatrika.webp',
 
-  // ── Karmaveera (Kannada magazine) ──
+  // ── Kannada Magazines ──
   'karmaveera':             'karmaveera.webp',
   'karmaveera.webp':        'karmaveera.webp',
   'karmaveera.png':         'karmaveera.webp',
   'Karmaveera':             'karmaveera.webp',
 
-  // ── Taranga (Kannada magazine) ──
   'taranga':                'taranga.webp',
   'taranga.webp':           'taranga.webp',
   'taranga.png':            'taranga.webp',
   'Taranga':                'taranga.webp',
 
-  // ── Sudha (Kannada magazine) ──
   'sudha':                  'sudha.webp',
   'sudha.webp':             'sudha.webp',
   'sudha.png':              'sudha.webp',
   'Sudha':                  'sudha.webp',
 
-  // ── Kasturi (Kannada magazine) ──
   'kasturi':                'kasturi.webp',
   'kasturi.webp':           'kasturi.webp',
   'kasturi.png':            'kasturi.webp',
   'Kasturi':                'kasturi.webp',
 
-  // ── Mayura (Kannada magazine) ──
   'mayura':                 'mayura.png',
   'mayura.png':             'mayura.png',
   'mayura.webp':            'mayura.png',
   'Mayura':                 'mayura.png',
 
-  // ── Priyanka (Kannada magazine) ──
   'priyanka':               'priyanka.webp',
   'priyanka.webp':          'priyanka.webp',
   'priyanka.png':           'priyanka.webp',
   'Priyanka':               'priyanka.webp',
 
-  // ── Gruhasobha (Kannada magazine) ──
   'gruhashobha':            'gruhashobha.webp',
   'gruhashobha.webp':       'gruhashobha.webp',
   'gruhashobha.png':        'gruhashobha.webp',
   'Gruhasobha':             'gruhashobha.webp',
 
-  // ── Frontline (English magazine) ──
   'frontline':              'frontline.webp',
   'frontline.webp':         'frontline.webp',
   'frontline.png':          'frontline.webp',
   'Frontline':              'frontline.webp',
 
-  // ── India Today (English magazine) ──
   'indiatoday':             'indiatoday.webp',
   'indiatoday.webp':        'indiatoday.webp',
   'indiatoday.png':         'indiatoday.webp',
@@ -369,13 +327,8 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
 };
 
 export function resolvePaperImage(image: string | null | undefined): any {
-  // Empty string / null / undefined => NO IMAGE (caller should render placeholder)
   if (!image || image.trim().length === 0) return null;
 
-  // 1) URLs / paths: admin-uploaded via Firebase Storage, gallery file://,
-  //    Expo ImagePicker assets-library/content://, inline base64 data:,
-  //    or raw absolute paths (Android sometimes returns /data/...  without
-  //    any scheme).
   if (typeof image === 'string' &&
       (/^(https?:|file:|content:|assets-library:|data:)/i.test(image) ||
        image.startsWith('/') ||
@@ -385,14 +338,11 @@ export function resolvePaperImage(image: string | null | undefined): any {
     return { uri: image };
   }
 
-  // 2) Exact key match (the normal / intended path)
   if (IMAGES[image] != null) return IMAGES[image];
 
-  // 3) Legacy alias match — covers every old seed key we've ever used
   const viaAlias = LEGACY_ALIAS_TO_CANONICAL[image];
   if (viaAlias != null && IMAGES[viaAlias] != null) return IMAGES[viaAlias];
 
-  // 4) Case-insensitive fallback (e.g. 'Hindu.webp' vs 'hindu.webp')
   const lower = image.toLowerCase();
   for (const k of Object.keys(IMAGES)) {
     if (k.toLowerCase() === lower) return IMAGES[k];
@@ -404,7 +354,6 @@ export function resolvePaperImage(image: string | null | undefined): any {
     }
   }
 
-  // 5) Extension strip fallback (someone typed 'vijayavani' not 'vijayavani.png')
   const bare = lower.replace(/\.[a-z0-9]+$/i, '');
   if (bare) {
     for (const k of Object.keys(IMAGES)) {
@@ -420,6 +369,5 @@ export function resolvePaperImage(image: string | null | undefined): any {
     }
   }
 
-  // 6) Final fallback: no image => caller renders placeholder
   return null;
 }

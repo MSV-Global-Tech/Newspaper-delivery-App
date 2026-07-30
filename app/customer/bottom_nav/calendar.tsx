@@ -36,12 +36,13 @@ export default function CalendarScreen() {
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState(today.getDate());
 
-  const [overrides, setOverrides] = useState<Record<string, 'Skipped' | 'Paused' | 'Delivered'>>({});
+  const [marks, setMarks] = useState(store.getCalendarMarks());
 
   useEffect(() => {
     const unsub = store.subscribe(() => {
       setUser(store.getUser());
       setDeliveries(store.getDeliveries());
+      setMarks(store.getCalendarMarks());
     });
     return unsub;
   }, []);
@@ -49,7 +50,7 @@ export default function CalendarScreen() {
   const firstDayOfWeek = new Date(currentYear, currentMonth, 1).getDay();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
 
-  const userSubs = deliveries.filter((d) => d.name === user?.name);
+  const userSubs = deliveries.filter((d) => d.name === user?.name && d.plan !== 'One-time');
   const primarySub = userSubs[0] || deliveries[0];
 
   const handlePrevMonth = () => {
@@ -78,52 +79,30 @@ export default function CalendarScreen() {
 
   const getDayStatus = (dayNum: number) => {
     const dateKey = `${currentYear}-${currentMonth + 1}-${dayNum}`;
-    if (overrides[dateKey]) return overrides[dateKey];
+    if (marks[dateKey]) return marks[dateKey];
 
     const isToday =
       currentYear === today.getFullYear() &&
       currentMonth === today.getMonth() &&
       dayNum === today.getDate();
 
-    const isPast =
-      new Date(currentYear, currentMonth, dayNum) <
-      new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-    if (dayNum === 14) return 'Skipped';
-    if (dayNum === 15) return 'Paused';
-    if (isPast) return 'Delivered';
     if (isToday) return primarySub?.status || 'Pending';
     return 'Scheduled';
   };
 
-  const toggleSkipDay = (dayNum: number) => {
+  const toggleMarkDelivered = (dayNum: number) => {
     const dateKey = `${currentYear}-${currentMonth + 1}-${dayNum}`;
-    const current = getDayStatus(dayNum);
+    store.setCalendarMark(dateKey, 'Delivered');
+  };
 
-    if (current === 'Skipped') {
-      const next = { ...overrides };
-      delete next[dateKey];
-      setOverrides(next);
-      Alert.alert('Resumed', `Delivery resumed for ${MONTH_NAMES[currentMonth]} ${dayNum}.`);
-    } else {
-      setOverrides({ ...overrides, [dateKey]: 'Skipped' });
-      Alert.alert('Skipped', `Paper delivery skipped for ${MONTH_NAMES[currentMonth]} ${dayNum}.`);
-    }
+  const toggleMarkNotDelivered = (dayNum: number) => {
+    const dateKey = `${currentYear}-${currentMonth + 1}-${dayNum}`;
+    store.setCalendarMark(dateKey, 'Skipped');
   };
 
   const togglePauseDay = (dayNum: number) => {
     const dateKey = `${currentYear}-${currentMonth + 1}-${dayNum}`;
-    const current = getDayStatus(dayNum);
-
-    if (current === 'Paused') {
-      const next = { ...overrides };
-      delete next[dateKey];
-      setOverrides(next);
-      Alert.alert('Resumed', `Pause removed for ${MONTH_NAMES[currentMonth]} ${dayNum}.`);
-    } else {
-      setOverrides({ ...overrides, [dateKey]: 'Paused' });
-      Alert.alert('Paused', `Vacation pause set for ${MONTH_NAMES[currentMonth]} ${dayNum}.`);
-    }
+    store.setCalendarMark(dateKey, 'Paused');
   };
 
   const selectedStatus = getDayStatus(selectedDay);
@@ -234,19 +213,33 @@ export default function CalendarScreen() {
                 currentMonth === today.getMonth() &&
                 dayNum === today.getDate();
 
-              let dotColor = '#CBD5E1';
-              if (status === 'Delivered') dotColor = '#16A34A';
-              else if (status === 'Skipped') dotColor = '#DC2626';
-              else if (status === 'Paused') dotColor = '#D97706';
-              else if (status === 'Pending' || status === 'Scheduled') dotColor = '#2563EB';
+              let isMarked = false;
+              let bgColor = 'transparent';
+              let textColor = '#0F172A';
+              
+              if (status === 'Delivered') {
+                bgColor = '#22C55E';
+                textColor = '#FFFFFF';
+                isMarked = true;
+              } else if (status === 'Skipped') {
+                bgColor = '#EF4444';
+                textColor = '#FFFFFF';
+                isMarked = true;
+              } else if (status === 'Paused') {
+                bgColor = '#F59E0B';
+                textColor = '#FFFFFF';
+                isMarked = true;
+              }
 
               return (
                 <TouchableOpacity
                   key={`day-${dayNum}`}
                   style={[
                     styles.dayTile,
-                    isSelected && styles.dayTileSelected,
-                    isToday && !isSelected && styles.dayTileToday,
+                    isMarked && { backgroundColor: bgColor },
+                    !isMarked && isSelected && styles.dayTileSelected,
+                    isToday && !isSelected && !isMarked && styles.dayTileToday,
+                    isSelected && isMarked && { borderWidth: 2, borderColor: '#0F172A' },
                   ]}
                   onPress={() => setSelectedDay(dayNum)}
                   activeOpacity={0.8}
@@ -254,18 +247,21 @@ export default function CalendarScreen() {
                   <Text
                     style={[
                       styles.dayNumText,
-                      isSelected && styles.dayNumTextSelected,
-                      isToday && !isSelected && styles.dayNumTextToday,
+                      isMarked && { color: textColor, fontWeight: '800' },
+                      !isMarked && isSelected && styles.dayNumTextSelected,
+                      isToday && !isSelected && !isMarked && styles.dayNumTextToday,
                     ]}
                   >
                     {dayNum}
                   </Text>
-                  <View
-                    style={[
-                      styles.statusDot,
-                      { backgroundColor: isSelected ? '#FFFFFF' : dotColor },
-                    ]}
-                  />
+                  {!isMarked && (
+                    <View
+                      style={[
+                        styles.statusDot,
+                        { backgroundColor: isSelected ? '#FFFFFF' : '#3B82F6' },
+                      ]}
+                    />
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -332,26 +328,46 @@ export default function CalendarScreen() {
             <TouchableOpacity
               style={[
                 styles.actionBtn,
-                selectedStatus === 'Skipped' ? styles.actionBtnActiveRed : styles.actionBtnOutlineRed,
+                selectedStatus === 'Delivered' ? { backgroundColor: '#16A34A' } : { backgroundColor: '#F0FDF4', borderWidth: 1.5, borderColor: '#BBF7D0' },
               ]}
-              onPress={() => toggleSkipDay(selectedDay)}
+              onPress={() => toggleMarkDelivered(selectedDay)}
               activeOpacity={0.8}
             >
-              <XCircle size={15} color={selectedStatus === 'Skipped' ? '#FFFFFF' : '#DC2626'} />
+              <Text style={{ fontSize: 16 }}>✅</Text>
               <Text
                 style={[
                   styles.actionBtnText,
-                  selectedStatus === 'Skipped' ? styles.textWhite : { color: '#DC2626' },
+                  selectedStatus === 'Delivered' ? styles.textWhite : { color: '#16A34A' },
                 ]}
               >
-                {selectedStatus === 'Skipped' ? 'Resume Delivery' : 'Skip Day'}
+                Mark Delivered
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
                 styles.actionBtn,
+                selectedStatus === 'Skipped' ? styles.actionBtnActiveRed : styles.actionBtnOutlineRed,
+              ]}
+              onPress={() => toggleMarkNotDelivered(selectedDay)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 16 }}>❌</Text>
+              <Text
+                style={[
+                  styles.actionBtnText,
+                  selectedStatus === 'Skipped' ? styles.textWhite : { color: '#DC2626' },
+                ]}
+              >
+                Not Delivered
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+              style={[
+                styles.actionBtn,
                 selectedStatus === 'Paused' ? styles.actionBtnActiveYellow : styles.actionBtnOutlineYellow,
+                { marginTop: 10 }
               ]}
               onPress={() => togglePauseDay(selectedDay)}
               activeOpacity={0.8}
@@ -366,7 +382,6 @@ export default function CalendarScreen() {
                 {selectedStatus === 'Paused' ? 'End Pause' : 'Pause Date'}
               </Text>
             </TouchableOpacity>
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>

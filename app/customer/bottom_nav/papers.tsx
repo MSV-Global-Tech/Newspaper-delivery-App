@@ -26,20 +26,45 @@ export default function SubscriptionsScreen() {
   }, []);
 
   const activeSubs = deliveries
-    .filter((d) => d.name === user?.name)
-    .map((d) => ({
-      id: d.id,
-      name: d.paperName,
-      language: d.paperName === 'The Hindu' ? 'English' : 'Kannada',
-      category: 'Daily',
-      status: d.status === 'Pending' ? 'Active' : d.status,
-      nextDelivery: d.status === 'Skipped' ? 'Paused' : 'Tomorrow, 26 Jul 2025',
-      plan: d.plan || 'Monthly',
-      price: d.priceMonth || 180,
-      logo_text: d.paperName.substring(0, 3).toUpperCase(),
-      logo_bg: '#EFF6FF',
-      logo_color: '#2563EB',
-    }));
+    .filter((d) => d.name === user?.name && d.plan !== 'One-time')
+    .map((d) => {
+      const isMilk = d.category === 'Milk' || d.imageSrc === 'milk.webp';
+      const isWater = d.category === 'Water' || d.imageSrc === 'water.webp';
+      
+      let logo_text = '';
+      let logo_bg = '#EFF6FF';
+      let logo_color = '#2563EB';
+      let language = d.paperName === 'The Hindu' ? 'English' : 'Kannada';
+      let category = d.category || 'Newspaper';
+      
+      if (isMilk) {
+        logo_text = '🥛';
+        logo_bg = '#E8F5E9';
+        logo_color = '#2E7D32';
+        language = 'Farm Fresh';
+      } else if (isWater) {
+        logo_text = '💧';
+        logo_bg = '#E3F2FD';
+        logo_color = '#1565C0';
+        language = 'Purified';
+      } else {
+        logo_text = d.paperName.substring(0, 3).toUpperCase();
+      }
+
+      return {
+        id: d.id,
+        name: d.paperName,
+        language,
+        category,
+        status: d.status === 'Pending' ? 'Active' : d.status,
+        nextDelivery: d.status === 'Skipped' ? 'Paused' : 'Tomorrow',
+        plan: d.plan || 'Monthly',
+        price: d.priceMonth || 180,
+        logo_text,
+        logo_bg,
+        logo_color,
+      };
+    });
 
   const contactAgent = () => {
     Linking.openURL('tel:9972505709');

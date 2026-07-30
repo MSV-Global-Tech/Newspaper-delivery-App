@@ -12,7 +12,6 @@ import {
   listenDeliveries,
   addDelivery,
   updateDeliveryStatus as fbUpdateDeliveryStatus,
-  seedDeliveries,
   listenPapers,
   addPaper as fbAddPaper,
   updatePaper as fbUpdatePaper,
@@ -27,9 +26,13 @@ import {
   addAgent as fbAddAgent,
   deleteAgent as fbDeleteAgent,
   seedAgents,
+  listenPayments,
+  addPayment as fbAddPayment,
+  updatePayment as fbUpdatePayment,
   PAPERS_CATALOG_WITH_IDS,
 } from '../database';
-import type { AgentDoc, AdminUserDoc } from '../database';
+import type { AgentDoc, AdminUserDoc, PaymentDoc } from '../database';
+import { setSessionUser } from './session';
 
 export type { AgentDoc, AdminUserDoc };
 
@@ -56,6 +59,9 @@ export interface Delivery {
   startDate?: string;
   days?: string[];
   paymentMethod?: string;
+  category?: 'Newspaper' | 'Milk' | 'Water';
+  quantity?: number;
+  imageSrc?: string;
 }
 
 export interface Newspaper {
@@ -68,6 +74,19 @@ export interface Newspaper {
   rating: number;
   src: any;
   imageSrc?: string;
+}
+
+export interface Payment {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  amount: number;
+  method: string;
+  txnId: string;
+  status: 'Paid' | 'Pending';
+  forMonth: string;
+  category?: 'Newspaper' | 'Milk' | 'Water';
+  createdAt?: any;
 }
 
 // ── Image resolution ───────────────────────────────────────────────────────────────
@@ -115,6 +134,9 @@ let agents: AgentDoc[] = [
   },
 ];
 
+let payments: Payment[] = [];
+let currentCalendarMarks: Record<string, string> = {};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 🧊 CATALOG NAME → IMAGE LUT (built ONCE).
 //    For every paper name that exists in the CATALOG:
@@ -144,6 +166,31 @@ const listeners = new Set<() => void>();
 // ── Pub/Sub ──────────────────────────────────────────────────────────────────
 function notify() {
   listeners.forEach((l) => l());
+}
+
+let paymentsUnsubscribe: (() => void) | null = null;
+
+function startPaymentsListener(user: User | null) {
+  if (paymentsUnsubscribe) {
+    paymentsUnsubscribe();
+    paymentsUnsubscribe = null;
+  }
+  if (!user) {
+    payments = [];
+    notify();
+    return;
+  }
+  try {
+    paymentsUnsubscribe = listenPayments(
+      (docs) => {
+        payments = docs;
+        notify();
+      },
+      user.isAdmin ? undefined : { customerPhone: user.phone }
+    );
+  } catch (e) {
+    console.warn('[Store] listenPayments failed:', e);
+  }
 }
 
 // ── Bootstrap: seed Firestore + start real-time listeners ────────────────────
@@ -205,12 +252,11 @@ async function bootstrap() {
     await seedAgents().catch(e => console.warn('[Store] seedAgents failed:', e?.code || e?.message));
   } catch {}
   try {
-    await seedDeliveries().catch(e => console.warn('[Store] seedDeliveries failed:', e?.code || e?.message));
-  } catch {}
-  try {
     // Papers is the largest/most-likely to rate-limit, run it last
     await seedPapers().catch(e => console.warn('[Store] seedPapers failed:', e?.code || e?.message));
   } catch {}
+  // Start dynamic payments listener with loaded user
+  startPaymentsListener(currentUser);
 }
 
 bootstrap();
@@ -225,6 +271,8 @@ export const store = {
     currentUser = user;
     // Persist to Firestore in background (no await — non-blocking)
     if (user) saveUser(user).catch(console.warn);
+    setSessionUser(user).catch(() => {});
+    startPaymentsListener(user);
     notify();
   },
 
@@ -324,6 +372,7 @@ export const store = {
       startDate: sub.startDate,
       days: sub.days,
       paymentMethod: sub.paymentMethod,
+      category: 'Newspaper',
     }).catch(console.warn);
   },
 
@@ -368,6 +417,38 @@ export const store = {
     agents = agents.filter((a) => a.id !== id);
     notify();
     fbDeleteAgent(id).catch(console.warn);
+  },
+
+  getPayments() {
+    return payments;
+  },
+
+  addPayment(payment: Omit<PaymentDoc, 'id'>) {
+    const tempId = `local-${Date.now()}`;
+    payments = [{ ...payment, id: tempId } as any, ...payments];
+    notify();
+    fbAddPayment(payment).catch(console.warn);
+  },
+
+  updatePayment(id: string, data: Partial<Omit<PaymentDoc, 'id'>>) {
+    payments = payments.map((p) => (p.id === id ? ({ ...p, ...data } as any) : p));
+    notify();
+    fbUpdatePayment(id, data).catch(console.warn);
+  },
+
+  getCalendarMarks() {
+    return currentCalendarMarks;
+  },
+
+  setCalendarMark(dateKey: string, status: string) {
+    if (currentCalendarMarks[dateKey] === status) {
+      const next = { ...currentCalendarMarks };
+      delete next[dateKey];
+      currentCalendarMarks = next;
+    } else {
+      currentCalendarMarks = { ...currentCalendarMarks, [dateKey]: status };
+    }
+    notify();
   },
 
   subscribe(listener: () => void) {

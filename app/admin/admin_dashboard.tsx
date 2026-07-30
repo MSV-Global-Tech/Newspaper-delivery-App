@@ -9,12 +9,14 @@ import {
   Image,
   Modal,
   Alert,
+  Share,
 } from 'react-native';
 import {
   Users,
   TrendingUp,
   FileText,
   DollarSign,
+  CreditCard,
   Search,
   Check,
   X,
@@ -39,15 +41,17 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { IMAGES, resolvePaperImage } from '../../assets/images';
 import { store } from '../../utils/store';
+import { getAdminOverviewSnapshot, setAdminOverviewSnapshot, type AdminOverviewSnapshot } from '../../utils/session';
 import { uploadNewspaperLogo, deleteImage } from '../../database';
 
 export default function AdminScreen() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'deliveries' | 'papers' | 'agents' | 'access'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'deliveries' | 'payments' | 'papers' | 'agents' | 'access'>('overview');
   const [search, setSearch] = useState('');
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [papersList, setPapersList] = useState(store.getPapers());
   const [adminNumbers, setAdminNumbers] = useState(store.getAdminNumbers());
   const [agentsList, setAgentsList] = useState(store.getAgents());
+  const [payments, setPayments] = useState(store.getPayments());
   const [newAdminPhone, setNewAdminPhone] = useState('');
   const [newAdminName, setNewAdminName] = useState('');
 
@@ -74,6 +78,23 @@ export default function AdminScreen() {
   // Add Agent State
   const [isAddingAgent, setIsAddingAgent] = useState(false);
   const [newAgent, setNewAgent] = useState({ name: '', phone: '', area: '', location: '' });
+  const [prevOverview, setPrevOverview] = useState<AdminOverviewSnapshot | null>(null);
+  const [paymentsMonth, setPaymentsMonth] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  });
+  const [selectedCustomer, setSelectedCustomer] = useState<{ name: string; phone: string } | null>(null);
+  const [isCustomerPaymentsOpen, setIsCustomerPaymentsOpen] = useState(false);
+  const [isPaymentEditorOpen, setIsPaymentEditorOpen] = useState(false);
+  const [paymentDraft, setPaymentDraft] = useState({
+    amount: '',
+    method: 'UPI',
+    txnId: '',
+    status: 'Paid' as 'Paid' | 'Pending',
+    forMonth: '',
+  });
 
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
@@ -81,8 +102,13 @@ export default function AdminScreen() {
       setPapersList(store.getPapers());
       setAdminNumbers(store.getAdminNumbers());
       setAgentsList(store.getAgents());
+      setPayments(store.getPayments());
     });
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    getAdminOverviewSnapshot().then(setPrevOverview).catch(() => {});
   }, []);
 
   const handleAddAgent = () => {
@@ -304,17 +330,215 @@ export default function AdminScreen() {
     router.replace('/customer/login');
   };
 
+  const exportDeliverySheets = async () => {
+    if (!deliveries.length) {
+      Alert.alert('No Deliveries', 'No delivery records found to export.');
+      return;
+    }
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = [
+      ['Customer', 'Phone', 'Address', 'Publication', 'Time', 'Status', 'MonthlyPrice'],
+      ...deliveries.map((d) => [
+        d.name,
+        d.phone ?? '',
+        d.address,
+        d.paperName,
+        d.time,
+        d.status,
+        typeof d.priceMonth === 'number' && isFinite(d.priceMonth) ? d.priceMonth : '',
+      ]),
+    ];
+    const csv = rows.map((r) => r.map(esc).join(',')).join('\n');
+    try {
+      await Share.share({
+        title: 'Delivery Sheet',
+        message: csv,
+      });
+    } catch {}
+  };
+
+  const monthTitle = (key: string) => {
+    const [y, m] = key.split('-');
+    const d = new Date(Number(y), Math.max(0, Number(m) - 1), 1);
+    return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  };
+
+  const shiftMonth = (delta: number) => {
+    const [y, m] = paymentsMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    const ny = d.getFullYear();
+    const nm = String(d.getMonth() + 1).padStart(2, '0');
+    setPaymentsMonth(`${ny}-${nm}`);
+  };
+
+  const normalizePhone = (phone: string) => phone.replace(/\D/g, '').slice(-10);
+
+  const openCustomerPayments = (name: string, phone: string) => {
+    setSelectedCustomer({ name, phone });
+    setIsCustomerPaymentsOpen(true);
+  };
+
+  const openPaymentEditor = (customer: { name: string; phone: string }, amount?: number) => {
+    setPaymentDraft({
+      amount: amount != null ? String(Math.round(amount)) : '',
+      method: 'UPI',
+      txnId: '',
+      status: 'Paid',
+      forMonth: paymentsMonth,
+    });
+    setSelectedCustomer(customer);
+    setIsCustomerPaymentsOpen(true);
+    setIsPaymentEditorOpen(true);
+  };
+
+  const savePayment = () => {
+    if (!selectedCustomer) return;
+    const amt = Number(paymentDraft.amount);
+    if (!isFinite(amt) || amt <= 0) {
+      Alert.alert('Invalid Amount', 'Enter a valid amount.');
+      return;
+    }
+    const phone = normalizePhone(selectedCustomer.phone);
+    if (phone.length !== 10) {
+      Alert.alert('Invalid Phone', 'Customer phone number is missing/invalid.');
+      return;
+    }
+    store.addPayment({
+      customerName: selectedCustomer.name,
+      customerPhone: phone,
+      amount: amt,
+      method: paymentDraft.method.trim() || 'UPI',
+      txnId: paymentDraft.txnId.trim(),
+      status: paymentDraft.status,
+      forMonth: paymentDraft.forMonth || paymentsMonth,
+    });
+    setIsPaymentEditorOpen(false);
+    setIsCustomerPaymentsOpen(true);
+    setPaymentDraft({ amount: '', method: 'UPI', txnId: '', status: 'Paid', forMonth: '' });
+  };
+
   const totalCustomers = new Set(deliveries.map(d => d.name)).size;
   const activeSubs = deliveries.length;
-  const totalMonthlyRevenue = deliveries.reduce((sum, d) => sum + (d.priceMonth || 180), 0);
+  const totalMonthlyRevenue = deliveries.reduce(
+    (sum, d) => sum + (typeof d.priceMonth === 'number' && isFinite(d.priceMonth) ? d.priceMonth : 0),
+    0
+  );
   const pendingCount = deliveries.filter(d => d.status === 'Pending').length;
 
+  const computeChange = (current: number, previous: number | null | undefined) => {
+    if (previous == null) return { label: null as string | null, trend: null as 'up' | 'down' | null };
+    if (previous === 0) {
+      if (current === 0) return { label: '0%', trend: null as 'up' | 'down' | null };
+      return { label: 'New', trend: 'up' as const };
+    }
+    const diff = current - previous;
+    const pct = (diff / previous) * 100;
+    const abs = Math.abs(pct);
+    const rounded = abs >= 10 ? Math.round(abs) : Math.round(abs * 10) / 10;
+    const sign = pct > 0 ? '+' : pct < 0 ? '-' : '';
+    const trend = pct > 0 ? ('up' as const) : pct < 0 ? ('down' as const) : null;
+    return { label: `${sign}${rounded}%`, trend };
+  };
+
+  const customerChange = computeChange(totalCustomers, prevOverview?.totalCustomers);
+  const subsChange = computeChange(activeSubs, prevOverview?.activeSubs);
+  const revenueChange = computeChange(totalMonthlyRevenue, prevOverview?.totalMonthlyRevenue);
+  const pendingChange = computeChange(pendingCount, prevOverview?.pendingCount);
+
+  useEffect(() => {
+    const snapshot: AdminOverviewSnapshot = {
+      totalCustomers,
+      activeSubs,
+      totalMonthlyRevenue,
+      pendingCount,
+      capturedAt: Date.now(),
+    };
+    const t = setTimeout(() => {
+      setAdminOverviewSnapshot(snapshot).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [totalCustomers, activeSubs, totalMonthlyRevenue, pendingCount]);
+
   const dynamicStats = [
-    { label: 'Total Customers', value: totalCustomers.toString(), change: '+12%', isUp: true, icon: Users, bg: '#EFF6FF', color: '#2563EB' },
-    { label: 'Active Subs', value: activeSubs.toString(), change: '+8%', isUp: true, icon: Check, bg: '#ECFDF5', color: '#059669' },
-    { label: 'Monthly Revenue', value: `₹${totalMonthlyRevenue.toLocaleString('en-IN')}`, change: '+15%', isUp: true, icon: DollarSign, bg: '#FEF2F2', color: '#DC2626' },
-    { label: 'Pending Delivery', value: pendingCount.toString(), change: '-4%', isUp: false, icon: FileText, bg: '#FFF7ED', color: '#D97706' },
+    { label: 'Total Customers', value: totalCustomers.toString(), change: customerChange.label, trend: customerChange.trend, icon: Users, bg: '#EFF6FF', color: '#2563EB' },
+    { label: 'Active Subs', value: activeSubs.toString(), change: subsChange.label, trend: subsChange.trend, icon: Check, bg: '#ECFDF5', color: '#059669' },
+    { label: 'Monthly Revenue', value: `₹${totalMonthlyRevenue.toLocaleString('en-IN')}`, change: revenueChange.label, trend: revenueChange.trend, icon: DollarSign, bg: '#FEF2F2', color: '#DC2626' },
+    { label: 'Pending Delivery', value: pendingCount.toString(), change: pendingChange.label, trend: pendingChange.trend, icon: FileText, bg: '#FFF7ED', color: '#D97706' },
   ];
+
+  const paymentCustomerRows = (() => {
+    const byPhone = new Map<string, { name: string; phone: string; subs: typeof deliveries }>();
+    for (const d of deliveries) {
+      if (!d.phone) continue;
+      const phone = normalizePhone(String(d.phone));
+      if (phone.length !== 10) continue;
+      const existing = byPhone.get(phone);
+      if (existing) {
+        existing.subs.push(d);
+      } else {
+        byPhone.set(phone, { name: d.name, phone, subs: [d] });
+      }
+    }
+
+    const paidByPhone = new Map<string, number>();
+    const pendingByPhone = new Map<string, number>();
+    for (const p of payments) {
+      if (p.forMonth !== paymentsMonth) continue;
+      const phone = normalizePhone(String(p.customerPhone));
+      if (phone.length !== 10) continue;
+      const amt = typeof p.amount === 'number' && isFinite(p.amount) ? p.amount : 0;
+      if (p.status === 'Paid') {
+        paidByPhone.set(phone, (paidByPhone.get(phone) ?? 0) + amt);
+      } else {
+        pendingByPhone.set(phone, (pendingByPhone.get(phone) ?? 0) + amt);
+      }
+    }
+
+    const rows = Array.from(byPhone.values()).map((c) => {
+      const due = c.subs.reduce((sum, s) => sum + (typeof s.priceMonth === 'number' && isFinite(s.priceMonth) ? s.priceMonth : 0), 0);
+      const paid = paidByPhone.get(c.phone) ?? 0;
+      const balance = Math.max(0, due - paid);
+      const status = balance <= 0 ? ('Paid' as const) : ('Pending' as const);
+      return {
+        name: c.name,
+        phone: c.phone,
+        subs: c.subs,
+        due,
+        paid,
+        balance,
+        status,
+        pendingMarked: pendingByPhone.get(c.phone) ?? 0,
+      };
+    });
+
+    rows.sort((a, b) => b.balance - a.balance);
+    return rows;
+  })();
+
+  const selectedPhone = selectedCustomer ? normalizePhone(selectedCustomer.phone) : '';
+  const selectedSubs = selectedPhone
+    ? deliveries.filter((d) => d.phone && normalizePhone(String(d.phone)) === selectedPhone)
+    : [];
+  const selectedPayments = selectedPhone
+    ? payments
+        .filter((p) => normalizePhone(String(p.customerPhone)) === selectedPhone)
+        .slice()
+        .sort((a: any, b: any) => {
+          const at = a?.createdAt?.seconds ?? 0;
+          const bt = b?.createdAt?.seconds ?? 0;
+          return bt - at;
+        })
+    : [];
+  const selectedMonthPaid = selectedPhone
+    ? payments
+        .filter((p) => p.forMonth === paymentsMonth && p.status === 'Paid' && normalizePhone(String(p.customerPhone)) === selectedPhone)
+        .reduce((sum, p) => sum + (typeof p.amount === 'number' && isFinite(p.amount) ? p.amount : 0), 0)
+    : 0;
+  const selectedMonthDue = selectedSubs.reduce(
+    (sum, s) => sum + (typeof s.priceMonth === 'number' && isFinite(s.priceMonth) ? s.priceMonth : 0),
+    0
+  );
+  const selectedMonthBalance = Math.max(0, selectedMonthDue - selectedMonthPaid);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
@@ -350,6 +574,7 @@ export default function AdminScreen() {
           {([
             { key: 'overview',   label: 'Overview', icon: TrendingUp },
             { key: 'deliveries', label: 'Deliveries', icon: Truck },
+            { key: 'payments',   label: 'Payments', icon: CreditCard },
             { key: 'papers',     label: 'Papers', icon: BookOpen },
             { key: 'agents',     label: 'Agents', icon: Users },
             { key: 'access',     label: 'Access', icon: Shield },
@@ -387,16 +612,26 @@ export default function AdminScreen() {
                     <View style={[styles.statIconBox, { backgroundColor: stat.bg }]}>
                       <stat.icon size={20} color={stat.color} />
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                      {stat.isUp ? (
-                        <TrendingUp size={12} color="#10B981" />
-                      ) : (
-                        <TrendingDown size={12} color="#EF4444" />
-                      )}
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: stat.isUp ? '#10B981' : '#EF4444' }}>
-                        {stat.change}
-                      </Text>
-                    </View>
+                    {stat.change ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                        {stat.trend === 'up' ? (
+                          <TrendingUp size={12} color="#10B981" />
+                        ) : stat.trend === 'down' ? (
+                          <TrendingDown size={12} color="#EF4444" />
+                        ) : null}
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '700',
+                            color: stat.trend === 'up' ? '#10B981' : stat.trend === 'down' ? '#EF4444' : '#64748B',
+                          }}
+                        >
+                          {stat.change}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#94A3B8' }}>—</Text>
+                    )}
                   </View>
                   <Text style={styles.statValue}>{stat.value}</Text>
                   <Text style={styles.statLabel}>{stat.label}</Text>
@@ -407,20 +642,20 @@ export default function AdminScreen() {
             {/* Quick Actions Panel */}
             <Text style={styles.sectionTitle}>Admin Quick Tasks</Text>
             <View style={styles.actionPanel}>
-              <TouchableOpacity style={styles.actionRow} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={exportDeliverySheets}>
                 <View style={[styles.actionIndicator, { backgroundColor: '#10B981' }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.actionName}>Export Delivery Sheets</Text>
-                  <Text style={styles.actionDesc}>Generate PDF route logs for agents</Text>
+                  <Text style={styles.actionDesc}>Share route sheet (CSV)</Text>
                 </View>
                 <ChevronRight size={16} color="#94A3B8" />
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.actionRow} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={() => setActiveTab('payments')}>
                 <View style={[styles.actionIndicator, { backgroundColor: '#F59E0B' }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.actionName}>Collect Outstanding Payments</Text>
-                  <Text style={styles.actionDesc}>Send automated UPI payment reminders</Text>
+                  <Text style={styles.actionDesc}>Open payments manager</Text>
                 </View>
                 <ChevronRight size={16} color="#94A3B8" />
               </TouchableOpacity>
@@ -472,7 +707,7 @@ export default function AdminScreen() {
                         <View style={{ marginTop: 8, backgroundColor: '#F8FAFC', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#F1F5F9' }}>
                           {item.plan && <Text style={{ fontSize: 11, color: '#475569', fontWeight: '500' }}>Plan: <Text style={{ color: '#0F172A', fontWeight: '700' }}>{item.plan}</Text></Text>}
                           {item.startDate && <Text style={{ fontSize: 11, color: '#475569', fontWeight: '500', marginTop: 3 }}>Start Date: <Text style={{ color: '#0F172A', fontWeight: '700' }}>{item.startDate}</Text></Text>}
-                          {item.paymentMethod && <Text style={{ fontSize: 11, color: '#475569', fontWeight: '500', marginTop: 3 }}>Order Fee (₹20): <Text style={{ color: '#0F172A', fontWeight: '700' }}>{item.paymentMethod}</Text></Text>}
+                          {item.paymentMethod && <Text style={{ fontSize: 11, color: '#475569', fontWeight: '500', marginTop: 3 }}>Order Fee (₹50): <Text style={{ color: '#0F172A', fontWeight: '700' }}>{item.paymentMethod}</Text></Text>}
                         </View>
                       )}
                     </View>
@@ -537,6 +772,87 @@ export default function AdminScreen() {
                   )}
                 </TouchableOpacity>
               ))}
+          </View>
+        )}
+
+        {activeTab === 'payments' && (
+          <View style={styles.container}>
+            <View style={styles.paymentsHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Payments</Text>
+                <Text style={styles.paymentsSub}>{monthTitle(paymentsMonth)}</Text>
+              </View>
+              <View style={styles.monthNav}>
+                <TouchableOpacity style={styles.monthNavBtn} onPress={() => shiftMonth(-1)} activeOpacity={0.8}>
+                  <Text style={styles.monthNavText}>Prev</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.monthNavBtn} onPress={() => shiftMonth(1)} activeOpacity={0.8}>
+                  <Text style={styles.monthNavText}>Next</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.searchBox}>
+              <Search size={18} color="#94A3B8" />
+              <TextInput
+                placeholder="Search customer name / phone..."
+                placeholderTextColor="#94A3B8"
+                value={search}
+                onChangeText={setSearch}
+                style={styles.searchInput}
+              />
+            </View>
+
+            {paymentCustomerRows
+              .filter((r) => {
+                const q = search.trim().toLowerCase();
+                if (!q) return true;
+                const digits = q.replace(/\D/g, '');
+                return (
+                  r.name.toLowerCase().includes(q) ||
+                  (digits.length ? r.phone.includes(digits) : false)
+                );
+              })
+              .map((r) => (
+                <TouchableOpacity
+                  key={r.phone}
+                  style={styles.paymentCustomerRow}
+                  activeOpacity={0.85}
+                  onPress={() => openCustomerPayments(r.name, r.phone)}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.paymentCustomerName}>{r.name}</Text>
+                    <Text style={styles.paymentCustomerMeta} numberOfLines={1}>
+                      +91 {r.phone}  •  {r.subs.length} subs
+                    </Text>
+                    <Text style={styles.paymentCustomerMeta} numberOfLines={1}>
+                      Due ₹{Math.round(r.due).toLocaleString('en-IN')}  •  Paid ₹{Math.round(r.paid).toLocaleString('en-IN')}  •  Balance ₹{Math.round(r.balance).toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+
+                  <View style={{ alignItems: 'flex-end', gap: 8 }}>
+                    <View style={[styles.payStatusPill, r.status === 'Paid' ? styles.payStatusPaid : styles.payStatusPending]}>
+                      <Text style={[styles.payStatusText, r.status === 'Paid' ? styles.payStatusTextPaid : styles.payStatusTextPending]}>
+                        {r.status}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.addPayBtn}
+                      onPress={() => openPaymentEditor({ name: r.name, phone: r.phone }, r.balance > 0 ? r.balance : undefined)}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.addPayBtnText}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+            {paymentCustomerRows.length === 0 ? (
+              <View style={styles.emptyStateBox}>
+                <Text style={styles.emptyStateTitle}>No subscriptions yet</Text>
+                <Text style={styles.emptyStateSub}>Once customers subscribe, they will appear here for payment tracking.</Text>
+              </View>
+            ) : null}
           </View>
         )}
 
@@ -814,6 +1130,176 @@ export default function AdminScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={isCustomerPaymentsOpen && !!selectedCustomer}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsCustomerPaymentsOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>{selectedCustomer?.name || 'Customer'}</Text>
+                <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600', marginTop: 2 }}>
+                  +91 {selectedCustomer?.phone || ''}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsCustomerPaymentsOpen(false)}>
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.paySummaryCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.paySummaryTitle}>{monthTitle(paymentsMonth)}</Text>
+                <Text style={styles.paySummaryLine}>
+                  Due ₹{Math.round(selectedMonthDue).toLocaleString('en-IN')}  •  Paid ₹{Math.round(selectedMonthPaid).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.paySummaryBalance}>
+                  Balance ₹{Math.round(selectedMonthBalance).toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.addPayBtnBig}
+                onPress={() => (selectedCustomer ? openPaymentEditor(selectedCustomer, selectedMonthBalance > 0 ? selectedMonthBalance : undefined) : null)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.addPayBtnBigText}>Add Payment</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              <Text style={[styles.sectionTitle, { marginTop: 10 }]}>Subscriptions</Text>
+              {selectedSubs.length === 0 ? (
+                <View style={styles.emptyStateBox}>
+                  <Text style={styles.emptyStateTitle}>No subscriptions</Text>
+                  <Text style={styles.emptyStateSub}>This customer has not subscribed to any paper yet.</Text>
+                </View>
+              ) : (
+                selectedSubs.map((s) => (
+                  <View key={s.id} style={styles.subRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.subRowTitle}>{s.paperName}</Text>
+                      <Text style={styles.subRowMeta} numberOfLines={1}>
+                        {s.plan || 'Monthly'}  •  ₹{Math.round((typeof s.priceMonth === 'number' && isFinite(s.priceMonth) ? s.priceMonth : 0)).toLocaleString('en-IN')}/mo
+                      </Text>
+                    </View>
+                    <View style={[styles.subStatusPill, s.status === 'Delivered' ? styles.subStatusDelivered : s.status === 'Skipped' ? styles.subStatusSkipped : styles.subStatusPending]}>
+                      <Text style={[styles.subStatusText, s.status === 'Delivered' ? styles.subStatusTextDelivered : s.status === 'Skipped' ? styles.subStatusTextSkipped : styles.subStatusTextPending]}>
+                        {s.status}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
+
+              <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Payment History</Text>
+              {selectedPayments.length === 0 ? (
+                <View style={styles.emptyStateBox}>
+                  <Text style={styles.emptyStateTitle}>No payments yet</Text>
+                  <Text style={styles.emptyStateSub}>Payments you add will appear here with full history.</Text>
+                </View>
+              ) : (
+                selectedPayments.map((p) => (
+                  <View key={p.id} style={styles.payHistoryRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.payHistoryTitle}>
+                        ₹{Math.round(p.amount).toLocaleString('en-IN')}  •  {p.forMonth}
+                      </Text>
+                      <Text style={styles.payHistoryMeta} numberOfLines={1}>
+                        {p.method || 'UPI'}{p.txnId ? `  •  ${p.txnId}` : ''}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.payStatusPill, p.status === 'Paid' ? styles.payStatusPaid : styles.payStatusPending]}
+                      onPress={() => store.updatePayment(p.id, { status: p.status === 'Paid' ? 'Pending' : 'Paid' })}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={[styles.payStatusText, p.status === 'Paid' ? styles.payStatusTextPaid : styles.payStatusTextPending]}>
+                        {p.status}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={isPaymentEditorOpen} transparent animationType="slide" onRequestClose={() => setIsPaymentEditorOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>Add Payment</Text>
+                <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600', marginTop: 2 }}>
+                  {selectedCustomer ? `${selectedCustomer.name} • +91 ${selectedCustomer.phone}` : ''}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsPaymentEditorOpen(false)}>
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Amount (₹)</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. 300"
+              keyboardType="numeric"
+              value={paymentDraft.amount}
+              onChangeText={(t) => setPaymentDraft({ ...paymentDraft, amount: t })}
+            />
+
+            <Text style={styles.inputLabel}>Month (YYYY-MM)</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder={paymentsMonth}
+              value={paymentDraft.forMonth || paymentsMonth}
+              onChangeText={(t) => setPaymentDraft({ ...paymentDraft, forMonth: t })}
+            />
+
+            <Text style={styles.inputLabel}>Method</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="UPI / Cash / Card"
+              value={paymentDraft.method}
+              onChangeText={(t) => setPaymentDraft({ ...paymentDraft, method: t })}
+            />
+
+            <Text style={styles.inputLabel}>Transaction / Ref ID</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Optional"
+              value={paymentDraft.txnId}
+              onChangeText={(t) => setPaymentDraft({ ...paymentDraft, txnId: t })}
+            />
+
+            <View style={styles.payStatusToggleRow}>
+              <TouchableOpacity
+                style={[styles.payToggleBtn, paymentDraft.status === 'Paid' && styles.payToggleBtnActivePaid]}
+                onPress={() => setPaymentDraft({ ...paymentDraft, status: 'Paid' })}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.payToggleText, paymentDraft.status === 'Paid' && styles.payToggleTextActive]}>Paid</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.payToggleBtn, paymentDraft.status === 'Pending' && styles.payToggleBtnActivePending]}
+                onPress={() => setPaymentDraft({ ...paymentDraft, status: 'Pending' })}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.payToggleText, paymentDraft.status === 'Pending' && styles.payToggleTextActive]}>Pending</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.saveBtn} onPress={savePayment} activeOpacity={0.9}>
+              <Text style={styles.saveBtnText}>Save Payment</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Add Paper Modal */}
       <Modal visible={isAddingPaper} transparent animationType="slide">
@@ -1510,6 +1996,254 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 48,
+  },
+  emptyStateBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  emptyStateSub: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  paymentsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  paymentsSub: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  monthNav: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  monthNavBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  monthNavText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#2563EB',
+  },
+  paymentCustomerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 12,
+  },
+  paymentCustomerName: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  paymentCustomerMeta: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  addPayBtn: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  addPayBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  payStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  payStatusPaid: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#BBF7D0',
+  },
+  payStatusPending: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  payStatusText: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  payStatusTextPaid: {
+    color: '#15803D',
+  },
+  payStatusTextPending: {
+    color: '#B45309',
+  },
+  paySummaryCard: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  paySummaryTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  paySummaryLine: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  paySummaryBalance: {
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  addPayBtnBig: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  addPayBtnBigText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  subRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 10,
+  },
+  subRowTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  subRowMeta: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  subStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  subStatusDelivered: {
+    backgroundColor: '#D1FAE5',
+  },
+  subStatusSkipped: {
+    backgroundColor: '#FEE2E2',
+  },
+  subStatusPending: {
+    backgroundColor: '#DBEAFE',
+  },
+  subStatusText: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  subStatusTextDelivered: {
+    color: '#065F46',
+  },
+  subStatusTextSkipped: {
+    color: '#991B1B',
+  },
+  subStatusTextPending: {
+    color: '#1D4ED8',
+  },
+  payHistoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 10,
+  },
+  payHistoryTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  payHistoryMeta: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  payStatusToggleRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+    marginTop: -4,
+  },
+  payToggleBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  payToggleBtnActivePaid: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#BBF7D0',
+  },
+  payToggleBtnActivePending: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  payToggleText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#475569',
+  },
+  payToggleTextActive: {
+    color: '#0F172A',
   },
   modalTitle: {
     fontSize: 18,
