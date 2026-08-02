@@ -2,7 +2,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   TextInput, StatusBar, StyleSheet, Image,
 } from 'react-native';
-import { ArrowLeft, Search, Star, BookOpen, Newspaper } from 'lucide-react-native';
+import { ArrowLeft, Search, BookOpen, Newspaper } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useRef } from 'react';
@@ -103,7 +103,7 @@ export default function NewspapersScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/customer/bottom_nav/home')} style={styles.backBtn} activeOpacity={0.7}>
           <ArrowLeft size={18} color="#0F172A" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -196,14 +196,14 @@ export default function NewspapersScreen() {
                 </View>
 
                 {catItems.map((item) => (
-                  <PaperCard key={item.id} item={item} deliveries={deliveries} requireAuth={requireAuth} />
+                  <PaperCard key={item.id} item={item} deliveries={deliveries} user={user} requireAuth={requireAuth} />
                 ))}
               </View>
             );
           })
         ) : (
           filtered.map((item) => (
-            <PaperCard key={item.id} item={item} deliveries={deliveries} requireAuth={requireAuth} />
+            <PaperCard key={item.id} item={item} deliveries={deliveries} user={user} requireAuth={requireAuth} />
           ))
         )}
 
@@ -217,8 +217,8 @@ export default function NewspapersScreen() {
   );
 }
 
-function PaperCard({ item, deliveries, requireAuth }: any) {
-  const isSubscribed = deliveries.some((d: any) => d.paperName === item.name);
+function PaperCard({ item, deliveries, user, requireAuth }: any) {
+  const isSubscribed = user ? deliveries.some((d: any) => d.paperName === item.name && d.name === user.name) : false;
   return (
     <TouchableOpacity
       style={styles.paperCard}
@@ -245,11 +245,7 @@ function PaperCard({ item, deliveries, requireAuth }: any) {
               <Text style={styles.paperLang}>• {item.category}</Text>
             </View>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-            <Star size={11} color="#F59E0B" fill="#F59E0B" />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>{item.rating}</Text>
           </View>
-        </View>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <View>

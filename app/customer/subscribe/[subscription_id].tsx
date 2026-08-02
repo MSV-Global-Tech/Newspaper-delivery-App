@@ -1,14 +1,17 @@
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet, Linking, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet, Linking, Image, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ArrowLeft, CheckCircle, Calendar, Check, X } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle, Calendar, Check, X, Camera, Trash2 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { WebView } from 'react-native-webview';
 import { Modal } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import PaperLogo from '../../../components/PaperLogo';
 import { store } from '../../../utils/store';
 import { IMAGES } from '../../../assets/images';
+import { uploadImage } from '../../../database/storageHelper';
 
 const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const STEP_LABELS = ['Plan', 'Schedule', 'Review', 'Payment'];
@@ -56,6 +59,37 @@ export default function SubscribeScreen() {
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [showRazorpay, setShowRazorpay] = useState(false);
   const [showFeeNote, setShowFeeNote] = useState(false);
+  const [homeImage, setHomeImage] = useState<string | null>(null);
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const pickHomeImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library to upload a home picture.');
+      return;
+    }
+    
+    // Also request location permission since we are associating the photo with the location
+    const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+    if (locStatus === 'granted') {
+      try {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setLocationCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+      } catch (e) {
+        console.warn('Could not fetch location', e);
+      }
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.6,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setHomeImage(result.assets[0].uri);
+    }
+  };
 
   const onStartDateChange = (event: any, selectedDate?: Date) => {
     setShowStartPicker(false);
@@ -104,9 +138,21 @@ export default function SubscribeScreen() {
     }
   };
 
-  const handlePaymentSuccess = (paymentId: string) => {
+  const handlePaymentSuccess = async (paymentId: string) => {
     setShowRazorpay(false);
     const user = store.getUser();
+
+    let homeImageUri: string | undefined;
+    if (homeImage) {
+      try {
+        setUploadingImage(true);
+        homeImageUri = await uploadImage(homeImage, `home_photos/${user?.phone}_${Date.now()}.jpg`);
+      } catch (e) {
+        console.warn('Home image upload failed:', e);
+      } finally {
+        setUploadingImage(false);
+      }
+    }
     
     store.addSubscription({
       paperName: paper.name,
@@ -116,7 +162,9 @@ export default function SubscribeScreen() {
       startDate: startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
       days: selectedDays,
       imageSource: paper.src,
-      paymentMethod: paymentMethod, 
+      paymentMethod: paymentMethod,
+      homeImageUri,
+      location: locationCoords || undefined,
     });
 
     const message = `*New ${paper.category} Subscription!* ${paper.category === 'Paper' ? '📰' : '📚'}
@@ -449,6 +497,54 @@ _Sent via PaperFresh App_`;
                   </TouchableOpacity>
                 );
               })}
+
+              {/* ── HOME LOCATION PHOTO ── */}
+              <View style={{ marginTop: 20 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                  <Camera size={16} color="#2563EB" />
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A', marginLeft: 6 }}>
+                    Home Location Photo
+                  </Text>
+                  <View style={{ marginLeft: 8, backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB' }}>Optional</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 12, lineHeight: 18 }}>
+                  Take a photo of your home entrance with your camera app, then select it here from your gallery.
+                </Text>
+
+                {homeImage ? (
+                  <View style={{ borderRadius: 14, overflow: 'hidden', borderWidth: 1.5, borderColor: '#E2E8F0' }}>
+                    <Image source={{ uri: homeImage }} style={{ width: '100%', height: 180 }} resizeMode="cover" />
+                    <TouchableOpacity
+                      onPress={() => setHomeImage(null)}
+                      style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#DC2626', borderRadius: 20, padding: 6 }}
+                      activeOpacity={0.8}
+                    >
+                      <Trash2 size={14} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(22,163,74,0.9)', paddingVertical: 8, alignItems: 'center' }}>
+                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>✓ Photo added – Tap red button to remove</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={pickHomeImage}
+                    style={{
+                      borderWidth: 2, borderColor: '#CBD5E1', borderStyle: 'dashed',
+                      borderRadius: 14, padding: 28, alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: '#F8FAFC', gap: 8
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Camera size={32} color="#94A3B8" />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#475569' }}>Choose from Gallery</Text>
+                    <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500', textAlign: 'center' }}>
+                      Select a photo of your home from your gallery
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </>
           )}
 

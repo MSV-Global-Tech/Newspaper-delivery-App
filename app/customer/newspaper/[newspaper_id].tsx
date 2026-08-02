@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet, Image } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ArrowLeft, Star, Heart } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { store } from '../../../utils/store';
@@ -24,11 +24,13 @@ export default function NewspaperDetailScreen() {
   const { newspaper_id } = useLocalSearchParams<{ newspaper_id: string }>();
   const [papers, setPapers] = useState(store.getPapers());
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
+  const [user, setUser] = useState(store.getUser());
 
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
       setPapers(store.getPapers());
       setDeliveries(store.getDeliveries());
+      setUser(store.getUser());
     });
     return unsubscribe;
   }, []);
@@ -44,7 +46,7 @@ export default function NewspaperDetailScreen() {
     src: null,
   };
 
-  const isSubscribed = deliveries.some(d => d.paperName === paper.name);
+  const isSubscribed = user ? deliveries.some(d => d.paperName === paper.name && d.name === user.name) : false;
   const tags = TAG_BY_LANGUAGE[paper.language] || ['Local', 'Popular'];
   if (paper.category === 'Magazine') tags.unshift('Weekly / Monthly');
 
@@ -55,49 +57,35 @@ export default function NewspaperDetailScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/customer/newspapers' as any);
+            }
+          }}
           style={styles.backBtn}
           activeOpacity={0.7}
         >
           <ArrowLeft size={18} color="#0F172A" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.heartBtn} activeOpacity={0.7}>
-          <Heart size={18} color="#EF4444" />
-        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Large Logo Header */}
-        <View style={[
-          styles.logoBanner,
-          { backgroundColor: paper.category === 'Paper' ? '#F8FAFC' : '#FAF5FF' }
-        ]}>
+        {/* Full Width Image Banner */}
+        <View style={{ width: '100%', height: 200, backgroundColor: paper.category === 'Paper' ? '#F8FAFC' : '#FAF5FF' }}>
           {paper.src ? (
-            <View style={{
-              width: 170, height: 170, borderRadius: 22,
-              backgroundColor: '#FFFFFF',
-              alignItems: 'center', justifyContent: 'center',
-              overflow: 'hidden',
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-              shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.06, shadowRadius: 10,
-              elevation: 2,
-            }}>
-              <Image source={paper.src} style={{ width: '100%', height: '100%', borderRadius: 21 }} resizeMode="cover" />
-            </View>
+            <Image source={paper.src} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
           ) : (
-            <PaperLogo name={paper.name} id={newspaper_id as string} size="lg" />
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <PaperLogo name={paper.name} id={newspaper_id as string} size="lg" />
+            </View>
           )}
+        </View>
+
+        <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
           <Text style={styles.paperName}>{paper.name}</Text>
           <Text style={styles.paperSub}>{paper.language} {paper.category}</Text>
-
-          {/* Rating */}
-          <View style={styles.ratingRow}>
-            <Star size={14} color="#F59E0B" fill="#F59E0B" />
-            <Text style={styles.ratingText}>{paper.rating}</Text>
-            <Text style={styles.reviewsText}>• {paper.language}</Text>
-          </View>
 
           {/* Tags */}
           <View style={styles.tagRow}>
@@ -118,7 +106,7 @@ export default function NewspaperDetailScreen() {
           </View>
         </View>
 
-        <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
           {/* About */}
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.aboutText}>
@@ -181,26 +169,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  heartBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFF1F2',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 
-  logoBanner: {
-    alignItems: 'center',
-    paddingVertical: 28,
-    backgroundColor: '#F8FAFC',
-    borderBottomWidth: 0,
-  },
   paperName: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
     color: '#0F172A',
-    marginTop: 14,
   },
   paperSub: {
     fontSize: 13,

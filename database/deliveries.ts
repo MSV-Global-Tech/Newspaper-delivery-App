@@ -32,6 +32,8 @@ export interface DeliveryDoc {
   paymentMethod?: string;
   category?: 'Newspaper' | 'Milk' | 'Water';
   quantity?: number;
+  homeImageUri?: string;
+  location?: { lat: number; lng: number };
   createdAt?: any;
 }
 

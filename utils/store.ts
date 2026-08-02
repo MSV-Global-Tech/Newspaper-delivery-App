@@ -62,6 +62,8 @@ export interface Delivery {
   category?: 'Newspaper' | 'Milk' | 'Water';
   quantity?: number;
   imageSrc?: string;
+  homeImageUri?: string;
+  location?: { lat: number; lng: number };
 }
 
 export interface Newspaper {
@@ -355,6 +357,10 @@ export const store = {
     imageSource: any;
     paymentMethod: string;
     imageSrc?: string;
+    homeImageUri?: string;
+    category?: 'Newspaper' | 'Milk' | 'Water';
+    quantity?: number;
+    location?: { lat: number; lng: number };
   }) {
     if (!currentUser) return;
     const imageSrc = sub.imageSrc ?? '';
@@ -372,7 +378,10 @@ export const store = {
       startDate: sub.startDate,
       days: sub.days,
       paymentMethod: sub.paymentMethod,
-      category: 'Newspaper',
+      category: sub.category ?? 'Newspaper',
+      quantity: sub.quantity ?? 1,
+      homeImageUri: sub.homeImageUri,
+      location: sub.location,
     }).catch(console.warn);
   },
 

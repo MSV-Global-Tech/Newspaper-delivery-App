@@ -16,7 +16,6 @@ import {
   MapPin,
   ChevronDown,
   CheckCircle2,
-  Star,
   ChevronRight,
   PauseCircle,
   SkipForward,
@@ -328,12 +327,7 @@ export default function HomeScreen() {
                         <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
                           ₹{paper.priceMonth}/mo
                         </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Star size={12} color="#FBBF24" fill="#FBBF24" />
-                          <Text style={{ color: '#FBBF24', fontSize: 13, fontWeight: '700' }}>
-                            {paper.rating}
-                          </Text>
-                        </View>
+
                       </View>
 
                       <Text style={{ color: '#E0E7FF', fontSize: 13, marginTop: 12, lineHeight: 18 }}>
@@ -581,47 +575,46 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {papers.slice(0, 4).map((paper) => (
-            <TouchableOpacity
-              key={paper.id}
-              style={styles.paperCard}
-              activeOpacity={0.85}
-              onPress={() => requireAuth(() => router.push(`/customer/newspaper/${paper.id}` as any))}
-            >
-              {/* Logo area — styled as portrait vertical newspaper cover */}
-              <View style={styles.paperLogoArea}>
-                <Image source={paper.src} style={{ width: '100%', height: '100%', borderRadius: 13 }} resizeMode="cover" />
-              </View>
-
-              <View style={{ flex: 1, marginLeft: 16, height: 110, justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={styles.paperName}>{paper.name}</Text>
-                    <Text style={styles.paperLang}>{paper.language}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                    <Star size={11} color="#F59E0B" fill="#F59E0B" />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>{paper.rating}</Text>
-                  </View>
+          {papers.slice(0, 4).map((paper) => {
+            const isSubscribed = user ? deliveries.some(d => d.paperName === paper.name && d.name === user.name) : false;
+            return (
+              <TouchableOpacity
+                key={paper.id}
+                style={styles.paperCard}
+                activeOpacity={0.85}
+                onPress={() => requireAuth(() => router.push(`/customer/newspaper/${paper.id}` as any))}
+              >
+                {/* Logo area — styled as portrait vertical newspaper cover */}
+                <View style={styles.paperLogoArea}>
+                  <Image source={paper.src} style={{ width: '100%', height: '100%', borderRadius: 13 }} resizeMode="cover" />
                 </View>
 
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                  <View>
-                    {paper.priceDay > 0 && <Text style={styles.priceText}>₹{paper.priceDay} / day</Text>}
-                    <Text style={styles.priceText}>₹{paper.priceMonth} / month</Text>
+                <View style={{ flex: 1, marginLeft: 16, height: 110, justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={styles.paperName}>{paper.name}</Text>
+                      <Text style={styles.paperLang}>{paper.language}</Text>
+                    </View>
                   </View>
 
-                  <TouchableOpacity
-                    style={styles.subBtn}
-                    onPress={() => requireAuth(() => router.push(`/customer/subscribe/${paper.id}` as any))}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.subBtnText}>Subscribe</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <View>
+                      {paper.priceDay > 0 && <Text style={styles.priceText}>₹{paper.priceDay} / day</Text>}
+                      <Text style={styles.priceText}>₹{paper.priceMonth} / month</Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.subBtn, isSubscribed && { backgroundColor: '#16A34A' }]}
+                      onPress={() => !isSubscribed && requireAuth(() => router.push(`/customer/subscribe/${paper.id}` as any))}
+                      activeOpacity={isSubscribed ? 1 : 0.85}
+                    >
+                      <Text style={styles.subBtnText}>{isSubscribed ? 'Active' : 'Subscribe'}</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
 
         </View>
       </ScrollView>

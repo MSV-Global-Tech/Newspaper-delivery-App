@@ -10,6 +10,7 @@ import {
   Modal,
   Alert,
   Share,
+  Linking,
 } from 'react-native';
 import {
   Users,
@@ -34,6 +35,7 @@ import {
   BookOpen,
   Shield,
   Truck,
+  Navigation,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
@@ -95,6 +97,10 @@ export default function AdminScreen() {
     status: 'Paid' as 'Paid' | 'Pending',
     forMonth: '',
   });
+
+  // Delivery Detail Modal
+  const [selectedDelivery, setSelectedDelivery] = useState<typeof deliveries[0] | null>(null);
+  const [showFullImage, setShowFullImage] = useState(false);
 
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
@@ -669,7 +675,7 @@ export default function AdminScreen() {
             <View style={styles.searchBox}>
               <Search size={18} color="#94A3B8" />
               <TextInput
-                placeholder="Search customers or routes..."
+                placeholder="Search customers or papers..."
                 placeholderTextColor="#94A3B8"
                 value={search}
                 onChangeText={setSearch}
@@ -677,103 +683,215 @@ export default function AdminScreen() {
               />
             </View>
 
-            {/* Delivery List */}
+            {/* Compact Delivery List */}
             <Text style={styles.sectionTitle}>Today's Logs</Text>
             {deliveries
-              .filter(d => d.name.toLowerCase().includes(search.toLowerCase()))
+              .filter(d => d.name.toLowerCase().includes(search.toLowerCase()) || d.paperName.toLowerCase().includes(search.toLowerCase()))
               .map(item => (
                 <TouchableOpacity
                   key={item.id}
-                  style={styles.custCard}
-                  activeOpacity={0.8}
-                  onPress={() => router.push(`/customer/delivery/${item.id}`)}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center',
+                    backgroundColor: '#FFFFFF', borderRadius: 14,
+                    padding: 12, marginBottom: 8,
+                    borderWidth: 1, borderColor: '#F1F5F9',
+                    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+                  }}
+                  activeOpacity={0.75}
+                  onPress={() => setSelectedDelivery(item)}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={styles.paperLogoBox}>
-                      <Image source={item.src} style={{ width: '100%', height: '100%', borderRadius: 13 }} resizeMode="cover" />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.custName}>{item.name}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                        <MapPin size={11} color="#64748B" />
-                        <Text style={styles.custAddress} numberOfLines={1}>
-                          {item.address}
-                        </Text>
-                      </View>
-                      <Text style={styles.custMeta}>
-                        {item.paperName}  •  {item.time}
-                      </Text>
-                      {(item.plan || item.startDate || item.paymentMethod) && (
-                        <View style={{ marginTop: 8, backgroundColor: '#F8FAFC', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#F1F5F9' }}>
-                          {item.plan && <Text style={{ fontSize: 11, color: '#475569', fontWeight: '500' }}>Plan: <Text style={{ color: '#0F172A', fontWeight: '700' }}>{item.plan}</Text></Text>}
-                          {item.startDate && <Text style={{ fontSize: 11, color: '#475569', fontWeight: '500', marginTop: 3 }}>Start Date: <Text style={{ color: '#0F172A', fontWeight: '700' }}>{item.startDate}</Text></Text>}
-                          {item.paymentMethod && <Text style={{ fontSize: 11, color: '#475569', fontWeight: '500', marginTop: 3 }}>Order Fee (₹50): <Text style={{ color: '#0F172A', fontWeight: '700' }}>{item.paymentMethod}</Text></Text>}
-                        </View>
-                      )}
-                    </View>
+                  {/* Paper thumbnail */}
+                  <View style={{ width: 44, height: 44, borderRadius: 10, overflow: 'hidden', backgroundColor: '#F1F5F9' }}>
+                    <Image source={item.src} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  </View>
 
-                    {/* Status Badge */}
-                    <View
-                      style={[
-                        styles.badge,
-                        item.status === 'Delivered' && styles.badgeDelivered,
-                        item.status === 'Skipped' && styles.badgeSkipped,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.badgeText,
-                          item.status === 'Delivered' && styles.badgeTextDelivered,
-                          item.status === 'Skipped' && styles.badgeTextSkipped,
-                        ]}
-                      >
-                        {item.status}
-                      </Text>
+                  {/* Info */}
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }} numberOfLines={1}>{item.name}</Text>
+                    <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600', marginTop: 1 }} numberOfLines={1}>{item.paperName}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                      <MapPin size={10} color="#94A3B8" />
+                      <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }} numberOfLines={1}>{item.address}</Text>
                     </View>
                   </View>
 
-                  {/* Subscription/Order Details */}
-                  {(item.plan || item.days) && (
-                    <View style={styles.subDetailsContainer}>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Plan: <Text style={styles.detailVal}>{item.plan || 'Monthly'}</Text></Text>
-                        <Text style={styles.detailLabel}>Cost: <Text style={styles.detailVal}>₹{item.priceMonth || 180}</Text></Text>
+                  {/* Fee paid indicator + status + arrow */}
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    {item.paymentMethod && (
+                      <View style={{ backgroundColor: '#ECFDF5', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#16A34A' }}>₹50 Paid</Text>
                       </View>
-                      {item.days && (
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                          <Text style={styles.detailLabel}>Days: <Text style={styles.detailVal}>{item.days.map(d => d.slice(0, 3)).join(', ')}</Text></Text>
-                          {item.startDate && (
-                            <Text style={styles.detailLabel}>Start: <Text style={styles.detailVal}>{item.startDate}</Text></Text>
-                          )}
-                        </View>
-                      )}
+                    )}
+                    <View style={[
+                      { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+                      item.status === 'Delivered' ? { backgroundColor: '#ECFDF5' } :
+                      item.status === 'Skipped' ? { backgroundColor: '#FEF2F2' } : { backgroundColor: '#FFF7ED' }
+                    ]}>
+                      <Text style={[
+                        { fontSize: 10, fontWeight: '700' },
+                        item.status === 'Delivered' ? { color: '#16A34A' } :
+                        item.status === 'Skipped' ? { color: '#EF4444' } : { color: '#D97706' }
+                      ]}>{item.status}</Text>
                     </View>
-                  )}
-
-                  {/* Actions Bar for Admin */}
-                  {item.status === 'Pending' && (
-                    <View style={styles.custActions}>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, styles.btnSkip]}
-                        onPress={() => handleUpdateStatus(item.id, 'Skipped')}
-                      >
-                        <X size={14} color="#EF4444" />
-                        <Text style={styles.btnTextSkip}>Skip</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.actionBtn, styles.btnDeliver]}
-                        onPress={() => handleUpdateStatus(item.id, 'Delivered')}
-                      >
-                        <Check size={14} color="#FFFFFF" />
-                        <Text style={styles.btnTextDeliver}>Mark Delivered</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                    <ChevronRight size={14} color="#CBD5E1" />
+                  </View>
                 </TouchableOpacity>
               ))}
           </View>
         )}
+
+        {/* ── Delivery Detail Modal ── */}
+        <Modal
+          visible={selectedDelivery !== null}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setSelectedDelivery(null)}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+            {/* Modal Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+              <TouchableOpacity onPress={() => setSelectedDelivery(null)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <ArrowLeft size={18} color="#0F172A" />
+              </TouchableOpacity>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>{selectedDelivery?.name}</Text>
+                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>Order Details</Text>
+              </View>
+              {/* Status badge */}
+              <View style={[
+                { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+                selectedDelivery?.status === 'Delivered' ? { backgroundColor: '#ECFDF5' } :
+                selectedDelivery?.status === 'Skipped' ? { backgroundColor: '#FEF2F2' } : { backgroundColor: '#FFF7ED' }
+              ]}>
+                <Text style={[
+                  { fontSize: 12, fontWeight: '800' },
+                  selectedDelivery?.status === 'Delivered' ? { color: '#16A34A' } :
+                  selectedDelivery?.status === 'Skipped' ? { color: '#EF4444' } : { color: '#D97706' }
+                ]}>{selectedDelivery?.status}</Text>
+              </View>
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+              {/* Paper Info */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <View style={{ width: 56, height: 56, borderRadius: 12, overflow: 'hidden', backgroundColor: '#E2E8F0' }}>
+                  <Image source={selectedDelivery?.src} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>{selectedDelivery?.paperName}</Text>
+                  <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500', marginTop: 2 }}>{selectedDelivery?.plan || 'Monthly'} Plan  •  ₹{selectedDelivery?.priceMonth}/mo</Text>
+                </View>
+              </View>
+
+              {/* Details Grid */}
+              {[
+                { label: 'Customer Name', value: selectedDelivery?.name },
+                { label: 'Phone', value: selectedDelivery?.phone || '—' },
+                { label: 'Address', value: selectedDelivery?.address },
+                { label: 'Delivery Days', value: selectedDelivery?.days?.map(d => d.slice(0, 3)).join(', ') || '—' },
+                { label: 'Start Date', value: selectedDelivery?.startDate || '—' },
+                { label: 'Order Fee (₹50)', value: selectedDelivery?.paymentMethod ? `Paid via ${selectedDelivery.paymentMethod}` : '—' },
+                { label: 'Delivery Time', value: selectedDelivery?.time || '5:30 AM' },
+              ].map(row => (
+                <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                  <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '600' }}>{row.label}</Text>
+                  <Text style={{ fontSize: 13, color: '#0F172A', fontWeight: '700', flex: 1, textAlign: 'right', marginLeft: 16 }}>{row.value}</Text>
+                </View>
+              ))}
+
+              {/* Home Location Photo & Directions */}
+              {(selectedDelivery?.homeImageUri || selectedDelivery?.location) && (
+                <View style={{ marginTop: 20 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <MapPin size={14} color="#2563EB" />
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A', marginLeft: 6 }}>Delivery Location</Text>
+                  </View>
+                  
+                  {selectedDelivery.homeImageUri && (
+                    <TouchableOpacity onPress={() => setShowFullImage(true)} activeOpacity={0.9} style={{ marginBottom: 12 }}>
+                      <Image
+                        source={{ uri: selectedDelivery.homeImageUri }}
+                        style={{ width: '100%', height: 220, borderRadius: 14, backgroundColor: '#F1F5F9' }}
+                        resizeMode="cover"
+                      />
+                      <View style={{ position: 'absolute', bottom: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>Tap to view full</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {selectedDelivery.location && (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#2563EB',
+                        borderRadius: 12,
+                        paddingVertical: 12,
+                        paddingHorizontal: 20,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        alignSelf: 'center',
+                        gap: 8,
+                        shadowColor: '#2563EB',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 6,
+                        elevation: 4,
+                        marginTop: 4,
+                        marginBottom: 4
+                      }}
+                      onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${selectedDelivery.location!.lat},${selectedDelivery.location!.lng}`)}
+                      activeOpacity={0.85}
+                    >
+                      <Navigation size={16} color="#FFFFFF" strokeWidth={2.5} />
+                      <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>Get Directions</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              {/* Mark Delivered Button */}
+              {selectedDelivery?.status === 'Pending' && (
+                <TouchableOpacity
+                  style={{ marginTop: 24, backgroundColor: '#16A34A', borderRadius: 14, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  onPress={() => {
+                    store.updateDeliveryStatus(selectedDelivery.id, 'Delivered');
+                    setSelectedDelivery(null);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Check size={18} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>Mark as Delivered</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+
+        {/* ── Full Screen Image Viewer ── */}
+        <Modal
+          visible={showFullImage}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setShowFullImage(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: 8 }}
+              onPress={() => setShowFullImage(false)}
+            >
+              <X size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            {selectedDelivery?.homeImageUri && (
+              <Image
+                source={{ uri: selectedDelivery.homeImageUri }}
+                style={{ width: '100%', height: '80%' }}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </Modal>
 
         {activeTab === 'payments' && (
           <View style={styles.container}>

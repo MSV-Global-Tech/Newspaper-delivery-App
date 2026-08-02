@@ -94,7 +94,7 @@ export const PAPERS_CATALOG: CatalogEntry[] = [
   { name: 'Karmaveera',          language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 50, rating: 4.6, image: 'karmaveera.webp' },
   { name: 'Taranga',             language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.5, image: 'taranga.webp'     },
   { name: 'Sudha',               language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 50, rating: 4.4, image: 'sudha.webp'        },
-  { name: 'Mayura',              language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.5, image: 'mayura.png'       },
+  { name: 'Mayura',              language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.5, image: 'mayura.webp'       },
   { name: 'Gruhasobha',          language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 70, rating: 4.3, image: 'gruhashobha.webp' },
   { name: 'Priyanka',            language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 45, rating: 4.3, image: 'priyanka.webp'     },
 
@@ -106,7 +106,7 @@ export const PAPERS_CATALOG: CatalogEntry[] = [
   { name: 'The Week',            language: 'English',  category: 'Magazine', priceDay: 0, priceMonth: 80,  rating: 4.4, image: 'theweak.webp'       },
 
   // ─── TAMIL MAGAZINES ───
-  { name: 'Thuglak',             language: 'Tamil',    category: 'Magazine', priceDay: 0, priceMonth: 40, rating: 4.6, image: 'thuglak.png'     },
+  { name: 'Thuglak',             language: 'Tamil',    category: 'Magazine', priceDay: 0, priceMonth: 40, rating: 4.6, image: 'thuglak.webp'     },
 
   // ─── MALAYALAM MAGAZINES ───
   { name: 'Malayalam Book',      language: 'Malayalam', category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.3, image: 'vijayavani.webp' },

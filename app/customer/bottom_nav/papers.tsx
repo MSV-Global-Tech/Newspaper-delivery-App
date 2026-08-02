@@ -30,13 +30,13 @@ export default function SubscriptionsScreen() {
     .map((d) => {
       const isMilk = d.category === 'Milk' || d.imageSrc === 'milk.webp';
       const isWater = d.category === 'Water' || d.imageSrc === 'water.webp';
-      
+
       let logo_text = '';
       let logo_bg = '#EFF6FF';
       let logo_color = '#2563EB';
       let language = d.paperName === 'The Hindu' ? 'English' : 'Kannada';
       let category = d.category || 'Newspaper';
-      
+
       if (isMilk) {
         logo_text = '🥛';
         logo_bg = '#E8F5E9';

@@ -153,7 +153,7 @@ export default function LoginScreen() {
 
   // For direct login canProceed is based only on phone input, originally was:
   // const canProceed = !otpSent ? phone.length === 10 : otp.length === 4;
-  const canProceed = phone.length === 10;
+  const canProceed = phone.length === 10 && name.trim().length > 0 && address.trim().length > 0;
 
   return (
     <SafeAreaView style={s.root}>

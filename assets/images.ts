@@ -54,7 +54,7 @@ export const IMAGES: Record<string, any> = {
   'taranga.webp':         require('./magzines/taranga.webp'),
   'sudha.webp':           require('./magzines/sudha.webp'),
   'kasturi.webp':        require('./magzines/kasturi.webp'),
-  'mayura.png':         require('./magzines/mayura.png'),
+  'mayura.webp':         require('./magzines/mayura.webp'),
   'priyanka.webp':       require('./magzines/priyanka.webp'),
   'gruhashobha.webp':    require('./magzines/gruhashobha.webp'),
   'frontline.webp':      require('./magzines/frontline.webp'),
@@ -62,7 +62,7 @@ export const IMAGES: Record<string, any> = {
   'sportsstar.webp':     require('./magzines/sportsstar.webp'),
   'readersdigest.webp':  require('./magzines/readersdigest.webp'),
   'theweak.webp':        require('./magzines/theweak.webp'),
-  'thuglak.png':         require('./magzines/thuglak.png'),
+  'thuglak.webp':         require('./magzines/thuglak.webp'),
 };
 
 const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
@@ -266,10 +266,10 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'kasturi.png':            'kasturi.webp',
   'Kasturi':                'kasturi.webp',
 
-  'mayura':                 'mayura.png',
-  'mayura.png':             'mayura.png',
-  'mayura.webp':            'mayura.png',
-  'Mayura':                 'mayura.png',
+  'mayura':                 'mayura.webp',
+  'mayura.png':             'mayura.webp',
+  'mayura.webp':            'mayura.webp',
+  'Mayura':                 'mayura.webp',
 
   'priyanka':               'priyanka.webp',
   'priyanka.webp':          'priyanka.webp',
@@ -320,10 +320,10 @@ const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {
   'theweak.webp':           'theweak.webp',
   'theweak.png':            'theweak.webp',
 
-  'thuglak':                'thuglak.png',
-  'thuglak.webp':           'thuglak.png',
-  'thuglak.png':            'thuglak.png',
-  'Thuglak':                'thuglak.png',
+  'thuglak':                'thuglak.webp',
+  'thuglak.webp':           'thuglak.webp',
+  'thuglak.png':            'thuglak.webp',
+  'Thuglak':                'thuglak.webp',
 };
 
 export function resolvePaperImage(image: string | null | undefined): any {
