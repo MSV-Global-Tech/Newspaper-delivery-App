@@ -3,10 +3,14 @@
  * Stores user profiles in the 'users' collection, keyed by phone number.
  */
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
+  onSnapshot,
   setDoc,
   deleteDoc,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -15,6 +19,8 @@ export interface UserDoc {
   phone: string;
   address: string;
   isAdmin: boolean;
+  customerKind?: 'new' | 'legacy';
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
   createdAt?: any;
 }
 
@@ -29,6 +35,28 @@ export async function saveUser(user: UserDoc) {
 export async function fetchUser(phone: string): Promise<UserDoc | null> {
   const snap = await getDoc(doc(db, COL, phone));
   return snap.exists() ? (snap.data() as UserDoc) : null;
+}
+
+export async function listUsers(): Promise<UserDoc[]> {
+  const snap = await getDocs(collection(db, COL));
+  return snap.docs.map((d) => d.data() as UserDoc);
+}
+
+export function listenUsers(callback: (docs: UserDoc[]) => void) {
+  return onSnapshot(
+    collection(db, COL),
+    (snap) => {
+      const items = snap.docs.map((d) => d.data() as UserDoc);
+      callback(items);
+    },
+    (error) => {
+      console.error('[DB] listenUsers error:', error?.code, error?.message);
+    }
+  );
+}
+
+export async function updateUser(phone: string, data: Partial<UserDoc>) {
+  await updateDoc(doc(db, COL, phone), data);
 }
 
 // ── Delete a user profile ────────────────────────────────────────────────────

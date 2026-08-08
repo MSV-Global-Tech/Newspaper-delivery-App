@@ -13,9 +13,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Linking,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import { uploadImage } from '../../../database/storageHelper';
 import * as Location from 'expo-location';
 import {
   User,
@@ -49,6 +54,7 @@ export default function ProfileScreen() {
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [loadingGps, setLoadingGps] = useState(false);
+  const [appSettings, setAppSettings] = useState(store.getAppSettings());
 
   // Editable fields in modal
   const [editName, setEditName] = useState('');
@@ -58,9 +64,72 @@ export default function ProfileScreen() {
     const unsubscribe = store.subscribe(() => {
       setUser(store.getUser());
       setDeliveries(store.getDeliveries());
+      setAppSettings(store.getAppSettings());
     });
     return unsubscribe;
   }, []);
+
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleUploadScreenshot = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission needed', 'Please grant permission to access your gallery to upload a screenshot.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets[0].uri) return;
+
+      setIsUploading(true);
+      const uri = result.assets[0].uri;
+
+      const publicUrl = await uploadImage(uri, `payment_screenshots/${user?.phone}_${Date.now()}.jpg`);
+
+      store.addPayment({
+        customerName: user?.name || '',
+        customerPhone: user?.phone || '',
+        amount: totalMonthlyCost,
+        method: 'UPI',
+        txnId: 'Screenshot Upload',
+        status: 'Pending',
+        forMonth: 'Current Month',
+        screenshotUrl: publicUrl
+      } as any);
+
+      Alert.alert('Success', 'Payment screenshot uploaded successfully. Admin will review it.');
+    } catch (error: any) {
+      Alert.alert('Upload Failed', error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9972505709@ibl%26pn=Newspaper%20Delivery%26cu=INR';
+
+  const handleDownloadQR = async () => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant media library permissions to save the QR code.');
+        return;
+      }
+
+      const fileUri = FileSystem.documentDirectory + 'qr_code.png';
+      const { uri } = await FileSystem.downloadAsync(qrUrl, fileUri);
+      await MediaLibrary.saveToLibraryAsync(uri);
+
+      Alert.alert('Success', 'QR Code saved to gallery!');
+    } catch (e: any) {
+      Alert.alert('Error', 'Failed to save QR Code: ' + e.message);
+    }
+  };
 
   const openEditModal = () => {
     setEditName(user?.name || '');
@@ -221,10 +290,6 @@ export default function ProfileScreen() {
           <View style={styles.heroInfo}>
             <View style={styles.nameRow}>
               <Text style={styles.userNameText}>{user?.name || 'Customer'}</Text>
-              <View style={styles.proBadge}>
-                <Sparkles size={10} color="#D97706" />
-                <Text style={styles.proBadgeText}>PRO</Text>
-              </View>
             </View>
             <Text style={styles.userPhoneText}>+91 {user?.phone || '9876543210'}</Text>
             <Text style={styles.userRoleText}>
@@ -244,7 +309,7 @@ export default function ProfileScreen() {
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
             <View style={[styles.statIconCircle, { backgroundColor: '#EFF6FF' }]}>
-              <Newspaper size={18} color="#2563EB" />
+              <Newspaper size={16} color="#2563EB" />
             </View>
             <Text style={styles.statNumber}>{activeCount}</Text>
             <Text style={styles.statLabel}>Active Papers</Text>
@@ -254,13 +319,65 @@ export default function ProfileScreen() {
 
           <View style={styles.statBox}>
             <View style={[styles.statIconCircle, { backgroundColor: '#F0FDF4' }]}>
-              <CheckCircle2 size={18} color="#16A34A" />
+              <CheckCircle2 size={16} color="#16A34A" />
             </View>
             <Text style={styles.statNumber}>₹{totalMonthlyCost}</Text>
             <Text style={styles.statLabel}>Monthly Cost</Text>
           </View>
-
         </View>
+
+        {/* ── PAYMENT QR CARD — shown only when admin approved ── */}
+        {user?.customerKind === 'legacy' && user?.approvalStatus === 'approved' && (
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeaderTitle}>Monthly Payment</Text>
+              <View style={{ backgroundColor: '#DCFCE7', borderWidth: 1, borderColor: '#BBF7D0', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
+                <Text style={{ fontSize: 10, fontWeight: '800', color: '#15803D' }}>✓ Approved</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.payNowRow}
+              activeOpacity={0.85}
+              onPress={() => Linking.openURL('upi://pay?pa=9972505709@ibl&pn=Newspaper%20Delivery&cu=INR')}
+            >
+              <View style={styles.payNowLeft}>
+                <View style={styles.payNowIconBox}>
+                  <CreditCard size={20} color="#2563EB" />
+                </View>
+                <View>
+                  <Text style={styles.payNowTitle}>Pay Monthly Bill</Text>
+                  <Text style={styles.payNowSub}>Tap here to open UPI app</Text>
+                </View>
+              </View>
+              <View style={styles.payNowBtn}>
+                <Text style={styles.payNowBtnText}>Pay Now</Text>
+                <ChevronRight size={12} color="#FFFFFF" />
+              </View>
+            </TouchableOpacity>
+
+            <View style={{ alignItems: 'center', marginTop: 15 }}>
+              <Text style={{ fontSize: 13, color: '#475569', marginBottom: 10, fontWeight: '600' }}>Or Scan to Pay</Text>
+              <Image source={{ uri: qrUrl }} style={{ width: 160, height: 160, borderRadius: 8, marginBottom: 10 }} />
+
+              <TouchableOpacity onPress={handleDownloadQR} style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, marginBottom: 15 }}>
+                <Text style={{ color: '#0F172A', fontWeight: '600', fontSize: 12 }}>Download QR Code</Text>
+              </TouchableOpacity>
+
+              <View style={{ width: '100%', height: 1, backgroundColor: '#E2E8F0', marginBottom: 15 }} />
+
+              <TouchableOpacity
+                onPress={handleUploadScreenshot}
+                disabled={isUploading}
+                style={{ backgroundColor: '#2563EB', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, width: '100%', alignItems: 'center' }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
+                  {isUploading ? 'Uploading...' : 'Upload Payment Screenshot'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* ── CURRENT DETAILS CARD ── */}
         <View style={styles.sectionCard}>
@@ -374,7 +491,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.menuTextContent}>
               <Text style={styles.menuTitle}>Help & Support</Text>
-              <Text style={styles.menuSub}>Contact Akhil K S (Agent/Owner)</Text>
+              <Text style={styles.menuSub}>Contact Customer care (Agent/Owner)</Text>
             </View>
             <ChevronRight size={18} color="#CBD5E1" />
           </TouchableOpacity>
@@ -525,13 +642,13 @@ export default function ProfileScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>1. Acceptance of Terms</Text>
               <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>By accessing and using the PaperFresh application, you agree to comply with and be bound by these terms and conditions.</Text>
-              
+
               <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>2. Subscription & Billing</Text>
               <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>A one-time booking fee of ₹50 is required to initiate a subscription. Your monthly newspaper/magazine bills are generated at the end of each month and collected directly by your delivery vendor. Failure to pay may result in suspension of deliveries.</Text>
-              
+
               <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>3. Deliveries</Text>
               <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>Deliveries are typically completed between 5:30 AM and 7:00 AM daily. We are not responsible for delays caused by extreme weather, strikes, or supply chain issues.</Text>
-              
+
               <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>4. Vacation Pauses & Skips</Text>
               <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>You can pause or skip deliveries using the app. You will not be billed for days that are successfully skipped prior to the delivery cutoff time (usually 9:00 PM the previous day).</Text>
 
@@ -689,8 +806,8 @@ const styles = StyleSheet.create({
   /* Stats Bar */
   statsContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingVertical: 14,
+    borderRadius: 16,
+    paddingVertical: 10,
     paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
@@ -700,7 +817,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
-    marginBottom: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -709,27 +826,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   statNumber: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: '#0F172A',
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748B',
     fontWeight: '600',
     marginTop: 1,
   },
   statDivider: {
     width: 1,
-    height: 36,
+    height: 28,
     backgroundColor: '#F1F5F9',
   },
 
@@ -985,5 +1102,277 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+
+  /* ── UPI/QR card in Profile ── */
+  upiCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFF',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    marginTop: 12,
+  },
+  upiTitle: { fontSize: 14, fontWeight: '800', color: '#1E3A8A' },
+  upiSub: { fontSize: 11, fontWeight: '600', color: '#64748B', marginTop: 2, marginBottom: 8 },
+  upiId: { fontSize: 13, fontWeight: '700', color: '#1D4ED8', letterSpacing: 0.3 },
+  upiName: { fontSize: 11, fontWeight: '600', color: '#64748B', marginTop: 2 },
+  upiPayBtn: {
+    marginTop: 10,
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  upiPayBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  upiMissing: { fontSize: 11, color: '#94A3B8', fontWeight: '600', marginTop: 6 },
+  upiQrBox: {
+    width: 88,
+    height: 88,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  upiQrImage: { width: 88, height: 88 },
+  pendingApprovalNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginTop: 12,
+  },
+  pendingApprovalIcon: { fontSize: 24 },
+  pendingApprovalTitle: { fontSize: 13, fontWeight: '800', color: '#92400E' },
+  pendingApprovalSub: { fontSize: 11, fontWeight: '500', color: '#B45309', marginTop: 3, lineHeight: 16 },
+
+  /* ── Pay Now compact row ── */
+  payNowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0F7FF',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  payNowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  payNowIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  payNowTitle: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
+  payNowSub: { fontSize: 11, fontWeight: '600', color: '#64748B', marginTop: 2 },
+  payNowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  payNowBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+
+  /* ── Full-screen Payment Modal ── */
+  payModalSafe: { flex: 1, backgroundColor: '#F0F4FF' },
+  payModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E3A8A',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  payModalBack: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  payModalTitle: { fontSize: 17, fontWeight: '900', color: '#FFFFFF' },
+  payModalSub: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  payModalBody: { padding: 20, paddingBottom: 48, alignItems: 'center' },
+
+  payMerchantPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    width: '100%',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  payMerchantAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+  },
+  payMerchantAvatarText: { fontSize: 18, fontWeight: '900', color: '#2563EB' },
+  payMerchantName: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+  payMerchantLabel: { fontSize: 11, fontWeight: '600', color: '#64748B', marginTop: 2 },
+
+  payQrContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+    width: '100%',
+  },
+  payQrLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#64748B',
+    letterSpacing: 1.2,
+    marginBottom: 16,
+  },
+  payQrFrame: {
+    width: 240,
+    height: 240,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  payQrImage: { width: 216, height: 216, borderRadius: 8 },
+  payQrPlaceholder: { alignItems: 'center' },
+  payQrPlaceholderText: { fontSize: 48 },
+  payQrHint: {
+    marginTop: 14,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+
+  payDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    marginBottom: 20,
+  },
+  payDividerLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
+  payDividerText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+  },
+
+  payUpiBlock: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  payUpiIdLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  payUpiIdRow: {
+    backgroundColor: '#F0F7FF',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginBottom: 6,
+  },
+  payUpiIdText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1D4ED8',
+    letterSpacing: 0.3,
+  },
+  payUpiNameText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 16,
+  },
+  payOpenUpiBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  payOpenUpiBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+
+  payFooterNote: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 20,
   },
 });

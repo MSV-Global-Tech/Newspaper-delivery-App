@@ -8,9 +8,6 @@ export const IMAGES: Record<string, any> = {
   'splash1.webp':    require('./splash1.webp'),
   'splash2.webp':    require('./splash2.webp'),
   'logo.png':       require('./logo.png'),
-  'milk.webp':      require('./Milk/milk.webp'),
-  'water.webp':     require('./Milk/water.webp'),
-  'newspaper.webp': require('./Milk/newspaper.webp'),
 
   // ── Kannada newspaper logos ──
   'vijayavani.webp':       require('./vijayavani.webp'),

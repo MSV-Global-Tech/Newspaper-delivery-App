@@ -44,16 +44,18 @@ import { router } from 'expo-router';
 import { IMAGES, resolvePaperImage } from '../../assets/images';
 import { store } from '../../utils/store';
 import { getAdminOverviewSnapshot, setAdminOverviewSnapshot, type AdminOverviewSnapshot } from '../../utils/session';
-import { uploadNewspaperLogo, deleteImage } from '../../database';
+import { uploadNewspaperLogo, deleteImage, listenUsers, updateUser } from '../../database';
 
 export default function AdminScreen() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'deliveries' | 'payments' | 'papers' | 'agents' | 'access'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'deliveries' | 'payments' | 'papers' | 'agents' | 'access'>('overview');
   const [search, setSearch] = useState('');
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [papersList, setPapersList] = useState(store.getPapers());
   const [adminNumbers, setAdminNumbers] = useState(store.getAdminNumbers());
   const [agentsList, setAgentsList] = useState(store.getAgents());
   const [payments, setPayments] = useState(store.getPayments());
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [custFilter, setCustFilter] = useState<'all' | 'active' | 'present' | 'pending'>('all');
   const [newAdminPhone, setNewAdminPhone] = useState('');
   const [newAdminName, setNewAdminName] = useState('');
 
@@ -110,6 +112,11 @@ export default function AdminScreen() {
       setAgentsList(store.getAgents());
       setPayments(store.getPayments());
     });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = listenUsers((docs) => setUsersList(docs as any[]));
     return unsubscribe;
   }, []);
 
@@ -579,6 +586,7 @@ export default function AdminScreen() {
         >
           {([
             { key: 'overview',   label: 'Overview', icon: TrendingUp },
+            { key: 'customers',  label: 'Customers', icon: UserPlus },
             { key: 'deliveries', label: 'Deliveries', icon: Truck },
             { key: 'payments',   label: 'Payments', icon: CreditCard },
             { key: 'papers',     label: 'Papers', icon: BookOpen },
@@ -666,6 +674,175 @@ export default function AdminScreen() {
                 <ChevronRight size={16} color="#94A3B8" />
               </TouchableOpacity>
             </View>
+          </View>
+        )}
+
+        {activeTab === 'customers' && (
+          <View style={styles.container}>
+
+            {(() => {
+              const customersOnly = usersList.filter((u: any) => !u?.isAdmin);
+              const presentCustomers = customersOnly.filter((u: any) => u?.customerKind !== 'legacy');
+              const activeCustomers = customersOnly.filter((u: any) => u?.customerKind === 'legacy' && u?.approvalStatus === 'approved');
+              const pendingLegacy = customersOnly.filter((u: any) => u?.customerKind === 'legacy' && u?.approvalStatus !== 'approved');
+
+              const getInitials = (name: string) => {
+                const parts = (name || 'C').trim().split(' ');
+                return parts.length >= 2
+                  ? (parts[0][0] + parts[1][0]).toUpperCase()
+                  : parts[0].substring(0, 2).toUpperCase();
+              };
+              const avatarColors = [
+                { bg: '#EFF6FF', text: '#2563EB' },
+                { bg: '#F0FDF4', text: '#16A34A' },
+                { bg: '#FFF7ED', text: '#EA580C' },
+                { bg: '#FAF5FF', text: '#9333EA' },
+                { bg: '#FFF1F2', text: '#E11D48' },
+                { bg: '#F0F9FF', text: '#0284C7' },
+              ];
+              const getAvatarColor = (phone: string) => avatarColors[(phone?.length || 0) % avatarColors.length];
+
+              // Determine which list to show based on filter
+              let listToShow: any[] = [];
+              if (custFilter === 'active') listToShow = activeCustomers;
+              else if (custFilter === 'present') listToShow = presentCustomers;
+              else if (custFilter === 'pending') listToShow = pendingLegacy;
+              else listToShow = [...pendingLegacy, ...activeCustomers, ...presentCustomers];
+
+              const filtered = listToShow.filter((u: any) =>
+                (u?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+                (u?.phone || '').includes(search)
+              );
+
+              return (
+                <>
+                  {/* Compact Filter Chips */}
+                  <View style={styles.custFilterRow}>
+                    {([
+                      { key: 'all',     label: 'All',     count: customersOnly.length,   activeBg: '#0F172A', activeText: '#FFFFFF', dotColor: '#64748B' },
+                      { key: 'active',  label: 'Active',  count: activeCustomers.length, activeBg: '#16A34A', activeText: '#FFFFFF', dotColor: '#16A34A' },
+                      { key: 'present', label: 'Present', count: presentCustomers.length,activeBg: '#2563EB', activeText: '#FFFFFF', dotColor: '#2563EB' },
+                      { key: 'pending', label: 'Pending', count: pendingLegacy.length,   activeBg: '#F59E0B', activeText: '#FFFFFF', dotColor: '#F59E0B' },
+                    ] as const).map(chip => {
+                      const isActive = custFilter === chip.key;
+                      return (
+                        <TouchableOpacity
+                          key={chip.key}
+                          onPress={() => setCustFilter(chip.key)}
+                          activeOpacity={0.75}
+                          style={[
+                            styles.custFilterChip,
+                            isActive && { backgroundColor: chip.activeBg, borderColor: chip.activeBg },
+                          ]}
+                        >
+                          <View style={[styles.custFilterDot, { backgroundColor: isActive ? chip.activeText : chip.dotColor }]} />
+                          <Text style={[styles.custFilterText, isActive && { color: chip.activeText }]}>{chip.label}</Text>
+                          <Text style={[styles.custFilterCount, isActive && { color: chip.activeText, opacity: 0.8 }]}>{chip.count}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Search Bar */}
+                  <View style={styles.searchBox}>
+                    <Search size={15} color="#94A3B8" />
+                    <TextInput
+                      placeholder="Search by name or phone..."
+                      placeholderTextColor="#94A3B8"
+                      value={search}
+                      onChangeText={setSearch}
+                      style={styles.searchInput}
+                    />
+                    {search.length > 0 && (
+                      <TouchableOpacity onPress={() => setSearch('')} activeOpacity={0.7}>
+                        <X size={15} color="#94A3B8" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Customer List */}
+                  {filtered.length === 0 ? (
+                    <View style={styles.custEmptyBox}>
+                      <Users size={24} color="#CBD5E1" />
+                      <Text style={styles.custEmptyTitle}>No customers found</Text>
+                      <Text style={styles.custEmptySub}>Try a different filter or search term</Text>
+                    </View>
+                  ) : (
+                    filtered.map((u: any) => {
+                      const ac = getAvatarColor(u.phone);
+                      const isPending = u?.customerKind === 'legacy' && u?.approvalStatus !== 'approved';
+                      const isActive = u?.customerKind === 'legacy' && u?.approvalStatus === 'approved';
+                      const isRejected = u?.approvalStatus === 'rejected';
+                      const accentColor = isActive ? '#16A34A' : isRejected ? '#EF4444' : isPending ? '#F59E0B' : '#2563EB';
+
+                      return (
+                        <View key={u.phone} style={[styles.custCardPremium, { borderLeftWidth: 3, borderLeftColor: accentColor }]}>
+                          <View style={[styles.custAvatar, { backgroundColor: ac.bg }]}>
+                            <Text style={[styles.custAvatarText, { color: ac.text }]}>{getInitials(u.name || 'C')}</Text>
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 10 }}>
+                            <Text style={styles.custName}>{u.name || 'Customer'}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                              <Phone size={9} color="#CBD5E1" />
+                              <Text style={styles.custMeta}>{u.phone}</Text>
+                            </View>
+                            {isPending && (
+                              <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                                <TouchableOpacity
+                                  style={styles.approveBtn}
+                                  activeOpacity={0.85}
+                                  onPress={() => updateUser(u.phone, { customerKind: 'legacy', approvalStatus: 'approved' } as any)}
+                                >
+                                  <Check size={10} color="#FFFFFF" />
+                                  <Text style={styles.approveBtnText}>Approve</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={styles.rejectBtn}
+                                  activeOpacity={0.85}
+                                  onPress={() => updateUser(u.phone, { customerKind: 'legacy', approvalStatus: 'rejected' } as any)}
+                                >
+                                  <X size={10} color="#EF4444" />
+                                  <Text style={styles.rejectBtnText}>Reject</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                          <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                            {isActive && (
+                              <View style={[styles.statusPill, { backgroundColor: '#DCFCE7', borderColor: '#BBF7D0' }]}>
+                                <Text style={[styles.statusPillText, { color: '#15803D' }]}>✓ Active</Text>
+                              </View>
+                            )}
+                            {!isActive && !isPending && (
+                              <View style={[styles.statusPill, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+                                <Text style={[styles.statusPillText, { color: '#1D4ED8' }]}>● New</Text>
+                              </View>
+                            )}
+                            {isPending && !isRejected && (
+                              <View style={[styles.statusPill, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
+                                <Text style={[styles.statusPillText, { color: '#92400E' }]}>⏳ Pending</Text>
+                              </View>
+                            )}
+                            {isRejected && (
+                              <View style={[styles.statusPill, { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}>
+                                <Text style={[styles.statusPillText, { color: '#DC2626' }]}>✕ Rejected</Text>
+                              </View>
+                            )}
+                            <TouchableOpacity
+                              style={styles.callBtn}
+                              activeOpacity={0.8}
+                              onPress={() => Linking.openURL(`tel:${u.phone}`)}
+                            >
+                              <Phone size={13} color="#2563EB" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })
+                  )}
+                </>
+              );
+            })()}
           </View>
         )}
 
@@ -920,6 +1097,33 @@ export default function AdminScreen() {
                 style={styles.searchInput}
               />
             </View>
+
+            {/* Pending Screenshot Payments */}
+            {payments.filter((p) => (p as any).screenshotUrl && p.status === 'Pending').length > 0 && (
+              <View style={{ backgroundColor: '#FEF3C7', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#FDE68A' }}>
+                <Text style={{ fontWeight: '800', color: '#92400E', fontSize: 13, marginBottom: 8 }}>
+                  ⏳ {payments.filter((p) => (p as any).screenshotUrl && p.status === 'Pending').length} Payment Screenshot(s) Awaiting Review
+                </Text>
+                {payments
+                  .filter((p) => (p as any).screenshotUrl && p.status === 'Pending')
+                  .map((p) => (
+                    <TouchableOpacity
+                      key={p.id}
+                      style={{ backgroundColor: '#FFFFFF', borderRadius: 8, padding: 10, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}
+                      onPress={() => openCustomerPayments(p.customerName, p.customerPhone)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontWeight: '700', fontSize: 13, color: '#0F172A' }}>{p.customerName}</Text>
+                        <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>₹{p.amount} • {p.forMonth}</Text>
+                      </View>
+                      <View style={{ backgroundColor: '#DBEAFE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99 }}>
+                        <Text style={{ color: '#1D4ED8', fontWeight: '700', fontSize: 11 }}>Review →</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            )}
 
             {paymentCustomerRows
               .filter((r) => {
@@ -1329,6 +1533,25 @@ export default function AdminScreen() {
                       <Text style={styles.payHistoryMeta} numberOfLines={1}>
                         {p.method || 'UPI'}{p.txnId ? `  •  ${p.txnId}` : ''}
                       </Text>
+                      {(p as any).screenshotUrl ? (
+                        <View style={{ marginTop: 8 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB', marginBottom: 4 }}>📎 Payment Screenshot</Text>
+                          <Image
+                            source={{ uri: (p as any).screenshotUrl }}
+                            style={{ width: '100%', height: 160, borderRadius: 8, backgroundColor: '#F1F5F9' }}
+                            resizeMode="contain"
+                          />
+                          {p.status === 'Pending' && (
+                            <TouchableOpacity
+                              onPress={() => store.updatePayment(p.id, { status: 'Paid' })}
+                              style={{ marginTop: 8, backgroundColor: '#16A34A', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+                              activeOpacity={0.85}
+                            >
+                              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>✓ Mark as Paid</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ) : null}
                     </View>
                     <TouchableOpacity
                       style={[styles.payStatusPill, p.status === 'Paid' ? styles.payStatusPaid : styles.payStatusPending]}
@@ -1835,6 +2058,166 @@ const styles = StyleSheet.create({
 
   sectionTitle: { fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 12 },
 
+  customerStatsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  customerStatCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  customerStatValue: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
+  customerStatLabel: { marginTop: 1, fontSize: 9, fontWeight: '700', color: '#94A3B8' },
+
+  /* filter chips */
+  custFilterRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 12,
+  },
+  custFilterChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  custFilterDot: { width: 5, height: 5, borderRadius: 3 },
+  custFilterText: { fontSize: 11, fontWeight: '700', color: '#475569' },
+  custFilterCount: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94A3B8',
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  mutedPill: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  customerBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  customerBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  statusPill: {
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  statusPillText: { fontSize: 11, fontWeight: '800' },
+  emptyText: { fontSize: 12, fontWeight: '700', color: '#64748B' },
+
+  /* ── Customer Premium Card ── */
+  custCardPremium: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 11,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  custAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  custAvatarText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  callBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginLeft: 8,
+  },
+  approveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  approveBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  rejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  rejectBtnText: { color: '#EF4444', fontSize: 11, fontWeight: '800' },
+  custEmptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+    gap: 6,
+  },
+  custEmptyTitle: { fontSize: 13, fontWeight: '800', color: '#64748B', marginTop: 4 },
+  custEmptySub: { fontSize: 11, fontWeight: '500', color: '#94A3B8', textAlign: 'center' },
+
   actionPanel: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -1872,7 +2255,9 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginBottom: 12,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   paperLogoBox: {
     width: 56,

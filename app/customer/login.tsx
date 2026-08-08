@@ -22,6 +22,7 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [existingCustomer, setExistingCustomer] = useState(false);
   const [loadingLoc, setLoadingLoc] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
@@ -129,21 +130,34 @@ export default function LoginScreen() {
       }
       
       if (existingUser) {
-        store.setUser({
+        const hydrated: any = {
           name: existingUser.name,
           phone: existingUser.phone,
           address: existingUser.address,
           isAdmin: isUserAdmin,
-        });
+          customerKind: existingUser.customerKind ?? 'new',
+          approvalStatus: existingUser.approvalStatus ?? 'pending',
+        };
+        store.setUser(hydrated);
+        // No longer blocking — let customer in. QR/Pay is gated by approvalStatus in profile.
       } else {
-        store.setUser({
+        const customerKind = existingCustomer ? 'legacy' : 'new';
+        const approvalStatus = existingCustomer ? 'pending' : 'approved';
+        const created: any = {
           name: isUserAdmin ? 'Admin' : (name || 'Customer'),
           phone,
           address: isUserAdmin ? 'Admin HQ' : (address || 'Not Provided'),
           isAdmin: isUserAdmin,
-        });
+          customerKind,
+          approvalStatus,
+        };
+        store.setUser(created);
       }
       showToast('Logged in successfully!');
+      if (isUserAdmin) {
+        router.replace('/customer/bottom_nav/admin');
+        return;
+      }
       router.replace('/customer/bottom_nav/home');
     } catch (error: any) {
       console.warn("Login Error:", error);
@@ -225,6 +239,20 @@ export default function LoginScreen() {
                 {phone.length === 10 && <Text style={s.tick}>✓</Text>}
               </View>
             </>
+
+            <TouchableOpacity
+              style={s.legacyRow}
+              activeOpacity={0.85}
+              onPress={() => setExistingCustomer((v) => !v)}
+            >
+              <View style={[s.legacyBox, existingCustomer && s.legacyBoxOn]}>
+                {existingCustomer && <Text style={s.legacyTick}>✓</Text>}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.legacyTitle}>Existing customer / ಪ್ರಸ್ತುತ ಗ್ರಾಹಕರು</Text>
+                <Text style={s.legacySub}>Tick if you are a previous active customer (needs admin approval) / ನೀವು ಹಿಂದಿನ ಸಕ್ರಿಯ ಗ್ರಾಹಕರಾದರೆ ಟಿಕ್ ಮಾಡಿ (ಅಡ್ಮಿನ್ ಅನುಮೋದನೆ ಬೇಕು)</Text>
+              </View>
+            </TouchableOpacity>
 
             {/* OTP (commented out for direct login bypass) */}
             {/*
@@ -315,6 +343,49 @@ const s = StyleSheet.create({
   flag: { fontSize: 13, fontWeight: '800', color: '#374151', marginRight: 4 },
   divV: { width: 1, height: 20, backgroundColor: '#E5E7EB', marginHorizontal: 10 },
   tick: { color: '#16A34A', fontSize: 16, fontWeight: '900' },
+  legacyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: -4,
+    marginBottom: 14,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+  },
+  legacyBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legacyBoxOn: {
+    borderColor: BLUE,
+    backgroundColor: BLUE,
+  },
+  legacyTick: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  legacyTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  legacySub: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
+    lineHeight: 16,
+  },
   gpsPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#EFF6FF', paddingHorizontal: 8, paddingVertical: 5,

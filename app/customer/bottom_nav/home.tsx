@@ -10,6 +10,7 @@ import {
   Alert,
   Linking,
   Dimensions,
+  Modal,
 } from 'react-native';
 import {
   Bell,
@@ -25,13 +26,14 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { store } from '../../../utils/store';
+import { checkForUpdate, type RemoteVersionInfo } from '../../../utils/updateChecker';
 
 
 
 const QUICK_ACTIONS: any[] = [
   { id: 'skip', label: 'Skip\nTomorrow', icon: SkipForward, bg: '#EEF2FF', color: '#2563EB' },
   { id: 'pause', label: 'Pause', icon: PauseCircle, bg: '#FFF7ED', color: '#EA580C' },
-  { id: 'call', label: 'Call Agent', subtitle: 'Akhil K S', icon: FontAwesome, iconName: 'phone', bg: '#EEF2FF', color: '#2563EB' },
+  { id: 'call', label: 'Call Agent', subtitle: 'Customer care', icon: FontAwesome, iconName: 'phone', bg: '#EEF2FF', color: '#2563EB' },
   {
     id: 'whatsapp',
     label: 'WhatsApp',
@@ -42,32 +44,7 @@ const QUICK_ACTIONS: any[] = [
   },
 ];
 
-const HOME_CATEGORIES: any[] = [
-  {
-    id: 'newspapers',
-    label: 'Newspapers',
-    subtitle: 'Daily papers\ndelivered',
-    src: require('../../../assets/Milk/newspaper.webp'),
-    bg: '#F5F5F0',
-    route: '/customer/newspapers',
-  },
-  {
-    id: 'milk',
-    label: 'Milk',
-    subtitle: 'Fresh milk\nat your door',
-    src: require('../../../assets/Milk/milk.webp'),
-    bg: '#F0FAF1',
-    route: '/customer/milk',
-  },
-  {
-    id: 'water_cans',
-    label: 'Water Cans',
-    subtitle: 'Pure water\ndelivered',
-    src: require('../../../assets/Milk/water.webp'),
-    bg: '#F0F6FF',
-    route: '/customer/water_cans',
-  },
-];
+
 
 
 const HOURS = new Date().getHours();
@@ -82,7 +59,16 @@ export default function HomeScreen() {
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [papers, setPapers] = useState(store.getPapers());
   const [agents, setAgents] = useState(store.getAgents());
+  const [appSettings, setAppSettings] = useState(store.getAppSettings());
   const [bannerReady, setBannerReady] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<RemoteVersionInfo | null>(null);
+
+  // ── Check for updates from GitHub on mount ──────────────────────────────────
+  useEffect(() => {
+    checkForUpdate().then((info) => {
+      if (info) setUpdateInfo(info);
+    });
+  }, []);
 
   const contactAgent = () => {
     Linking.openURL('tel:9972505709');
@@ -98,12 +84,18 @@ export default function HomeScreen() {
       setDeliveries(store.getDeliveries());
       setPapers(store.getPapers());
       setAgents(store.getAgents());
+      setAppSettings(store.getAppSettings());
     });
     return unsubscribe;
   }, []);
 
   const customerDeliveries = deliveries.filter((d) => d.name === user?.name && d.plan !== 'One-time');
   const currentDelivery = customerDeliveries[0] || null;
+  const showOnlinePay =
+    !!user &&
+    !user.isAdmin &&
+    user.customerKind === 'legacy' &&
+    user.approvalStatus === 'approved';
 
   const scrollRef = useRef<FlatList<any>>(null);
   const adIndexRef = useRef(0);
@@ -204,6 +196,55 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" animated={true} />
+
+      {/* ── IN-APP UPDATE MODAL ─────────────────────────────────────────── */}
+      <Modal
+        visible={!!updateInfo}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { if (!updateInfo?.mandatory) setUpdateInfo(null); }}
+      >
+        <View style={styles.updateOverlay}>
+          <View style={styles.updateCard}>
+            <View style={styles.updateIconRow}>
+              <Text style={{ fontSize: 36 }}>🚀</Text>
+            </View>
+            <Text style={styles.updateTitle}>Update Available!</Text>
+            <Text style={styles.updateVersion}>Version {updateInfo?.version}</Text>
+
+            {!!updateInfo?.releaseNotes && (
+              <View style={styles.updateNotesBox}>
+                <Text style={styles.updateNotesTitle}>What's new</Text>
+                <Text style={styles.updateNotesText}>{updateInfo.releaseNotes}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.updateBtn}
+              activeOpacity={0.85}
+              onPress={() => Linking.openURL(updateInfo?.downloadUrl || '')}
+            >
+              <Text style={styles.updateBtnText}>Download Update</Text>
+            </TouchableOpacity>
+
+            {!updateInfo?.mandatory && (
+              <TouchableOpacity
+                style={styles.updateSkipBtn}
+                onPress={() => setUpdateInfo(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.updateSkipText}>Remind me later</Text>
+              </TouchableOpacity>
+            )}
+
+            {updateInfo?.mandatory && (
+              <Text style={styles.updateMandatoryNote}>
+                This update is required to continue using the app.
+              </Text>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* ── CLEAN WHITE TOP HEADER ──────────────── */}
       <View style={styles.topHeader}>
@@ -343,6 +384,8 @@ export default function HomeScreen() {
             </View>
           )}
 
+          {/* UPI/QR payment moved to Profile screen */}
+
           {/* ── QUICK ACTIONS ─────────────────────────────────── */}
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickRow}>
@@ -372,30 +415,7 @@ export default function HomeScreen() {
             ))}
           </View>
 
-          {/* ── CATEGORY TILES (Card style like reference) ── */}
-          <View style={styles.homeCategoryRow}>
-            {HOME_CATEGORIES.map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                style={[styles.homeCategoryCard, { backgroundColor: c.bg }]}
-                activeOpacity={0.75}
-                onPress={() => router.push(c.route)}
-              >
-                {/* Product image — top */}
-                <Image
-                  source={c.src}
-                  style={styles.homeCatImage}
-                  resizeMode="contain"
-                />
-                {/* Text — below image */}
-                <Text style={styles.homeCatLabel}>{c.label}</Text>
-                <View style={styles.homeCatSubRow}>
-                  <Text style={styles.homeCatSub}>{c.subtitle}</Text>
-                  <ChevronRight size={11} color="#94A3B8" />
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+
 
           {/* ── LANGUAGE FILTER BOX ────────────────────────────── */}
           <View style={styles.sectionHeader}>
@@ -670,6 +690,43 @@ const styles = StyleSheet.create({
   todaySub: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '600' },
   todayTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '900', marginTop: 2 },
   todayTime: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 4, fontWeight: '500' },
+  upiCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  upiTitle: { fontSize: 14, fontWeight: '900', color: '#0F172A', letterSpacing: -0.2 },
+  upiSub: { fontSize: 12, fontWeight: '600', color: '#64748B', marginTop: 2 },
+  upiId: { marginTop: 10, fontSize: 13, fontWeight: '900', color: '#2563EB' },
+  upiName: { marginTop: 2, fontSize: 11, fontWeight: '600', color: '#94A3B8' },
+  upiMissing: { marginTop: 10, fontSize: 12, fontWeight: '600', color: '#94A3B8' },
+  upiPayBtn: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  upiPayBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  upiQrBox: {
+    width: 96,
+    height: 96,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upiQrImage: { width: '100%', height: '100%' },
   confirmedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: '#16A34A', paddingHorizontal: 10, paddingVertical: 5,
@@ -873,5 +930,97 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#64748B',
     letterSpacing: 0.2,
+  },
+
+  /* ── Update Modal ──────────────────────────────── */
+  updateOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  updateCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  updateIconRow: {
+    width: 68,
+    height: 68,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  updateTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  updateVersion: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2563EB',
+    marginBottom: 16,
+  },
+  updateNotesBox: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  updateNotesTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 5,
+  },
+  updateNotesText: {
+    fontSize: 13,
+    color: '#334155',
+    lineHeight: 19,
+  },
+  updateBtn: {
+    width: '100%',
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  updateBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  updateSkipBtn: {
+    paddingVertical: 8,
+  },
+  updateSkipText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  updateMandatoryNote: {
+    marginTop: 8,
+    fontSize: 11,
+    color: '#EF4444',
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

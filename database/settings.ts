@@ -17,6 +17,13 @@ export interface AdminUserDoc {
   phone: string;
 }
 
+export interface AppSettingsDoc {
+  admins: AdminUserDoc[];
+  paymentUpiId?: string;
+  paymentUpiName?: string;
+  paymentQrDataUrl?: string;
+}
+
 const SETTINGS_DOC = doc(db, 'settings', 'app');
 
 // ── Seed initial admin accounts if document does not exist ────────────────────
@@ -45,7 +52,12 @@ export async function seedSettings() {
     }
     return;
   }
-  await setDoc(SETTINGS_DOC, { admins: INITIAL_ADMINS });
+  await setDoc(SETTINGS_DOC, {
+    admins: INITIAL_ADMINS,
+    paymentUpiId: '',
+    paymentUpiName: '',
+    paymentQrDataUrl: '',
+  } satisfies AppSettingsDoc);
   console.log('[DB] Settings seeded with admins.');
 }
 
@@ -68,6 +80,42 @@ export function listenAdminNumbers(callback: (admins: AdminUserDoc[]) => void) {
       callback(INITIAL_ADMINS);
     }
   );
+}
+
+export function listenAppSettings(callback: (settings: AppSettingsDoc) => void) {
+  return onSnapshot(
+    SETTINGS_DOC,
+    (snap) => {
+      const data: any = snap.data() ?? {};
+      let admins: AdminUserDoc[] = data?.admins ?? INITIAL_ADMINS;
+      INITIAL_ADMINS.forEach((pAdmin) => {
+        if (!admins.some((a) => a.phone === pAdmin.phone)) {
+          admins = [...admins, pAdmin];
+        }
+      });
+      callback({
+        admins,
+        paymentUpiId: String(data?.paymentUpiId ?? ''),
+        paymentUpiName: String(data?.paymentUpiName ?? ''),
+        paymentQrDataUrl: String(data?.paymentQrDataUrl ?? ''),
+      });
+    },
+    (error) => {
+      console.error('[DB] listenAppSettings error:', error?.code, error?.message);
+      callback({
+        admins: INITIAL_ADMINS,
+        paymentUpiId: '',
+        paymentUpiName: '',
+        paymentQrDataUrl: '',
+      });
+    }
+  );
+}
+
+export async function updatePaymentSettings(
+  data: Partial<Pick<AppSettingsDoc, 'paymentUpiId' | 'paymentUpiName' | 'paymentQrDataUrl'>>
+) {
+  await updateDoc(SETTINGS_DOC, data as any);
 }
 
 // ── Add an admin profile ──────────────────────────────────────────────────────

@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "versionCode": 1,
+  "mandatory": false,
+  "releaseNotes": "Initial release of Newspaper Delivery app.",
+  "downloadUrl": "https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/releases/latest",
+  "minSupportedVersionCode": 1
+}

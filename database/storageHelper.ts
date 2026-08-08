@@ -159,7 +159,16 @@ export async function uploadImage(localUri: string, fullStoragePath: string): Pr
   if (!localUri) return '';
 
   if (!USE_STORAGE) {
-    return await uriToBase64(localUri);
+    const dataUrl = await uriToBase64(localUri);
+    const sizeKB = Math.round(dataUrl.length / 1.33 / 1024);
+    if (sizeKB > 900) {
+      throw new Error(
+        `Image is too large (~${sizeKB} KB after encoding).  ` +
+        'Firestore documents are limited to 1 MB.  Please choose a smaller ' +
+        'image or enable Firebase Storage.'
+      );
+    }
+    return dataUrl;
   }
 
   const { mime } = guessMime(localUri);

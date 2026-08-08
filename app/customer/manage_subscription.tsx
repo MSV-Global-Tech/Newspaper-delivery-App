@@ -154,7 +154,7 @@ export default function ManageSubscriptionScreen() {
         {/* Contact Agent Button */}
         <TouchableOpacity style={styles.contactBtn} onPress={contactAgent} activeOpacity={0.8}>
           <FontAwesome name="phone" size={18} color="#2563EB" />
-          <Text style={styles.contactBtnText}>Contact Agent (Akhil K S)</Text>
+          <Text style={styles.contactBtnText}>Contact Agent (Customer care)</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

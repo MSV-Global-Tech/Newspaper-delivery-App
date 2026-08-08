@@ -17,7 +17,8 @@ import {
   updatePaper as fbUpdatePaper,
   deletePaper as fbDeletePaper,
   seedPapers,
-  listenAdminNumbers,
+  listenAppSettings,
+  updatePaymentSettings as fbUpdatePaymentSettings,
   addAdminNumber as fbAddAdminNumber,
   removeAdminNumber as fbRemoveAdminNumber,
   seedSettings,
@@ -31,7 +32,7 @@ import {
   updatePayment as fbUpdatePayment,
   PAPERS_CATALOG_WITH_IDS,
 } from '../database';
-import type { AgentDoc, AdminUserDoc, PaymentDoc } from '../database';
+import type { AgentDoc, AdminUserDoc, AppSettingsDoc, PaymentDoc } from '../database';
 import { setSessionUser } from './session';
 
 export type { AgentDoc, AdminUserDoc };
@@ -42,6 +43,8 @@ export interface User {
   phone: string;
   address: string;
   isAdmin: boolean;
+  customerKind?: 'new' | 'legacy';
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 export interface Delivery {
@@ -122,6 +125,13 @@ let adminUsers: AdminUserDoc[] = [
   { name: 'System Admin', phone: '8123363394' },
   { name: 'Akhil KS', phone: '9972505709' },
 ];
+
+let appSettings: AppSettingsDoc = {
+  admins: adminUsers,
+  paymentUpiId: '',
+  paymentUpiName: '',
+  paymentQrDataUrl: '',
+};
 
 let deliveries: Delivery[] = [];
 
@@ -229,8 +239,9 @@ async function bootstrap() {
       notify();
     });
 
-    listenAdminNumbers((admins) => {
-      adminUsers = admins;
+    listenAppSettings((settings) => {
+      appSettings = settings;
+      adminUsers = settings.admins;
       notify();
     });
 
@@ -395,6 +406,16 @@ export const store = {
 
   getAdminNumbers() {
     return adminUsers;
+  },
+
+  getAppSettings() {
+    return appSettings;
+  },
+
+  updatePaymentSettings(data: Partial<Pick<AppSettingsDoc, 'paymentUpiId' | 'paymentUpiName' | 'paymentQrDataUrl'>>) {
+    appSettings = { ...appSettings, ...data };
+    notify();
+    fbUpdatePaymentSettings(data).catch(console.warn);
   },
 
   addAdminNumber(phone: string, name: string) {

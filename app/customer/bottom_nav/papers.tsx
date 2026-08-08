@@ -193,7 +193,7 @@ export default function SubscriptionsScreen() {
             onPress={contactAgent}
           >
             <FontAwesome name="phone" size={18} color="#2563EB" />
-            <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 15 }}>Contact Agent (Akhil K S)</Text>
+            <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 15 }}>Contact Agent (Customer care)</Text>
           </TouchableOpacity>
         </View>
         <View style={{ height: 24 }} />
