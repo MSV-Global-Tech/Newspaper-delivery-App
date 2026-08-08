@@ -13,7 +13,7 @@
 // ─── CONFIG ────────────────────────────────────────────────────────────────────
 // Replace this URL with your own GitHub raw content URL once you push to GitHub.
 export const GITHUB_VERSION_URL =
-  'https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/main/version.json';
+  'https://raw.githubusercontent.com/MSV-Global-Tech/Newspaper-delivery-App/main/version.json';
 
 // The current installed version of the app (keep this in sync with app.json → version)
 export const CURRENT_VERSION = '1.0.0';
