@@ -58,7 +58,6 @@ export default function HomeScreen() {
   const [user, setUser] = useState(store.getUser());
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [papers, setPapers] = useState(store.getPapers());
-  const [agents, setAgents] = useState(store.getAgents());
   const [appSettings, setAppSettings] = useState(store.getAppSettings());
   const [bannerReady, setBannerReady] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<RemoteVersionInfo | null>(null);
@@ -83,7 +82,6 @@ export default function HomeScreen() {
       setUser(store.getUser());
       setDeliveries(store.getDeliveries());
       setPapers(store.getPapers());
-      setAgents(store.getAgents());
       setAppSettings(store.getAppSettings());
     });
     return unsubscribe;
@@ -552,42 +550,7 @@ export default function HomeScreen() {
             </>
           )}
 
-          {/* ── DELIVERY AGENTS (ADMIN ONLY) ──────────────────── */}
-          {user?.isAdmin && (
-            <>
-              <View style={styles.sectionHeader}>
-                <View>
-                  <Text style={styles.sectionTitle}>Delivery Agents</Text>
-                  <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }}>Your neighbourhood paper-boys</Text>
-                </View>
-                <TouchableOpacity onPress={() => router.push('/customer/agents' as any)}>
-                  <Text style={styles.viewAll}>See All</Text>
-                </TouchableOpacity>
-              </View>
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 4, paddingRight: 4 }} style={{ marginBottom: 24 }}>
-                {agents.slice(0, 5).map((agent) => (
-                  <TouchableOpacity
-                    key={agent.id}
-                    style={styles.agentChip}
-                    activeOpacity={0.85}
-                    onPress={() => router.push('/customer/agents' as any)}
-                  >
-                    <View style={styles.agentChipAvatar}>
-                      <Text style={styles.agentChipAvatarText}>
-                        {agent.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
-                      </Text>
-                    </View>
-                    <Text style={styles.agentChipName} numberOfLines={1}>{agent.name}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                      <MapPin size={9} color="#94A3B8" />
-                      <Text style={styles.agentChipArea} numberOfLines={1}>{agent.area}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </>
-          )}
           <View style={[styles.sectionHeader, { marginTop: 4 }]}>
             <Text style={styles.sectionTitle}>Recommended</Text>
             <TouchableOpacity onPress={() => router.push('/customer/newspapers' as any)}>
@@ -874,31 +837,6 @@ const styles = StyleSheet.create({
   },
   subBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
 
-  /* Agent chip (horizontal scroll) */
-  agentChip: {
-    width: 100,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EEF2F7',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  agentChipAvatar: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#BFDBFE',
-    marginBottom: 6,
-  },
-  agentChipAvatarText: { fontSize: 15, fontWeight: '800', color: '#2563EB' },
-  agentChipName: { fontSize: 12, fontWeight: '700', color: '#0F172A', textAlign: 'center' },
-  agentChipArea: { fontSize: 10, color: '#94A3B8', fontWeight: '500', textAlign: 'center' },
 
   /* Language filter tiles — minimal tinted boxes */
   langGrid: {

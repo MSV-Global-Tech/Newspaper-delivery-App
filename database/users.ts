@@ -22,6 +22,33 @@ export interface UserDoc {
   customerKind?: 'new' | 'legacy';
   approvalStatus?: 'pending' | 'approved' | 'rejected';
   createdAt?: any;
+  bills?: CustomerBill[];
+  paymentHistory?: CustomerPayment[];
+}
+
+export interface CustomerBillItem {
+  id: string;
+  name: string;
+  amount: number;
+}
+
+export interface CustomerBill {
+  id: string;
+  month: string;
+  date: string;
+  items: CustomerBillItem[];
+  totalAmount: number;
+  status: 'Unpaid' | 'Paid';
+  paymentProof?: string;
+  paidAt?: string;
+}
+
+export interface CustomerPayment {
+  id: string;
+  amount: number;
+  date: string;
+  status: 'Paid' | 'Approved' | 'Rejected' | 'Pending';
+  screenshot?: string;
 }
 
 const COL = 'users';
@@ -62,4 +89,22 @@ export async function updateUser(phone: string, data: Partial<UserDoc>) {
 // ── Delete a user profile ────────────────────────────────────────────────────
 export async function deleteUser(phone: string) {
   await deleteDoc(doc(db, COL, phone));
+}
+
+// ── Real-time listener for a single user (for customers to receive bill updates) ──
+export function listenUser(phone: string, callback: (data: UserDoc | null) => void) {
+  return onSnapshot(
+    doc(db, COL, phone),
+    (snap) => {
+      callback(snap.exists() ? (snap.data() as UserDoc) : null);
+    },
+    (error) => {
+      console.error('[DB] listenUser error:', error?.code, error?.message);
+    }
+  );
+}
+
+// ── Bills Management ────────────────────────────────────────────────────────
+export async function updateCustomerBill(phone: string, bills: CustomerBill[]) {
+  await updateDoc(doc(db, COL, phone), { bills });
 }

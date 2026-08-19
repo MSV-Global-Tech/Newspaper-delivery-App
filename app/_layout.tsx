@@ -2,11 +2,7 @@ import { Stack, usePathname } from 'expo-router';
 import '../global.css';
 import { useEffect, useRef } from 'react';
 import { store } from '../utils/store';
-import { getSessionUser, setLastRoute } from '../utils/session';
-
-function shouldPersistRoute(pathname: string) {
-  return pathname !== '/' && pathname !== '/customer/login' && pathname !== '/+not-found';
-}
+import { getSessionUser } from '../utils/session';
 
 export default function RootLayout() {
   const pathname = usePathname();
@@ -26,9 +22,6 @@ export default function RootLayout() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (shouldPersistRoute(pathname)) setLastRoute(pathname);
-  }, [pathname]);
 
   return (
     <Stack screenOptions={{ headerShown: false }} />

@@ -36,6 +36,7 @@ import {
   Shield,
   Truck,
   Navigation,
+  Briefcase,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
@@ -45,19 +46,21 @@ import { IMAGES, resolvePaperImage } from '../../assets/images';
 import { store } from '../../utils/store';
 import { getAdminOverviewSnapshot, setAdminOverviewSnapshot, type AdminOverviewSnapshot } from '../../utils/session';
 import { uploadNewspaperLogo, deleteImage, listenUsers, updateUser } from '../../database';
+import AdminVendorsTab from '../../components/AdminVendorsTab';
+import AdminCustomerBillingModal from '../../components/AdminCustomerBillingModal';
 
 export default function AdminScreen() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'deliveries' | 'payments' | 'papers' | 'agents' | 'access'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'deliveries' | 'payments' | 'papers' | 'access' | 'vendors'>('overview');
   const [search, setSearch] = useState('');
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [papersList, setPapersList] = useState(store.getPapers());
   const [adminNumbers, setAdminNumbers] = useState(store.getAdminNumbers());
-  const [agentsList, setAgentsList] = useState(store.getAgents());
   const [payments, setPayments] = useState(store.getPayments());
   const [usersList, setUsersList] = useState<any[]>([]);
   const [custFilter, setCustFilter] = useState<'all' | 'active' | 'present' | 'pending'>('all');
   const [newAdminPhone, setNewAdminPhone] = useState('');
   const [newAdminName, setNewAdminName] = useState('');
+  const [selectedCustomerForBilling, setSelectedCustomerForBilling] = useState<any>(null);
 
   // Add Paper State
   const [isAddingPaper, setIsAddingPaper] = useState(false);
@@ -79,9 +82,7 @@ export default function AdminScreen() {
     currentImageSrc: string;
   } | null>(null);
 
-  // Add Agent State
-  const [isAddingAgent, setIsAddingAgent] = useState(false);
-  const [newAgent, setNewAgent] = useState({ name: '', phone: '', area: '', location: '' });
+  // Add Agent State (Removed)
   const [prevOverview, setPrevOverview] = useState<AdminOverviewSnapshot | null>(null);
   const [paymentsMonth, setPaymentsMonth] = useState(() => {
     const d = new Date();
@@ -109,7 +110,6 @@ export default function AdminScreen() {
       setDeliveries(store.getDeliveries());
       setPapersList(store.getPapers());
       setAdminNumbers(store.getAdminNumbers());
-      setAgentsList(store.getAgents());
       setPayments(store.getPayments());
     });
     return unsubscribe;
@@ -121,25 +121,9 @@ export default function AdminScreen() {
   }, []);
 
   useEffect(() => {
-    getAdminOverviewSnapshot().then(setPrevOverview).catch(() => {});
+    getAdminOverviewSnapshot().then(setPrevOverview).catch(() => { });
   }, []);
 
-  const handleAddAgent = () => {
-    if (!newAgent.name || !newAgent.phone || !newAgent.area) return;
-    store.addAgent({
-      name: newAgent.name.trim(),
-      phone: newAgent.phone.trim(),
-      area: newAgent.area.trim(),
-      location: newAgent.location.trim(),
-      isActive: true,
-    });
-    setNewAgent({ name: '', phone: '', area: '', location: '' });
-    setIsAddingAgent(false);
-  };
-
-  const handleDeleteAgent = (id: string) => {
-    store.deleteAgent(id);
-  };
 
   const pickImage = async () => {
     try {
@@ -279,7 +263,7 @@ export default function AdminScreen() {
         }
         imageSrc = uploaded;
         if (oldCloudUrl) {
-          deleteImage(oldCloudUrl).catch(() => {});
+          deleteImage(oldCloudUrl).catch(() => { });
         }
       }
       const ratingNum = parseFloat(editingPaper.rating);
@@ -322,7 +306,7 @@ export default function AdminScreen() {
           style: 'destructive',
           onPress: () => {
             if (editingPaper.currentImageSrc && /^https?:\/\//i.test(editingPaper.currentImageSrc)) {
-              deleteImage(editingPaper.currentImageSrc).catch(() => {});
+              deleteImage(editingPaper.currentImageSrc).catch(() => { });
             }
             store.deletePaper(editingPaper.id);
             setIsEditingPaper(false);
@@ -367,7 +351,7 @@ export default function AdminScreen() {
         title: 'Delivery Sheet',
         message: csv,
       });
-    } catch {}
+    } catch { }
   };
 
   const monthTitle = (key: string) => {
@@ -467,7 +451,7 @@ export default function AdminScreen() {
       capturedAt: Date.now(),
     };
     const t = setTimeout(() => {
-      setAdminOverviewSnapshot(snapshot).catch(() => {});
+      setAdminOverviewSnapshot(snapshot).catch(() => { });
     }, 800);
     return () => clearTimeout(t);
   }, [totalCustomers, activeSubs, totalMonthlyRevenue, pendingCount]);
@@ -534,18 +518,18 @@ export default function AdminScreen() {
     : [];
   const selectedPayments = selectedPhone
     ? payments
-        .filter((p) => normalizePhone(String(p.customerPhone)) === selectedPhone)
-        .slice()
-        .sort((a: any, b: any) => {
-          const at = a?.createdAt?.seconds ?? 0;
-          const bt = b?.createdAt?.seconds ?? 0;
-          return bt - at;
-        })
+      .filter((p) => normalizePhone(String(p.customerPhone)) === selectedPhone)
+      .slice()
+      .sort((a: any, b: any) => {
+        const at = a?.createdAt?.seconds ?? 0;
+        const bt = b?.createdAt?.seconds ?? 0;
+        return bt - at;
+      })
     : [];
   const selectedMonthPaid = selectedPhone
     ? payments
-        .filter((p) => p.forMonth === paymentsMonth && p.status === 'Paid' && normalizePhone(String(p.customerPhone)) === selectedPhone)
-        .reduce((sum, p) => sum + (typeof p.amount === 'number' && isFinite(p.amount) ? p.amount : 0), 0)
+      .filter((p) => p.forMonth === paymentsMonth && p.status === 'Paid' && normalizePhone(String(p.customerPhone)) === selectedPhone)
+      .reduce((sum, p) => sum + (typeof p.amount === 'number' && isFinite(p.amount) ? p.amount : 0), 0)
     : 0;
   const selectedMonthDue = selectedSubs.reduce(
     (sum, s) => sum + (typeof s.priceMonth === 'number' && isFinite(s.priceMonth) ? s.priceMonth : 0),
@@ -585,13 +569,13 @@ export default function AdminScreen() {
           contentContainerStyle={styles.tabBar}
         >
           {([
-            { key: 'overview',   label: 'Overview', icon: TrendingUp },
-            { key: 'customers',  label: 'Customers', icon: UserPlus },
+            { key: 'overview', label: 'Overview', icon: TrendingUp },
+            { key: 'customers', label: 'Customers', icon: UserPlus },
             { key: 'deliveries', label: 'Deliveries', icon: Truck },
-            { key: 'payments',   label: 'Payments', icon: CreditCard },
-            { key: 'papers',     label: 'Papers', icon: BookOpen },
-            { key: 'agents',     label: 'Agents', icon: Users },
-            { key: 'access',     label: 'Access', icon: Shield },
+            { key: 'payments', label: 'Payments', icon: CreditCard },
+            { key: 'papers', label: 'Papers', icon: BookOpen },
+            { key: 'vendors', label: 'Vendors', icon: Briefcase },
+            { key: 'access', label: 'Access', icon: Shield },
           ] as const).map(({ key, label, icon: Icon }) => {
             const isActive = activeTab === key;
             return (
@@ -616,6 +600,7 @@ export default function AdminScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        {activeTab === 'vendors' && <AdminVendorsTab />}
         {activeTab === 'overview' && (
           <View style={styles.container}>
             {/* Stats Grid */}
@@ -719,10 +704,10 @@ export default function AdminScreen() {
                   {/* Compact Filter Chips */}
                   <View style={styles.custFilterRow}>
                     {([
-                      { key: 'all',     label: 'All',     count: customersOnly.length,   activeBg: '#0F172A', activeText: '#FFFFFF', dotColor: '#64748B' },
-                      { key: 'active',  label: 'Active',  count: activeCustomers.length, activeBg: '#16A34A', activeText: '#FFFFFF', dotColor: '#16A34A' },
-                      { key: 'present', label: 'Present', count: presentCustomers.length,activeBg: '#2563EB', activeText: '#FFFFFF', dotColor: '#2563EB' },
-                      { key: 'pending', label: 'Pending', count: pendingLegacy.length,   activeBg: '#F59E0B', activeText: '#FFFFFF', dotColor: '#F59E0B' },
+                      { key: 'all', label: 'All', count: customersOnly.length, activeBg: '#0F172A', activeText: '#FFFFFF', dotColor: '#64748B' },
+                      { key: 'active', label: 'Active', count: activeCustomers.length, activeBg: '#16A34A', activeText: '#FFFFFF', dotColor: '#16A34A' },
+                      { key: 'present', label: 'Present', count: presentCustomers.length, activeBg: '#2563EB', activeText: '#FFFFFF', dotColor: '#2563EB' },
+                      { key: 'pending', label: 'Pending', count: pendingLegacy.length, activeBg: '#F59E0B', activeText: '#FFFFFF', dotColor: '#F59E0B' },
                     ] as const).map(chip => {
                       const isActive = custFilter === chip.key;
                       return (
@@ -776,7 +761,12 @@ export default function AdminScreen() {
                       const accentColor = isActive ? '#16A34A' : isRejected ? '#EF4444' : isPending ? '#F59E0B' : '#2563EB';
 
                       return (
-                        <View key={u.phone} style={[styles.custCardPremium, { borderLeftWidth: 3, borderLeftColor: accentColor }]}>
+                        <TouchableOpacity
+                          key={u.phone}
+                          style={[styles.custCardPremium, { borderLeftWidth: 3, borderLeftColor: accentColor }]}
+                          activeOpacity={0.8}
+                          onPress={() => setSelectedCustomerForBilling(u)}
+                        >
                           <View style={[styles.custAvatar, { backgroundColor: ac.bg }]}>
                             <Text style={[styles.custAvatarText, { color: ac.text }]}>{getInitials(u.name || 'C')}</Text>
                           </View>
@@ -836,7 +826,7 @@ export default function AdminScreen() {
                               <Phone size={13} color="#2563EB" />
                             </TouchableOpacity>
                           </View>
-                        </View>
+                        </TouchableOpacity>
                       );
                     })
                   )}
@@ -903,12 +893,12 @@ export default function AdminScreen() {
                     <View style={[
                       { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
                       item.status === 'Delivered' ? { backgroundColor: '#ECFDF5' } :
-                      item.status === 'Skipped' ? { backgroundColor: '#FEF2F2' } : { backgroundColor: '#FFF7ED' }
+                        item.status === 'Skipped' ? { backgroundColor: '#FEF2F2' } : { backgroundColor: '#FFF7ED' }
                     ]}>
                       <Text style={[
                         { fontSize: 10, fontWeight: '700' },
                         item.status === 'Delivered' ? { color: '#16A34A' } :
-                        item.status === 'Skipped' ? { color: '#EF4444' } : { color: '#D97706' }
+                          item.status === 'Skipped' ? { color: '#EF4444' } : { color: '#D97706' }
                       ]}>{item.status}</Text>
                     </View>
                     <ChevronRight size={14} color="#CBD5E1" />
@@ -939,12 +929,12 @@ export default function AdminScreen() {
               <View style={[
                 { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
                 selectedDelivery?.status === 'Delivered' ? { backgroundColor: '#ECFDF5' } :
-                selectedDelivery?.status === 'Skipped' ? { backgroundColor: '#FEF2F2' } : { backgroundColor: '#FFF7ED' }
+                  selectedDelivery?.status === 'Skipped' ? { backgroundColor: '#FEF2F2' } : { backgroundColor: '#FFF7ED' }
               ]}>
                 <Text style={[
                   { fontSize: 12, fontWeight: '800' },
                   selectedDelivery?.status === 'Delivered' ? { color: '#16A34A' } :
-                  selectedDelivery?.status === 'Skipped' ? { color: '#EF4444' } : { color: '#D97706' }
+                    selectedDelivery?.status === 'Skipped' ? { color: '#EF4444' } : { color: '#D97706' }
                 ]}>{selectedDelivery?.status}</Text>
               </View>
             </View>
@@ -984,7 +974,7 @@ export default function AdminScreen() {
                     <MapPin size={14} color="#2563EB" />
                     <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A', marginLeft: 6 }}>Delivery Location</Text>
                   </View>
-                  
+
                   {selectedDelivery.homeImageUri && (
                     <TouchableOpacity onPress={() => setShowFullImage(true)} activeOpacity={0.9} style={{ marginBottom: 12 }}>
                       <Image
@@ -1270,7 +1260,7 @@ export default function AdminScreen() {
         {activeTab === 'access' && (
           <View style={styles.container}>
             <Text style={styles.sectionTitle}>Manage Admin Access</Text>
-            
+
             <View style={{ backgroundColor: '#F8FAFC', padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}>
               <Text style={[styles.inputLabel, { marginBottom: 4 }]}>Admin Name</Text>
               <TextInput
@@ -1335,122 +1325,7 @@ export default function AdminScreen() {
           </View>
         )}
 
-        {/* ── Agents Tab ── */}
-        {activeTab === 'agents' && (
-          <View style={styles.container}>
-            {/* Header row */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <View>
-                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Delivery Agents</Text>
-                <Text style={{ fontSize: 12, color: '#94A3B8', fontWeight: '500', marginTop: 2 }}>{agentsList.length} agents in Bengaluru</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.addPaperBtn}
-                onPress={() => setIsAddingAgent(!isAddingAgent)}
-                activeOpacity={0.8}
-              >
-                <UserPlus size={15} color="#FFFFFF" />
-                <Text style={styles.addPaperBtnText}>{isAddingAgent ? 'Cancel' : 'Add Agent'}</Text>
-              </TouchableOpacity>
-            </View>
 
-            {/* Inline add-agent form */}
-            {isAddingAgent && (
-              <View style={styles.agentFormBox}>
-                <Text style={[styles.sectionTitle, { fontSize: 14, marginBottom: 14 }]}>New Delivery Agent</Text>
-
-                <Text style={styles.inputLabel}>Full Name *</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="e.g. Akhil KS"
-                  value={newAgent.name}
-                  onChangeText={t => setNewAgent({ ...newAgent, name: t })}
-                />
-
-                <Text style={styles.inputLabel}>Mobile Number *</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="e.g. 9972505709"
-                  keyboardType="number-pad"
-                  maxLength={10}
-                  value={newAgent.phone}
-                  onChangeText={t => setNewAgent({ ...newAgent, phone: t })}
-                />
-
-                <Text style={styles.inputLabel}>Area (Delivery Zone) *</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="e.g. Mahalakshmi Layout"
-                  value={newAgent.area}
-                  onChangeText={t => setNewAgent({ ...newAgent, area: t })}
-                />
-
-                <Text style={styles.inputLabel}>Location / Sector</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="e.g. North Bengaluru"
-                  value={newAgent.location}
-                  onChangeText={t => setNewAgent({ ...newAgent, location: t })}
-                />
-
-                <TouchableOpacity style={styles.saveBtn} onPress={handleAddAgent} activeOpacity={0.85}>
-                  <Text style={styles.saveBtnText}>Save Agent</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Agent cards */}
-            {agentsList.map(agent => (
-              <View key={agent.id} style={styles.agentCard}>
-                {/* Avatar */}
-                <View style={styles.agentAvatar}>
-                  <Text style={styles.agentAvatarText}>
-                    {agent.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
-                  </Text>
-                </View>
-
-                {/* Info */}
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.custName}>{agent.name}</Text>
-                    <View style={[styles.badge, { backgroundColor: agent.isActive ? '#D1FAE5' : '#FEE2E2' }]}>
-                      <Text style={[styles.badgeText, { color: agent.isActive ? '#065F46' : '#991B1B' }]}>
-                        {agent.isActive ? 'Active' : 'Inactive'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                    <MapPin size={11} color="#64748B" />
-                    <Text style={styles.custAddress}>{agent.area}</Text>
-                  </View>
-
-                  {agent.location ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                      <MapPin size={11} color="#94A3B8" />
-                      <Text style={[styles.custAddress, { color: '#94A3B8' }]}>{agent.location}</Text>
-                    </View>
-                  ) : null}
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-                    <View style={styles.agentPhonePill}>
-                      <Phone size={12} color="#2563EB" />
-                      <Text style={styles.agentPhoneText}>{agent.phone}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.deleteAgentBtn}
-                      onPress={() => handleDeleteAgent(agent.id)}
-                      activeOpacity={0.8}
-                    >
-                      <Trash2 size={13} color="#EF4444" />
-                      <Text style={styles.deleteAgentBtnText}>Remove</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
       </ScrollView>
 
       <Modal
@@ -1953,8 +1828,12 @@ export default function AdminScreen() {
         </View>
       </Modal>
 
-      {/* ── Agents Tab ── */}
-      {activeTab === 'agents' && false /* rendered inside ScrollView below */ && null}
+      {/* Customer Billing Modal */}
+      <AdminCustomerBillingModal
+        visible={!!selectedCustomerForBilling}
+        customer={selectedCustomerForBilling}
+        onClose={() => setSelectedCustomerForBilling(null)}
+      />
 
     </SafeAreaView>
   );
@@ -2816,51 +2695,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-
-  /* ── Agent styles ── */
-  agentFormBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  agentCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#EEF2F7',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  agentAvatar: {
-    width: 46, height: 46, borderRadius: 23,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#BFDBFE',
-  },
-  agentAvatarText: { fontSize: 15, fontWeight: '800', color: '#2563EB' },
-  agentPhonePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 8, borderWidth: 1, borderColor: '#BFDBFE',
-  },
-  agentPhoneText: { fontSize: 12, fontWeight: '700', color: '#2563EB' },
-  deleteAgentBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#FEF2F2',
-    paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 8, borderWidth: 1, borderColor: '#FECACA',
-  },
-  deleteAgentBtnText: { fontSize: 12, fontWeight: '700', color: '#EF4444' },
 });

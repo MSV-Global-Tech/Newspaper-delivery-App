@@ -23,19 +23,17 @@ import {
   removeAdminNumber as fbRemoveAdminNumber,
   seedSettings,
   saveUser,
-  listenAgents,
-  addAgent as fbAddAgent,
-  deleteAgent as fbDeleteAgent,
-  seedAgents,
   listenPayments,
   addPayment as fbAddPayment,
   updatePayment as fbUpdatePayment,
   PAPERS_CATALOG_WITH_IDS,
+  listenVendors,
+  listenUser,
 } from '../database';
-import type { AgentDoc, AdminUserDoc, AppSettingsDoc, PaymentDoc } from '../database';
+import type { AdminUserDoc, AppSettingsDoc, PaymentDoc, VendorDoc } from '../database';
 import { setSessionUser } from './session';
 
-export type { AgentDoc, AdminUserDoc };
+export type { AdminUserDoc, VendorDoc };
 
 // ── Types ────────────────────────────────────────────────────────────────────
 export interface User {
@@ -45,6 +43,9 @@ export interface User {
   isAdmin: boolean;
   customerKind?: 'new' | 'legacy';
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  isVendor?: boolean;
+  vendorData?: VendorDoc;
+  sessionToken?: string;
 }
 
 export interface Delivery {
@@ -135,19 +136,10 @@ let appSettings: AppSettingsDoc = {
 
 let deliveries: Delivery[] = [];
 
-let agents: AgentDoc[] = [
-  {
-    id: 'seed-1',
-    name: 'Akhil KS',
-    phone: '9972505709',
-    area: 'Mahalakshmi Layout',
-    location: 'North Bengaluru',
-    isActive: true,
-  },
-];
 
 let payments: Payment[] = [];
 let currentCalendarMarks: Record<string, string> = {};
+let allVendors: VendorDoc[] = [];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🧊 CATALOG NAME → IMAGE LUT (built ONCE).
@@ -205,6 +197,35 @@ function startPaymentsListener(user: User | null) {
   }
 }
 
+// ── Real-time listener for the logged-in customer's own Firestore doc ─────────
+// This ensures bills added by admin appear in the customer app without re-login.
+let userDocUnsubscribe: (() => void) | null = null;
+
+function startUserListener(user: User | null) {
+  if (userDocUnsubscribe) {
+    userDocUnsubscribe();
+    userDocUnsubscribe = null;
+  }
+  // Only listen for regular customers (not admin, not vendor)
+  if (!user || user.isAdmin || user.isVendor) return;
+  try {
+    userDocUnsubscribe = listenUser(user.phone, (doc) => {
+      if (!doc || !currentUser) return;
+      // Merge fresh Firestore fields (bills, approvalStatus, etc.) into currentUser
+      currentUser = {
+        ...currentUser,
+        customerKind: doc.customerKind ?? currentUser.customerKind,
+        approvalStatus: doc.approvalStatus ?? currentUser.approvalStatus,
+        bills: (doc as any).bills,
+        paymentHistory: (doc as any).paymentHistory,
+      } as any;
+      notify();
+    });
+  } catch (e) {
+    console.warn('[Store] listenUser failed:', e);
+  }
+}
+
 // ── Bootstrap: seed Firestore + start real-time listeners ────────────────────
 async function bootstrap() {
   // ═══════════════════════════════════════════════════════════════════
@@ -245,8 +266,16 @@ async function bootstrap() {
       notify();
     });
 
-    listenAgents((docs) => {
-      agents = docs;
+
+    listenVendors((docs) => {
+      allVendors = docs;
+      // If the current user is a vendor, we should update their session with new vendor data
+      if (currentUser?.isVendor && currentUser.vendorData?.secretCode) {
+        const updatedVendor = docs.find(v => v.secretCode === currentUser!.vendorData!.secretCode);
+        if (updatedVendor) {
+          currentUser = { ...currentUser, vendorData: updatedVendor };
+        }
+      }
       notify();
     });
   } catch (e) {
@@ -261,9 +290,7 @@ async function bootstrap() {
   try {
     await seedSettings().catch(e => console.warn('[Store] seedSettings failed:', e?.code || e?.message));
   } catch {}
-  try {
-    await seedAgents().catch(e => console.warn('[Store] seedAgents failed:', e?.code || e?.message));
-  } catch {}
+
   try {
     // Papers is the largest/most-likely to rate-limit, run it last
     await seedPapers().catch(e => console.warn('[Store] seedPapers failed:', e?.code || e?.message));
@@ -286,6 +313,7 @@ export const store = {
     if (user) saveUser(user).catch(console.warn);
     setSessionUser(user).catch(() => {});
     startPaymentsListener(user);
+    startUserListener(user);
     notify();
   },
 
@@ -432,25 +460,13 @@ export const store = {
     fbRemoveAdminNumber(phone).catch(console.warn);
   },
 
-  getAgents() {
-    return agents;
-  },
-
-  addAgent(agent: Omit<AgentDoc, 'id'>) {
-    const tempId = `local-${Date.now()}`;
-    agents = [...agents, { ...agent, id: tempId }];
-    notify();
-    fbAddAgent(agent).catch(console.warn);
-  },
-
-  deleteAgent(id: string) {
-    agents = agents.filter((a) => a.id !== id);
-    notify();
-    fbDeleteAgent(id).catch(console.warn);
-  },
 
   getPayments() {
     return payments;
+  },
+
+  getAllVendors() {
+    return allVendors;
   },
 
   addPayment(payment: Omit<PaymentDoc, 'id'>) {

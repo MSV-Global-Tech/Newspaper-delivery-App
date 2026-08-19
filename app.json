@@ -15,7 +15,7 @@
       }
     },
     "android": {
-      "package": "com.newspaper.delivery",
+      "package": "com.newspaper.deliveryapp",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
@@ -68,7 +68,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": ""
+        "projectId": "c29ba46b-1fcc-448f-bc0d-590bef2a7186"
       }
     },
     "owner": ""

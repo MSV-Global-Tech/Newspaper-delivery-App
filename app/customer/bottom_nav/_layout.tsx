@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, Newspaper, Calendar as CalendarIcon, User, Settings, Package } from 'lucide-react-native';
+import { Home, Newspaper, Calendar as CalendarIcon, User, Settings, Package, Receipt } from 'lucide-react-native';
 import { useState, useEffect } from 'react';
 import { store } from '../../../utils/store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,11 +77,12 @@ export default function TabLayout() {
           },
         })}
       />
+
       <Tabs.Screen
-        name="orders"
+        name="bills"
         options={{
-          title: 'Orders',
-          tabBarIcon: ({ color }) => <Package size={22} color={color} />,
+          title: 'My Bills',
+          tabBarIcon: ({ color }) => <Receipt size={22} color={color} />,
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {

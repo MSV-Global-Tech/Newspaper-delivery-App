@@ -17,11 +17,9 @@ export {
   seedSettings,
 } from './settings';
 export type { AdminUserDoc, AppSettingsDoc } from './settings';
-export { saveUser, fetchUser, listUsers, listenUsers, updateUser, deleteUser } from './users';
+export { saveUser, fetchUser, listUsers, listenUsers, listenUser, updateUser, deleteUser, updateCustomerBill } from './users';
 export type { UserDoc } from './users';
 export { uploadNewspaperLogo, uploadImage, deleteImage } from './storageHelper';
-export { listenAgents, addAgent, updateAgent, deleteAgent, seedAgents } from './agents';
-export type { AgentDoc } from './agents';
 export { listenPayments, addPayment, updatePayment } from './payments';
 export type { PaymentDoc } from './payments';
 export {
@@ -31,3 +29,14 @@ export {
 export type { CatalogEntry, CatalogCategory } from './papers_catalog';
 export { placeOrder, listenCustomerOrders } from './orders';
 export type { OrderDoc } from './orders';
+
+export {
+  saveVendor,
+  fetchVendorById,
+  fetchVendorByCode,
+  listenVendors,
+  listenVendor,
+  updateVendor,
+  deleteVendor,
+} from './vendors';
+export type { VendorDoc, VendorPayment } from './vendors';

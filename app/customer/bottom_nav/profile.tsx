@@ -44,8 +44,16 @@ import {
   Save,
   LocateFixed,
   ArrowLeft,
+  Eye,
+  EyeOff,
+  Store,
+  FileText,
+  UploadCloud,
+  CheckCircle,
 } from 'lucide-react-native';
 import { store } from '../../../utils/store';
+import { fetchVendorByCode, updateVendor } from '../../../database';
+import { updateCustomerBill } from '../../../database/users';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState(store.getUser());
@@ -60,6 +68,12 @@ export default function ProfileScreen() {
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
 
+  // Vendor Login states
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const [vendorCode, setVendorCode] = useState('');
+  const [showVendorCode, setShowVendorCode] = useState(false);
+  const [isVerifyingVendor, setIsVerifyingVendor] = useState(false);
+
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
       setUser(store.getUser());
@@ -70,8 +84,9 @@ export default function ProfileScreen() {
   }, []);
 
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedBill, setSelectedBill] = useState<any>(null);
 
-  const handleUploadScreenshot = async () => {
+  const handleUploadScreenshot = async (bill: any) => {
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
@@ -92,16 +107,11 @@ export default function ProfileScreen() {
 
       const publicUrl = await uploadImage(uri, `payment_screenshots/${user?.phone}_${Date.now()}.jpg`);
 
-      store.addPayment({
-        customerName: user?.name || '',
-        customerPhone: user?.phone || '',
-        amount: totalMonthlyCost,
-        method: 'UPI',
-        txnId: 'Screenshot Upload',
-        status: 'Pending',
-        forMonth: 'Current Month',
-        screenshotUrl: publicUrl
-      } as any);
+      await updateCustomerBill(user?.phone as string, [
+        ...((user as any)?.bills?.map((b: any) =>
+          b.id === bill.id ? { ...b, paymentProof: publicUrl } : b
+        ) || []),
+      ]);
 
       Alert.alert('Success', 'Payment screenshot uploaded successfully. Admin will review it.');
     } catch (error: any) {
@@ -189,6 +199,37 @@ export default function ProfileScreen() {
 
     setIsEditModalOpen(false);
     Alert.alert('Updated', 'Profile details updated successfully!');
+  };
+
+  const handleVendorLogin = async () => {
+    if (vendorCode.trim().length === 0) return;
+    setIsVerifyingVendor(true);
+    try {
+      const vendor = await fetchVendorByCode(vendorCode.trim());
+      if (vendor) {
+        const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await updateVendor(vendor.id, { currentSessionToken: sessionToken });
+
+        store.setUser({
+          name: vendor.name,
+          phone: vendor.phone || '',
+          address: vendor.address || '',
+          isAdmin: false,
+          isVendor: true,
+          vendorData: { ...vendor, currentSessionToken: sessionToken },
+          sessionToken: sessionToken,
+        });
+        Alert.alert('Success', 'Vendor Login successful!');
+        setIsVendorModalOpen(false);
+        router.push('/vendor/dashboard' as any);
+      } else {
+        Alert.alert('Error', 'Invalid secret code');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Login failed');
+    } finally {
+      setIsVerifyingVendor(false);
+    }
   };
 
   const handleLogout = () => {
@@ -326,57 +367,98 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── PAYMENT QR CARD — shown only when admin approved ── */}
+        {/* ── MY BILLS ── */}
         {user?.customerKind === 'legacy' && user?.approvalStatus === 'approved' && (
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeaderTitle}>Monthly Payment</Text>
-              <View style={{ backgroundColor: '#DCFCE7', borderWidth: 1, borderColor: '#BBF7D0', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
-                <Text style={{ fontSize: 10, fontWeight: '800', color: '#15803D' }}>✓ Approved</Text>
+          <>
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionHeaderTitle}>My Unpaid Bills</Text>
               </View>
+              {(() => {
+                const unpaidBills = ((user as any).bills || []).filter((b: any) => b.status !== 'Paid');
+                if (unpaidBills.length === 0) {
+                  return (
+                    <Text style={{ fontSize: 13, color: '#6B7280', fontStyle: 'italic', textAlign: 'center', marginVertical: 10 }}>
+                      No unpaid bills. You're all caught up! 🎉
+                    </Text>
+                  );
+                }
+                return unpaidBills.map((bill: any) => (
+                  <View key={bill.id} style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <View>
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F172A' }}>{bill.month}</Text>
+                        <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '600', marginTop: 2 }}>Unpaid</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: '#2563EB' }}>₹{bill.totalAmount}</Text>
+                        <TouchableOpacity onPress={() => setSelectedBill(bill)} style={{ marginTop: 4 }}>
+                          <Text style={{ fontSize: 12, color: '#2563EB', fontWeight: '600' }}>View Bill</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    {bill.paymentProof ? (
+                      <View style={{ backgroundColor: '#FEF3C7', padding: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
+                        <Clock size={14} color="#B45309" />
+                        <Text style={{ fontSize: 11, color: '#B45309', fontWeight: '600', marginLeft: 6 }}>Verification Pending by Admin</Text>
+                      </View>
+                    ) : (
+                      <View style={{ marginTop: 4, gap: 8 }}>
+                        <TouchableOpacity
+                          style={{ backgroundColor: '#2563EB', paddingVertical: 10, borderRadius: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
+                          onPress={() => Linking.openURL(`upi://pay?pa=9972505709@ibl&pn=Newspaper%20Delivery&am=${bill.totalAmount}&cu=INR`)}
+                        >
+                          <CreditCard size={14} color="#FFF" style={{ marginRight: 6 }} />
+                          <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>Pay via UPI ₹{bill.totalAmount}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleUploadScreenshot(bill)}
+                          disabled={isUploading}
+                          style={{ backgroundColor: '#F1F5F9', paddingVertical: 10, borderRadius: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
+                        >
+                          <UploadCloud size={14} color="#64748B" style={{ marginRight: 6 }} />
+                          <Text style={{ color: '#475569', fontSize: 13, fontWeight: '600' }}>{isUploading ? 'Uploading...' : 'Upload Screenshot'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                ));
+              })()}
             </View>
 
-            <TouchableOpacity
-              style={styles.payNowRow}
-              activeOpacity={0.85}
-              onPress={() => Linking.openURL('upi://pay?pa=9972505709@ibl&pn=Newspaper%20Delivery&cu=INR')}
-            >
-              <View style={styles.payNowLeft}>
-                <View style={styles.payNowIconBox}>
-                  <CreditCard size={20} color="#2563EB" />
-                </View>
-                <View>
-                  <Text style={styles.payNowTitle}>Pay Monthly Bill</Text>
-                  <Text style={styles.payNowSub}>Tap here to open UPI app</Text>
-                </View>
+            {/* ── PAYMENT HISTORY ── */}
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionHeaderTitle}>Payment History</Text>
               </View>
-              <View style={styles.payNowBtn}>
-                <Text style={styles.payNowBtnText}>Pay Now</Text>
-                <ChevronRight size={12} color="#FFFFFF" />
-              </View>
-            </TouchableOpacity>
-
-            <View style={{ alignItems: 'center', marginTop: 15 }}>
-              <Text style={{ fontSize: 13, color: '#475569', marginBottom: 10, fontWeight: '600' }}>Or Scan to Pay</Text>
-              <Image source={{ uri: qrUrl }} style={{ width: 160, height: 160, borderRadius: 8, marginBottom: 10 }} />
-
-              <TouchableOpacity onPress={handleDownloadQR} style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, marginBottom: 15 }}>
-                <Text style={{ color: '#0F172A', fontWeight: '600', fontSize: 12 }}>Download QR Code</Text>
-              </TouchableOpacity>
-
-              <View style={{ width: '100%', height: 1, backgroundColor: '#E2E8F0', marginBottom: 15 }} />
-
-              <TouchableOpacity
-                onPress={handleUploadScreenshot}
-                disabled={isUploading}
-                style={{ backgroundColor: '#2563EB', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, width: '100%', alignItems: 'center' }}
-              >
-                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
-                  {isUploading ? 'Uploading...' : 'Upload Payment Screenshot'}
-                </Text>
-              </TouchableOpacity>
+              {(() => {
+                const paidBills = ((user as any).bills || []).filter((b: any) => b.status === 'Paid').map((b: any) => ({
+                  id: b.id, amount: b.totalAmount, date: b.paidAt || b.date, status: 'Paid', title: `Bill: ${b.month}`
+                }));
+                const combined = [...paidBills].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+                if (combined.length === 0) {
+                  return <Text style={{ fontSize: 13, color: '#6B7280', fontStyle: 'italic', textAlign: 'center', marginVertical: 10 }}>No payments recorded yet.</Text>;
+                }
+                return combined.map((p: any, i: number) => (
+                  <View key={p.id} style={[{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 }, i > 0 && { borderTopWidth: 1, borderTopColor: '#F1F5F9' }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <CheckCircle size={20} color="#10B981" />
+                      <View style={{ marginLeft: 10 }}>
+                        <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>{p.title}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginTop: 2 }}>₹{p.amount}</Text>
+                        <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                          {p.date ? new Date(p.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'center' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#065F46' }}>Paid</Text>
+                    </View>
+                  </View>
+                ));
+              })()}
             </View>
-          </View>
+          </>
         )}
 
         {/* ── CURRENT DETAILS CARD ── */}
@@ -421,6 +503,20 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
+        </View>
+
+        {/* ── VENDOR LOGIN SECTION ── */}
+        <View style={styles.sectionCard}>
+          <TouchableOpacity style={styles.menuRow} activeOpacity={0.7} onPress={() => setIsVendorModalOpen(true)}>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#F3E8FF' }]}>
+              <Store size={18} color="#9333EA" />
+            </View>
+            <View style={styles.menuTextContent}>
+              <Text style={styles.menuTitle}>Are You a Vendor?</Text>
+              <Text style={styles.menuSub}>Login to vendor dashboard</Text>
+            </View>
+            <ChevronRight size={18} color="#CBD5E1" />
+          </TouchableOpacity>
         </View>
 
         {/* ── PREFERENCES ── */}
@@ -667,6 +763,111 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── VENDOR LOGIN MODAL ── */}
+      <Modal
+        visible={isVendorModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsVendorModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Store size={18} color="#9333EA" />
+                <Text style={styles.modalTitle}>Vendor Login</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setIsVendorModalOpen(false)}
+                activeOpacity={0.7}
+              >
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalFieldGroup}>
+              <Text style={styles.modalLabel}>Secret Vendor Code</Text>
+              <View style={styles.modalInputRow}>
+                <TextInput
+                  style={[styles.modalTextInput, { letterSpacing: 1 }]}
+                  placeholder="Enter your secret code"
+                  placeholderTextColor="#94A3B8"
+                  value={vendorCode}
+                  onChangeText={setVendorCode}
+                  secureTextEntry={!showVendorCode}
+                  autoCapitalize="characters"
+                />
+                <TouchableOpacity onPress={() => setShowVendorCode(!showVendorCode)} style={{ padding: 4 }}>
+                  {showVendorCode ? <EyeOff size={18} color="#64748B" /> : <Eye size={18} color="#64748B" />}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setIsVendorModalOpen(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalDoneBtn, { backgroundColor: '#9333EA', shadowColor: '#9333EA' }]}
+                onPress={handleVendorLogin}
+                activeOpacity={0.85}
+                disabled={isVerifyingVendor}
+              >
+                <Text style={styles.modalDoneText}>{isVerifyingVendor ? 'Verifying...' : 'Next'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── VIEW BILL MODAL ── */}
+      <Modal visible={!!selectedBill} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ width: '100%', backgroundColor: '#FFF', borderRadius: 16, overflow: 'hidden', maxHeight: '80%' }}>
+            {selectedBill && (
+              <>
+                <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+                  <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 18, fontWeight: '800', textAlign: 'center', color: '#111827', letterSpacing: 1, marginBottom: 4 }}>NEWSPAPER DELIVERY</Text>
+                  <View style={{ height: 1, borderWidth: 1, borderColor: '#D1D5DB', borderStyle: 'dashed', marginVertical: 12 }} />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: '#374151' }}>BILL: {selectedBill.id.slice(-6).toUpperCase()}</Text>
+                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: '#374151' }}>{new Date(selectedBill.date).toLocaleDateString()}</Text>
+                  </View>
+                  <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: '#374151', marginBottom: 4 }}>CUSTOMER: {user?.name?.toUpperCase()}</Text>
+                  <View style={{ height: 1, borderWidth: 1, borderColor: '#D1D5DB', borderStyle: 'dashed', marginVertical: 12 }} />
+                  {(selectedBill.items || []).map((item: any) => (
+                    <View key={item.id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: '#111827', flex: 2 }}>{item.name.toUpperCase()}</Text>
+                      <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: '#111827', textAlign: 'right' }}>₹{Number(item.amount).toFixed(2)}</Text>
+                    </View>
+                  ))}
+                  <View style={{ height: 1, borderWidth: 1, borderColor: '#D1D5DB', borderStyle: 'dashed', marginVertical: 12 }} />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 14, fontWeight: '800', color: '#111827' }}>TOTAL</Text>
+                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 16, fontWeight: '800', color: '#111827' }}>₹{Number(selectedBill.totalAmount).toFixed(2)}</Text>
+                  </View>
+                </ScrollView>
+                <View style={{ padding: 16 }}>
+                  <TouchableOpacity style={{ backgroundColor: '#F1F5F9', padding: 14, borderRadius: 10, alignItems: 'center' }} onPress={() => setSelectedBill(null)}>
+                    <Text style={{ color: '#475569', fontWeight: '700' }}>Close</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }

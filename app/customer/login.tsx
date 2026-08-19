@@ -13,9 +13,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
-import { MapPin } from 'lucide-react-native'; // Lock is commented out for now: import { Lock, MapPin } from 'lucide-react-native';
+import { MapPin, Eye, EyeOff } from 'lucide-react-native';
 import { store } from '../../utils/store';
-import { fetchUser } from '../../database';
+import { fetchUser, fetchVendorByCode, updateVendor } from '../../database';
 // import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 export default function LoginScreen() {
@@ -116,8 +116,7 @@ export default function LoginScreen() {
   };
   */
 
-  const handleDirectLogin = async () => {
-    if (phone.length < 10) return;
+  const handleDirectLogin = async () => {    if (phone.length < 10) return;
     try {
       showToast('Logging in...');
       
@@ -165,8 +164,6 @@ export default function LoginScreen() {
     }
   };
 
-  // For direct login canProceed is based only on phone input, originally was:
-  // const canProceed = !otpSent ? phone.length === 10 : otp.length === 4;
   const canProceed = phone.length === 10 && name.trim().length > 0 && address.trim().length > 0;
 
   return (
@@ -194,66 +191,65 @@ export default function LoginScreen() {
 
             {/* Customer fields */}
             <>
-              <Text style={s.lbl}>Your Name</Text>
-              <TextInput
-                style={s.inp}
-                placeholder="Enter your full name"
-                placeholderTextColor="#9CA3AF"
-                value={name}
-                onChangeText={setName}
-              />
+                  <Text style={s.lbl}>Your Name</Text>
+                  <TextInput
+                    style={s.inp}
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#9CA3AF"
+                    value={name}
+                    onChangeText={setName}
+                  />
 
-              <Text style={s.lbl}>Delivery Address</Text>
-              <View style={s.inpRow}>
-                <TextInput
-                  style={{ flex: 1, fontSize: 15, color: '#111827', fontWeight: '600', paddingVertical: 0 }}
-                  placeholder={loadingLoc ? 'Fetching current location...' : 'Your doorstep address'}
-                  placeholderTextColor="#9CA3AF"
-                  value={loadingLoc ? '' : address}
-                  onChangeText={setAddress}
-                  onFocus={() => { if (!address && !loadingLoc) fetchGPS(); }}
-                  editable={!loadingLoc}
-                />
-                <TouchableOpacity style={s.gpsPill} onPress={fetchGPS}>
-                  <MapPin size={12} color="#2563EB" />
-                  <Text style={s.gpsTxt}>{loadingLoc ? '…' : 'GPS'}</Text>
+                  <Text style={s.lbl}>Delivery Address</Text>
+                  <View style={s.inpRow}>
+                    <TextInput
+                      style={{ flex: 1, fontSize: 15, color: '#111827', fontWeight: '600', paddingVertical: 0 }}
+                      placeholder={loadingLoc ? 'Fetching current location...' : 'Your doorstep address'}
+                      placeholderTextColor="#9CA3AF"
+                      value={loadingLoc ? '' : address}
+                      onChangeText={setAddress}
+                      onFocus={() => { if (!address && !loadingLoc) fetchGPS(); }}
+                      editable={!loadingLoc}
+                    />
+                    <TouchableOpacity style={s.gpsPill} onPress={fetchGPS}>
+                      <MapPin size={12} color="#2563EB" />
+                      <Text style={s.gpsTxt}>{loadingLoc ? '…' : 'GPS'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+
+                {/* Phone */}
+                <>
+                  <Text style={s.lbl}>Mobile Number</Text>
+                  <View style={s.inpRow}>
+                    <Text style={s.flag}>🇮🇳 +91</Text>
+                    <View style={s.divV} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 15, color: '#111827', fontWeight: '600' }}
+                      placeholder="10-digit number"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="number-pad"
+                      maxLength={10}
+                      value={phone}
+                      onChangeText={setPhone}
+                    />
+                    {phone.length === 10 && <Text style={s.tick}>✓</Text>}
+                  </View>
+                </>
+
+                <TouchableOpacity
+                  style={s.legacyRow}
+                  activeOpacity={0.85}
+                  onPress={() => setExistingCustomer((v) => !v)}
+                >
+                  <View style={[s.legacyBox, existingCustomer && s.legacyBoxOn]}>
+                    {existingCustomer && <Text style={s.legacyTick}>✓</Text>}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.legacyTitle}>Existing customer / ಪ್ರಸ್ತುತ ಗ್ರಾಹಕರು</Text>
+                    <Text style={s.legacySub}>Tick if you are a previous active customer (needs admin approval) / ನೀವು ಹಿಂದಿನ ಸಕ್ರಿಯ ಗ್ರಾಹಕರಾದರೆ ಟಿಕ್ ಮಾಡಿ (ಅಡ್ಮಿನ್ ಅನುಮೋದನೆ ಬೇಕು)</Text>
+                  </View>
                 </TouchableOpacity>
-              </View>
-            </>
-
-            {/* Phone */}
-            <>
-              <Text style={s.lbl}>Mobile Number</Text>
-              <View style={s.inpRow}>
-                <Text style={s.flag}>🇮🇳 +91</Text>
-                <View style={s.divV} />
-                <TextInput
-                  style={{ flex: 1, fontSize: 15, color: '#111827', fontWeight: '600' }}
-                  placeholder="10-digit number"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="number-pad"
-                  maxLength={10}
-                  value={phone}
-                  onChangeText={setPhone}
-                />
-                {phone.length === 10 && <Text style={s.tick}>✓</Text>}
-              </View>
-            </>
-
-            <TouchableOpacity
-              style={s.legacyRow}
-              activeOpacity={0.85}
-              onPress={() => setExistingCustomer((v) => !v)}
-            >
-              <View style={[s.legacyBox, existingCustomer && s.legacyBoxOn]}>
-                {existingCustomer && <Text style={s.legacyTick}>✓</Text>}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.legacyTitle}>Existing customer / ಪ್ರಸ್ತುತ ಗ್ರಾಹಕರು</Text>
-                <Text style={s.legacySub}>Tick if you are a previous active customer (needs admin approval) / ನೀವು ಹಿಂದಿನ ಸಕ್ರಿಯ ಗ್ರಾಹಕರಾದರೆ ಟಿಕ್ ಮಾಡಿ (ಅಡ್ಮಿನ್ ಅನುಮೋದನೆ ಬೇಕು)</Text>
-              </View>
-            </TouchableOpacity>
-
             {/* OTP (commented out for direct login bypass) */}
             {/*
             {otpSent && (
@@ -318,16 +314,6 @@ const s = StyleSheet.create({
 
   sheetContainer: { flex: 1, backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28 },
   sheet: { flex: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 24 },
-
-  tabs: {
-    flexDirection: 'row', backgroundColor: '#F3F4F6',
-    borderRadius: 12, padding: 4, marginBottom: 20,
-  },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 9 },
-  tabOn: { backgroundColor: BLUE },
-  tabOnAdmin: { backgroundColor: '#7C3AED' },
-  tabTxt: { fontSize: 13, fontWeight: '700', color: '#6B7280' },
-  tabTxtOn: { color: '#FFFFFF' },
 
   lbl: { fontSize: 12, fontWeight: '700', color: '#6B7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
   inp: {

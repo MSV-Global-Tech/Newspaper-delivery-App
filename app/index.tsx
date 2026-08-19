@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight } from 'lucide-react-native';
 import { IMAGES } from '../assets/images';
-import { getHasSeenOnboarding, getLastRoute, getSessionUser, setHasSeenOnboarding } from '../utils/session';
+import { getHasSeenOnboarding, getSessionUser, setHasSeenOnboarding } from '../utils/session';
 import { store } from '../utils/store';
 import { useEffect, useRef, useState } from 'react';
 
@@ -44,10 +44,9 @@ export default function OnboardingScreen() {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const [hasSeenOnboarding, sessionUser, lastRoute] = await Promise.all([
+      const [hasSeenOnboarding, sessionUser] = await Promise.all([
         getHasSeenOnboarding(),
         getSessionUser(),
-        getLastRoute(),
       ]);
 
       if (sessionUser) store.setUser(sessionUser as any);
@@ -59,7 +58,7 @@ export default function OnboardingScreen() {
       }
 
       if (sessionUser) {
-        router.replace((lastRoute ?? '/customer/bottom_nav/home') as any);
+        router.replace('/customer/bottom_nav/home');
         return;
       }
 
