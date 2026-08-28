@@ -174,215 +174,215 @@ export default function CalendarScreen() {
       >
         {/* ── CLEAN MONTHLY CALENDAR CARD ── */}
         <View style={styles.calendarCard}>
-          {/* Month Navigator Header */}
-          <View style={styles.monthHeader}>
-            <TouchableOpacity style={styles.arrowBtn} onPress={handlePrevMonth} activeOpacity={0.7}>
-              <ChevronLeft size={20} color="#334155" />
-            </TouchableOpacity>
+            {/* Month Navigator Header */}
+            <View style={styles.monthHeader}>
+              <TouchableOpacity style={styles.arrowBtn} onPress={handlePrevMonth} activeOpacity={0.7}>
+                <ChevronLeft size={18} color="#334155" />
+              </TouchableOpacity>
 
-            <Text style={styles.monthTitleText}>
-              {MONTH_NAMES[currentMonth]} {currentYear}
-            </Text>
-
-            <TouchableOpacity style={styles.arrowBtn} onPress={handleNextMonth} activeOpacity={0.7}>
-              <ChevronRight size={20} color="#334155" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Weekday Row Header */}
-          <View style={styles.weekdayRow}>
-            {DAY_NAMES.map((d, index) => (
-              <Text key={index} style={styles.weekdayText}>
-                {d}
+              <Text style={styles.monthTitleText}>
+                {MONTH_NAMES[currentMonth]} {currentYear}
               </Text>
-            ))}
-          </View>
 
-          {/* Days Grid */}
-          <View style={styles.daysGrid}>
-            {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-              <View key={`empty-${i}`} style={styles.dayTileEmpty} />
-            ))}
+              <TouchableOpacity style={styles.arrowBtn} onPress={handleNextMonth} activeOpacity={0.7}>
+                <ChevronRight size={18} color="#334155" />
+              </TouchableOpacity>
+            </View>
 
-            {Array.from({ length: daysInMonth }).map((_, idx) => {
-              const dayNum = idx + 1;
-              const status = getDayStatus(dayNum);
-              const isSelected = selectedDay === dayNum;
-              const isToday =
-                currentYear === today.getFullYear() &&
-                currentMonth === today.getMonth() &&
-                dayNum === today.getDate();
+            {/* Weekday Row Header */}
+            <View style={styles.weekdayRow}>
+              {DAY_NAMES.map((d, index) => (
+                <Text key={index} style={styles.weekdayText}>
+                  {d}
+                </Text>
+              ))}
+            </View>
 
-              let isMarked = false;
-              let bgColor = 'transparent';
-              let textColor = '#0F172A';
-              
-              if (status === 'Delivered') {
-                bgColor = '#22C55E';
-                textColor = '#FFFFFF';
-                isMarked = true;
-              } else if (status === 'Skipped') {
-                bgColor = '#EF4444';
-                textColor = '#FFFFFF';
-                isMarked = true;
-              } else if (status === 'Paused') {
-                bgColor = '#F59E0B';
-                textColor = '#FFFFFF';
-                isMarked = true;
-              }
+            {/* Days Grid */}
+            <View style={styles.daysGrid}>
+              {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+                <View key={`empty-${i}`} style={styles.dayTileEmpty} />
+              ))}
 
-              return (
-                <TouchableOpacity
-                  key={`day-${dayNum}`}
-                  style={[
-                    styles.dayTile,
-                    isMarked && { backgroundColor: bgColor },
-                    !isMarked && isSelected && styles.dayTileSelected,
-                    isToday && !isSelected && !isMarked && styles.dayTileToday,
-                    isSelected && isMarked && { borderWidth: 2, borderColor: '#0F172A' },
-                  ]}
-                  onPress={() => setSelectedDay(dayNum)}
-                  activeOpacity={0.8}
-                >
-                  <Text
+              {Array.from({ length: daysInMonth }).map((_, idx) => {
+                const dayNum = idx + 1;
+                const status = getDayStatus(dayNum);
+                const isSelected = selectedDay === dayNum;
+                const isToday =
+                  currentYear === today.getFullYear() &&
+                  currentMonth === today.getMonth() &&
+                  dayNum === today.getDate();
+
+                let isMarked = false;
+                let bgColor = 'transparent';
+                let textColor = '#0F172A';
+                
+                if (status === 'Delivered') {
+                  bgColor = '#22C55E';
+                  textColor = '#FFFFFF';
+                  isMarked = true;
+                } else if (status === 'Skipped') {
+                  bgColor = '#EF4444';
+                  textColor = '#FFFFFF';
+                  isMarked = true;
+                } else if (status === 'Paused') {
+                  bgColor = '#F59E0B';
+                  textColor = '#FFFFFF';
+                  isMarked = true;
+                }
+
+                return (
+                  <TouchableOpacity
+                    key={`day-${dayNum}`}
                     style={[
-                      styles.dayNumText,
-                      isMarked && { color: textColor, fontWeight: '800' },
-                      !isMarked && isSelected && styles.dayNumTextSelected,
-                      isToday && !isSelected && !isMarked && styles.dayNumTextToday,
+                      styles.dayTile,
+                      isMarked && { backgroundColor: bgColor },
+                      !isMarked && isSelected && styles.dayTileSelected,
+                      isToday && !isSelected && !isMarked && styles.dayTileToday,
+                      isSelected && isMarked && { borderWidth: 2, borderColor: '#0F172A' },
                     ]}
+                    onPress={() => setSelectedDay(dayNum)}
+                    activeOpacity={0.8}
                   >
-                    {dayNum}
-                  </Text>
-                  {!isMarked && (
-                    <View
+                    <Text
                       style={[
-                        styles.statusDot,
-                        { backgroundColor: isSelected ? '#FFFFFF' : '#3B82F6' },
+                        styles.dayNumText,
+                        isMarked && { color: textColor, fontWeight: '800' },
+                        !isMarked && isSelected && styles.dayNumTextSelected,
+                        isToday && !isSelected && !isMarked && styles.dayNumTextToday,
                       ]}
-                    />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+                    >
+                      {dayNum}
+                    </Text>
+                    {!isMarked && (
+                      <View
+                        style={[
+                          styles.statusDot,
+                          { backgroundColor: isSelected ? '#FFFFFF' : '#3B82F6' },
+                        ]}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Legend Bar */}
+            <View style={styles.legendContainer}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#16A34A' }]} />
+                <Text style={styles.legendText}>Delivered</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#2563EB' }]} />
+                <Text style={styles.legendText}>Scheduled</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} />
+                <Text style={styles.legendText}>Skipped</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#D97706' }]} />
+                <Text style={styles.legendText}>Paused</Text>
+              </View>
+            </View>
           </View>
 
-          {/* Legend Bar */}
-          <View style={styles.legendContainer}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#16A34A' }]} />
-              <Text style={styles.legendText}>Delivered</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#2563EB' }]} />
-              <Text style={styles.legendText}>Scheduled</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} />
-              <Text style={styles.legendText}>Skipped</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#D97706' }]} />
-              <Text style={styles.legendText}>Paused</Text>
-            </View>
-          </View>
-        </View>
+          {/* ── SELECTED DAY DETAIL & ACTIONS ── */}
+          <View style={styles.actionCard}>
+            <View style={styles.actionCardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.selectedDateTitle}>
+                  {MONTH_NAMES[currentMonth]} {selectedDay}, {currentYear}
+                </Text>
+                <Text style={styles.paperSubName}>
+                  Paper: <Text style={{ color: '#2563EB', fontWeight: '800' }}>{primarySub?.paperName || 'Vijayavani'}</Text>
+                </Text>
+              </View>
 
-        {/* ── SELECTED DAY DETAIL & ACTIONS ── */}
-        <View style={styles.actionCard}>
-          <View style={styles.actionCardHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.selectedDateTitle}>
-                {MONTH_NAMES[currentMonth]} {selectedDay}, {currentYear}
-              </Text>
-              <Text style={styles.paperSubName}>
-                Paper: <Text style={{ color: '#2563EB', fontWeight: '800' }}>{primarySub?.paperName || 'Vijayavani'}</Text>
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.statusBadge,
-                selectedStatus === 'Delivered' && { backgroundColor: '#DCFCE7' },
-                selectedStatus === 'Skipped' && { backgroundColor: '#FEE2E2' },
-                selectedStatus === 'Paused' && { backgroundColor: '#FEF3C7' },
-                (selectedStatus === 'Scheduled' || selectedStatus === 'Pending') && { backgroundColor: '#EFF6FF' },
-              ]}
-            >
-              <Text
+              <View
                 style={[
-                  styles.statusBadgeText,
-                  selectedStatus === 'Delivered' && { color: '#15803D' },
-                  selectedStatus === 'Skipped' && { color: '#B91C1C' },
-                  selectedStatus === 'Paused' && { color: '#B45309' },
-                  (selectedStatus === 'Scheduled' || selectedStatus === 'Pending') && { color: '#1E40AF' },
+                  styles.statusBadge,
+                  selectedStatus === 'Delivered' && { backgroundColor: '#DCFCE7' },
+                  selectedStatus === 'Skipped' && { backgroundColor: '#FEE2E2' },
+                  selectedStatus === 'Paused' && { backgroundColor: '#FEF3C7' },
+                  (selectedStatus === 'Scheduled' || selectedStatus === 'Pending') && { backgroundColor: '#EFF6FF' },
                 ]}
               >
-                {selectedStatus}
-              </Text>
+                <Text
+                  style={[
+                    styles.statusBadgeText,
+                    selectedStatus === 'Delivered' && { color: '#15803D' },
+                    selectedStatus === 'Skipped' && { color: '#B91C1C' },
+                    selectedStatus === 'Paused' && { color: '#B45309' },
+                    (selectedStatus === 'Scheduled' || selectedStatus === 'Pending') && { color: '#1E40AF' },
+                  ]}
+                >
+                  {selectedStatus}
+                </Text>
+              </View>
             </View>
-          </View>
 
-          {/* Action Row */}
-          <View style={styles.quickActionRow}>
+            {/* Action Row */}
+            <View style={styles.quickActionRow}>
+              <TouchableOpacity
+                style={[
+                  styles.actionBtn,
+                  selectedStatus === 'Delivered' ? { backgroundColor: '#16A34A' } : { backgroundColor: '#F0FDF4', borderWidth: 1.5, borderColor: '#BBF7D0' },
+                ]}
+                onPress={() => toggleMarkDelivered(selectedDay)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 14 }}>✅</Text>
+                <Text
+                  style={[
+                    styles.actionBtnText,
+                    selectedStatus === 'Delivered' ? styles.textWhite : { color: '#16A34A' },
+                  ]}
+                >
+                  Mark Delivered
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.actionBtn,
+                  selectedStatus === 'Skipped' ? styles.actionBtnActiveRed : styles.actionBtnOutlineRed,
+                ]}
+                onPress={() => toggleMarkNotDelivered(selectedDay)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 14 }}>❌</Text>
+                <Text
+                  style={[
+                    styles.actionBtnText,
+                    selectedStatus === 'Skipped' ? styles.textWhite : { color: '#DC2626' },
+                  ]}
+                >
+                  Not Delivered
+                </Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                selectedStatus === 'Delivered' ? { backgroundColor: '#16A34A' } : { backgroundColor: '#F0FDF4', borderWidth: 1.5, borderColor: '#BBF7D0' },
-              ]}
-              onPress={() => toggleMarkDelivered(selectedDay)}
-              activeOpacity={0.8}
-            >
-              <Text style={{ fontSize: 16 }}>✅</Text>
-              <Text
                 style={[
-                  styles.actionBtnText,
-                  selectedStatus === 'Delivered' ? styles.textWhite : { color: '#16A34A' },
+                  styles.actionBtn,
+                  selectedStatus === 'Paused' ? styles.actionBtnActiveYellow : styles.actionBtnOutlineYellow,
+                  { marginTop: 8 }
                 ]}
+                onPress={() => togglePauseDay(selectedDay)}
+                activeOpacity={0.8}
               >
-                Mark Delivered
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                selectedStatus === 'Skipped' ? styles.actionBtnActiveRed : styles.actionBtnOutlineRed,
-              ]}
-              onPress={() => toggleMarkNotDelivered(selectedDay)}
-              activeOpacity={0.8}
-            >
-              <Text style={{ fontSize: 16 }}>❌</Text>
-              <Text
-                style={[
-                  styles.actionBtnText,
-                  selectedStatus === 'Skipped' ? styles.textWhite : { color: '#DC2626' },
-                ]}
-              >
-                Not Delivered
-              </Text>
-            </TouchableOpacity>
+                <PauseCircle size={13} color={selectedStatus === 'Paused' ? '#FFFFFF' : '#D97706'} />
+                <Text
+                  style={[
+                    styles.actionBtnText,
+                    selectedStatus === 'Paused' ? styles.textWhite : { color: '#D97706' },
+                  ]}
+                >
+                  {selectedStatus === 'Paused' ? 'End Pause' : 'Pause Date'}
+                </Text>
+              </TouchableOpacity>
           </View>
-          <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                selectedStatus === 'Paused' ? styles.actionBtnActiveYellow : styles.actionBtnOutlineYellow,
-                { marginTop: 10 }
-              ]}
-              onPress={() => togglePauseDay(selectedDay)}
-              activeOpacity={0.8}
-            >
-              <PauseCircle size={15} color={selectedStatus === 'Paused' ? '#FFFFFF' : '#D97706'} />
-              <Text
-                style={[
-                  styles.actionBtnText,
-                  selectedStatus === 'Paused' ? styles.textWhite : { color: '#D97706' },
-                ]}
-              >
-                {selectedStatus === 'Paused' ? 'End Pause' : 'Pause Date'}
-              </Text>
-            </TouchableOpacity>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -391,7 +391,7 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#2563EB', // Top area blue for status bar
+    backgroundColor: '#2563EB',
   },
 
   /* Blue Top Header */
@@ -402,19 +402,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 20,
+    paddingBottom: 16,
     gap: 10,
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: -0.3,
@@ -422,17 +422,17 @@ const styles = StyleSheet.create({
   headerSub: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 2,
+    marginTop: 1,
     fontWeight: '500',
   },
   todayBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     paddingVertical: 6,
-    borderRadius: 18,
+    borderRadius: 17,
   },
   todayBtnText: {
     fontSize: 12,
@@ -447,53 +447,53 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     backgroundColor: '#F8FAFC',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 30,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 18,
   },
 
   /* Calendar Card */
   calendarCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 14,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowRadius: 7,
     elevation: 2,
   },
   monthHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   arrowBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   monthTitleText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: '#0F172A',
   },
   weekdayRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingBottom: 10,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   weekdayText: {
     width: '14.28%',
@@ -508,15 +508,15 @@ const styles = StyleSheet.create({
   },
   dayTileEmpty: {
     width: '14.28%',
-    height: 44,
+    height: 38,
   },
   dayTile: {
     width: '14.28%',
-    height: 44,
+    height: 38,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
-    marginVertical: 2,
+    borderRadius: 11,
+    marginVertical: 1,
   },
   dayTileSelected: {
     backgroundColor: '#2563EB',
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
     borderColor: '#2563EB',
   },
   dayNumText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#0F172A',
   },
@@ -540,18 +540,18 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    marginTop: 2,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 1,
   },
 
   /* Legend */
   legendContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 14,
-    paddingTop: 12,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
@@ -574,24 +574,24 @@ const styles = StyleSheet.create({
   /* Selected Day Actions */
   actionCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowRadius: 7,
     elevation: 2,
   },
   actionCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 11,
   },
   selectedDateTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: '#0F172A',
   },
@@ -602,9 +602,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   statusBadge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 9,
   },
   statusBadgeText: {
     fontSize: 11,
@@ -612,16 +612,16 @@ const styles = StyleSheet.create({
   },
   quickActionRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 9,
   },
   actionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 42,
-    borderRadius: 12,
+    gap: 5,
+    height: 39,
+    borderRadius: 11,
   },
   actionBtnOutlineRed: {
     borderWidth: 1.5,
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#D97706',
   },
   actionBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
   },
   textWhite: {

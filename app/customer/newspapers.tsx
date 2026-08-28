@@ -77,7 +77,21 @@ export default function NewspapersScreen() {
       (activeLanguage === 'All' || n.language === activeLanguage) &&
       (activeCategory === 'All' || n.category === activeCategory) &&
       n.name.toLowerCase().includes(search.toLowerCase())
-  );
+  ).sort((a, b) => {
+    if (activeLanguage === 'All') {
+      const ak = a.language === 'Kannada' ? 0 : 1;
+      const bk = b.language === 'Kannada' ? 0 : 1;
+      if (ak !== bk) return ak - bk;
+      const ac = a.category === 'Paper' ? 0 : 1;
+      const bc = b.category === 'Paper' ? 0 : 1;
+      if (ac !== bc) return ac - bc;
+      return a.name.localeCompare(b.name);
+    }
+    const ac2 = a.category === 'Paper' ? 0 : 1;
+    const bc2 = b.category === 'Paper' ? 0 : 1;
+    if (ac2 !== bc2) return ac2 - bc2;
+    return a.name.localeCompare(b.name);
+  });
 
   const shownPapersCount = filtered.filter((p) => p.category === 'Paper').length;
   const shownMagazinesCount = filtered.filter((p) => p.category === 'Magazine').length;

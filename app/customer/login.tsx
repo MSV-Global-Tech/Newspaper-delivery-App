@@ -180,7 +180,7 @@ export default function LoginScreen() {
       {/* ── Blue Header ── */}
       <View style={s.header}>
         <Text style={s.headerIcon}>📰</Text>
-        <Text style={s.headerTitle}>Paper<Text style={s.headerAccent}>Fresh</Text></Text>
+        <Text style={s.headerTitle}>Newspaper<Text style={s.headerAccent}>Delivery</Text></Text>
         <Text style={s.headerSub}>Your daily newspaper, at your doorstep</Text>
       </View>
 

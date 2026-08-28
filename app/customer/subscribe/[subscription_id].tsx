@@ -142,6 +142,14 @@ export default function SubscribeScreen() {
     setShowRazorpay(false);
     const user = store.getUser();
 
+    if (!user || !user.phone) {
+      Alert.alert('Error', 'Please login first to subscribe');
+      router.push('/customer/login');
+      return;
+    }
+
+    console.log('Adding subscription for user:', user.name, 'Phone:', user.phone);
+
     let homeImageUri: string | undefined;
     if (homeImage) {
       try {
@@ -162,9 +170,11 @@ export default function SubscribeScreen() {
       startDate: startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
       days: selectedDays,
       imageSource: paper.src,
+      imageSrc: paper.imageSrc || '',
       paymentMethod: paymentMethod,
       homeImageUri,
       location: locationCoords || undefined,
+      category: 'Newspaper', // Map both Paper and Magazine to Newspaper for delivery system
     });
 
     const message = `*New ${paper.category} Subscription!* ${paper.category === 'Paper' ? '📰' : '📚'}

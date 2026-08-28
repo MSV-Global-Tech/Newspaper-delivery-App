@@ -8,7 +8,6 @@ import {
   TextInput,
   StatusBar,
   Alert,
-  Switch,
   Modal,
   KeyboardAvoidingView,
   Platform,
@@ -30,7 +29,6 @@ import {
   CheckCircle2,
   Calendar,
   CreditCard,
-  Bell,
   HelpCircle,
   ChevronRight,
   Shield,
@@ -60,7 +58,6 @@ export default function ProfileScreen() {
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
-  const [notifEnabled, setNotifEnabled] = useState(true);
   const [loadingGps, setLoadingGps] = useState(false);
   const [appSettings, setAppSettings] = useState(store.getAppSettings());
 
@@ -85,8 +82,22 @@ export default function ProfileScreen() {
 
   const [isUploading, setIsUploading] = useState(false);
   const [selectedBill, setSelectedBill] = useState<any>(null);
+  const [isPaymentAmountModalOpen, setIsPaymentAmountModalOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [billForPayment, setBillForPayment] = useState<any>(null);
 
   const handleUploadScreenshot = async (bill: any) => {
+    setBillForPayment(bill);
+    setPaymentAmount(bill.totalAmount?.toString() || '');
+    setIsPaymentAmountModalOpen(true);
+  };
+
+  const handleProcessPaymentUpload = async () => {
+    if (!paymentAmount || isNaN(Number(paymentAmount)) || Number(paymentAmount) <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+      return;
+    }
+
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
@@ -109,10 +120,13 @@ export default function ProfileScreen() {
 
       await updateCustomerBill(user?.phone as string, [
         ...((user as any)?.bills?.map((b: any) =>
-          b.id === bill.id ? { ...b, paymentProof: publicUrl } : b
+          b.id === billForPayment.id ? { ...b, paymentProof: publicUrl, paidAmount: Number(paymentAmount) } : b
         ) || []),
       ]);
 
+      setIsPaymentAmountModalOpen(false);
+      setPaymentAmount('');
+      setBillForPayment(null);
       Alert.alert('Success', 'Payment screenshot uploaded successfully. Admin will review it.');
     } catch (error: any) {
       Alert.alert('Upload Failed', error.message);
@@ -161,14 +175,14 @@ export default function ProfileScreen() {
         longitude: loc.coords.longitude,
       });
 
-      if (geo.length > 0) {
+      if (geo.length > 0 && geo[0]) {
         const a = geo[0];
         const parts = [];
-        if (a.name && !a.name.includes('+') && isNaN(Number(a.name))) parts.push(a.name);
-        if (a.street && a.street !== a.name) parts.push(a.street);
-        if (a.district) parts.push(a.district); else if (a.subregion) parts.push(a.subregion);
-        if (a.city) parts.push(a.city);
-        if (a.postalCode) parts.push(a.postalCode);
+        if (a?.name && !a.name.includes('+') && isNaN(Number(a.name))) parts.push(a.name);
+        if (a?.street && a.street !== a.name) parts.push(a.street);
+        if (a?.district) parts.push(a.district); else if (a?.subregion) parts.push(a.subregion);
+        if (a?.city) parts.push(a.city);
+        if (a?.postalCode) parts.push(a.postalCode);
 
         const fullAddr = parts.filter(Boolean).join(', ');
         if (fullAddr) setEditAddress(fullAddr);
@@ -240,7 +254,10 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: () => {
           store.setUser(null);
-          router.replace('/customer/login');
+          // Force navigation after a small delay to ensure state updates
+          setTimeout(() => {
+            router.replace('/customer/login');
+          }, 100);
         },
       },
     ]);
@@ -250,10 +267,6 @@ export default function ProfileScreen() {
     Linking.openURL('tel:9972505709');
   };
 
-  const userDeliveries = deliveries.filter((d) => d.name === user?.name);
-  const activeCount = userDeliveries.length;
-  const totalMonthlyCost = userDeliveries.reduce((acc, d) => acc + (d.priceMonth || 180), 0);
-
   const getInitials = (str?: string) => {
     if (!str) return 'PF';
     const parts = str.split(' ');
@@ -261,6 +274,7 @@ export default function ProfileScreen() {
     return str.substring(0, 2).toUpperCase();
   };
 
+  // Early return for guest view
   if (!user) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -289,6 +303,11 @@ export default function ProfileScreen() {
       </SafeAreaView>
     );
   }
+
+  // User-dependent calculations - only run if user exists
+  const userDeliveries = (deliveries || []).filter((d) => d?.name === user?.name);
+  const activeCount = userDeliveries.length;
+  const totalMonthlyCost = userDeliveries.reduce((acc, d) => acc + (d?.priceMonth || 180), 0);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -522,25 +541,6 @@ export default function ProfileScreen() {
         {/* ── PREFERENCES ── */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionHeaderTitle}>Subscription Controls</Text>
-
-          {/* Delivery Notifications */}
-          <View style={styles.menuRow}>
-            <View style={[styles.menuIconContainer, { backgroundColor: '#EFF6FF' }]}>
-              <Bell size={18} color="#2563EB" />
-            </View>
-            <View style={styles.menuTextContent}>
-              <Text style={styles.menuTitle}>Morning Delivery Alert</Text>
-              <Text style={styles.menuSub}>Get notified when paper arrives</Text>
-            </View>
-            <Switch
-              value={notifEnabled}
-              onValueChange={setNotifEnabled}
-              trackColor={{ false: '#E2E8F0', true: '#BFDBFE' }}
-              thumbColor={notifEnabled ? '#2563EB' : '#94A3B8'}
-            />
-          </View>
-
-          <View style={styles.itemSeparator} />
 
           {/* Manage Subscriptions */}
           <TouchableOpacity
@@ -830,6 +830,78 @@ export default function ProfileScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* ── PAYMENT AMOUNT MODAL ── */}
+      <Modal visible={isPaymentAmountModalOpen} transparent animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <CreditCard size={18} color="#2563EB" />
+                <Text style={styles.modalTitle}>Enter Payment Amount</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => {
+                  setIsPaymentAmountModalOpen(false);
+                  setPaymentAmount('');
+                  setBillForPayment(null);
+                }}
+                activeOpacity={0.7}
+              >
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalFieldGroup}>
+              <Text style={styles.modalLabel}>Amount Paid (₹)</Text>
+              <View style={styles.modalInputRow}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: '#64748B', marginRight: 8 }}>₹</Text>
+                <TextInput
+                  style={styles.modalTextInput}
+                  placeholder="0.00"
+                  placeholderTextColor="#94A3B8"
+                  value={paymentAmount}
+                  onChangeText={setPaymentAmount}
+                  keyboardType="decimal-pad"
+                  autoFocus
+                />
+              </View>
+              {billForPayment && (
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>
+                  Bill Amount: ₹{billForPayment.totalAmount}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => {
+                  setIsPaymentAmountModalOpen(false);
+                  setPaymentAmount('');
+                  setBillForPayment(null);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalDoneBtn}
+                onPress={handleProcessPaymentUpload}
+                activeOpacity={0.85}
+                disabled={isUploading}
+              >
+                <Text style={styles.modalDoneText}>{isUploading ? 'Uploading...' : 'Upload Screenshot'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* ── VIEW BILL MODAL ── */}
       <Modal visible={!!selectedBill} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
@@ -840,21 +912,21 @@ export default function ProfileScreen() {
                   <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 18, fontWeight: '800', textAlign: 'center', color: '#111827', letterSpacing: 1, marginBottom: 4 }}>NEWSPAPER DELIVERY</Text>
                   <View style={{ height: 1, borderWidth: 1, borderColor: '#D1D5DB', borderStyle: 'dashed', marginVertical: 12 }} />
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: '#374151' }}>BILL: {selectedBill.id.slice(-6).toUpperCase()}</Text>
-                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: '#374151' }}>{new Date(selectedBill.date).toLocaleDateString()}</Text>
+                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: '#374151' }}>BILL: {selectedBill?.id?.slice(-6).toUpperCase() || 'N/A'}</Text>
+                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: '#374151' }}>{new Date(selectedBill?.date || Date.now()).toLocaleDateString()}</Text>
                   </View>
-                  <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: '#374151', marginBottom: 4 }}>CUSTOMER: {user?.name?.toUpperCase()}</Text>
+                  <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: '#374151', marginBottom: 4 }}>CUSTOMER: {user?.name?.toUpperCase() || 'CUSTOMER'}</Text>
                   <View style={{ height: 1, borderWidth: 1, borderColor: '#D1D5DB', borderStyle: 'dashed', marginVertical: 12 }} />
-                  {(selectedBill.items || []).map((item: any) => (
-                    <View key={item.id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: '#111827', flex: 2 }}>{item.name.toUpperCase()}</Text>
-                      <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: '#111827', textAlign: 'right' }}>₹{Number(item.amount).toFixed(2)}</Text>
+                  {(selectedBill.items || []).map((item: any, index: number) => (
+                    <View key={item?.id || index} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: '#111827', flex: 2 }}>{item?.name?.toUpperCase() || 'Item'}</Text>
+                      <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: '#111827', textAlign: 'right' }}>₹{Number(item?.amount || 0).toFixed(2)}</Text>
                     </View>
                   ))}
                   <View style={{ height: 1, borderWidth: 1, borderColor: '#D1D5DB', borderStyle: 'dashed', marginVertical: 12 }} />
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 14, fontWeight: '800', color: '#111827' }}>TOTAL</Text>
-                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 16, fontWeight: '800', color: '#111827' }}>₹{Number(selectedBill.totalAmount).toFixed(2)}</Text>
+                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 16, fontWeight: '800', color: '#111827' }}>₹{Number(selectedBill?.totalAmount || 0).toFixed(2)}</Text>
                   </View>
                 </ScrollView>
                 <View style={{ padding: 16 }}>

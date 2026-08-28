@@ -1,17 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, ScrollView, TextInput,
-  StyleSheet, Alert, Platform
+  StyleSheet, Alert, Platform, Image
 } from 'react-native';
-import { X, PlusCircle, CheckCircle, Clock, Search, Trash2, ChevronRight } from 'lucide-react-native';
+import { X, PlusCircle, CheckCircle, Clock, Search, Trash2, ChevronRight, Eye, Calendar } from 'lucide-react-native';
 import { updateCustomerBill } from '../database/users';
-
-const PREDEFINED_PAPERS = [
-  'Prajavani', 'Vijaya Karnataka', 'Kannada Prabha', 'Udayavani', 'Samyukta Karnataka', 'Hosa Digantha',
-  'The Hindu', 'Times of India', 'Deccan Herald', 'Economic Times', 'Mint', 'Business Standard',
-  'Hindustan Times', 'Indian Express', 'Dainik Bhaskar', 'Dainik Jagran', 'Amar Ujala',
-  'Sudha', 'Taranga', 'India Today', 'Frontline', 'The Week', 'Outlook', 'Business Today',
-];
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { store } from '../utils/store';
 
 interface AdminCustomerBillingModalProps {
   visible: boolean;
@@ -21,7 +16,8 @@ interface AdminCustomerBillingModalProps {
 
 export default function AdminCustomerBillingModal({ visible, customer, onClose }: AdminCustomerBillingModalProps) {
   const [view, setView] = useState<'bills' | 'generate'>('bills');
-  const [billMonth, setBillMonth] = useState('');
+  const [billDate, setBillDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [billItems, setBillItems] = useState<{ id: string; name: string; amount: string }[]>([
     { id: Date.now().toString(), name: '', amount: '' }
   ]);
@@ -30,6 +26,25 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
   const [paperSearch, setPaperSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [showScreenshotModal, setShowScreenshotModal] = useState(false);
+  const [selectedScreenshotUrl, setSelectedScreenshotUrl] = useState<string | null>(null);
+  const [selectedBillForScreenshot, setSelectedBillForScreenshot] = useState<any>(null);
+  const [customerPapers, setCustomerPapers] = useState<string[]>([]);
+
+  // Get customer's subscribed papers
+  useEffect(() => {
+    if (visible && customer?.phone) {
+      const deliveries = store.getDeliveries();
+      const customerDeliveries = deliveries.filter((d) => d?.name === customer?.name && d?.phone === customer?.phone);
+      const subscribedPapers = [...new Set(customerDeliveries.map((d) => d?.paperName).filter(Boolean))];
+      setCustomerPapers(subscribedPapers);
+      
+      // If customer has only one subscription, auto-fill the first item
+      if (subscribedPapers.length === 1 && billItems.length === 1 && !billItems[0].name) {
+        setBillItems([{ id: Date.now().toString(), name: subscribedPapers[0], amount: '' }]);
+      }
+    }
+  }, [visible, customer?.phone, customer?.name]);
 
   // Reset form when customer changes
   useEffect(() => {
@@ -42,7 +57,7 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
   if (!visible || !customer) return null;
 
   const resetForm = () => {
-    setBillMonth(new Date().toLocaleString('default', { month: 'long', year: 'numeric' }));
+    setBillDate(new Date());
     setBillItems([{ id: Date.now().toString(), name: '', amount: '' }]);
   };
 
@@ -53,6 +68,10 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
   const totalAmount = billItems.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
 
   const openPaperPicker = (id: string) => {
+    if (customerPapers.length === 0) {
+      Alert.alert('No Subscriptions', 'This customer has no active subscriptions. Please have them subscribe to newspapers first before generating bills.');
+      return;
+    }
     setPickerTargetId(id);
     setPaperSearch('');
     setShowPaperPicker(true);
@@ -64,6 +83,11 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
     }
     setShowPaperPicker(false);
     setPickerTargetId(null);
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) setBillDate(selectedDate);
   };
 
   const addBillItem = () => {
@@ -79,16 +103,17 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
   };
 
   const handleGenerateBill = async () => {
-    if (!billMonth.trim()) { Alert.alert('Error', 'Please enter a billing month.'); return; }
     const validItems = billItems
       .filter(i => i.name.trim() && parseFloat(i.amount) > 0)
       .map(i => ({ id: i.id, name: i.name.trim(), amount: parseFloat(i.amount) }));
     if (validItems.length === 0) { Alert.alert('Error', 'Please add at least one item with a valid amount.'); return; }
 
+    const formattedDate = billDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
     const newBill = {
       id: `bill_${Date.now()}`,
-      month: billMonth.trim(),
-      date: new Date().toISOString(),
+      month: formattedDate,
+      date: billDate.toISOString(),
       items: validItems,
       totalAmount: validItems.reduce((s, i) => s + i.amount, 0),
       status: 'Unpaid',
@@ -133,7 +158,13 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
     );
   };
 
-  const filteredPapers = PREDEFINED_PAPERS.filter(p => p.toLowerCase().includes(paperSearch.toLowerCase()));
+  const handleViewScreenshot = (screenshotUrl: string, bill: any) => {
+    setSelectedScreenshotUrl(screenshotUrl);
+    setSelectedBillForScreenshot(bill);
+    setShowScreenshotModal(true);
+  };
+
+  const filteredPapers = customerPapers.filter(p => p.toLowerCase().includes(paperSearch.toLowerCase()));
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -176,10 +207,14 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
                         <Text style={s.billAmount}>₹{bill.totalAmount} <Text style={s.billMonthTxt}>({bill.month})</Text></Text>
                         <Text style={s.billMeta}>{(bill.items || []).length} item{(bill.items || []).length !== 1 ? 's' : ''}</Text>
                         {bill.paymentProof && (
-                          <View style={s.proofBadge}>
-                            <Clock size={11} color="#B45309" />
-                            <Text style={s.proofTxt}>Screenshot uploaded by customer</Text>
-                          </View>
+                          <TouchableOpacity 
+                            style={s.proofBadge} 
+                            onPress={() => handleViewScreenshot(bill.paymentProof, bill)}
+                            activeOpacity={0.7}
+                          >
+                            <Eye size={11} color="#B45309" />
+                            <Text style={s.proofTxt}>View Payment Screenshot</Text>
+                          </TouchableOpacity>
                         )}
                         <Text style={s.billStatusTxt}>Unpaid</Text>
                       </View>
@@ -205,7 +240,7 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
                       <View style={[s.dot, { backgroundColor: '#10B981' }]} />
                       <View style={{ flex: 1 }}>
                         <Text style={[s.billAmount, { color: '#166534' }]}>₹{bill.totalAmount} <Text style={s.billMonthTxt}>({bill.month})</Text></Text>
-                        <Text style={s.billMeta}>
+                        <Text style={[s.billMeta, { color: '#15803D' }]}>
                           Paid: {bill.paidAt ? new Date(bill.paidAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
                         </Text>
                       </View>
@@ -222,14 +257,25 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
             {/* ── Generate Bill View ── */}
             {view === 'generate' && (
               <>
-                <Text style={s.sectionLabel}>Billing Month</Text>
-                <TextInput
-                  style={s.input}
-                  value={billMonth}
-                  onChangeText={setBillMonth}
-                  placeholder="e.g. August 2026"
-                  placeholderTextColor="#94A3B8"
-                />
+                <Text style={s.sectionLabel}>Billing Date</Text>
+                <TouchableOpacity 
+                  style={s.dateInput} 
+                  onPress={() => setShowDatePicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <Calendar size={16} color="#2563EB" />
+                  <Text style={s.dateText}>
+                    {billDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={billDate}
+                    mode="date"
+                    display="default"
+                    onChange={handleDateChange}
+                  />
+                )}
 
                 <Text style={[s.sectionLabel, { marginTop: 12 }]}>Items</Text>
                 {billItems.map((item, index) => (
@@ -277,30 +323,79 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
         <View style={s.pickerOverlay}>
           <View style={s.pickerSheet}>
             <View style={s.pickerHeader}>
-              <Text style={s.pickerTitle}>Select Paper</Text>
+              <Text style={s.pickerTitle}>Customer's Subscriptions</Text>
               <TouchableOpacity onPress={() => setShowPaperPicker(false)}>
                 <X size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
-            <View style={s.pickerSearch}>
-              <Search size={15} color="#94A3B8" />
-              <TextInput
-                style={s.pickerSearchInput}
-                placeholder="Search papers…"
-                placeholderTextColor="#94A3B8"
-                value={paperSearch}
-                onChangeText={setPaperSearch}
-                autoFocus
-              />
-            </View>
+            {customerPapers.length > 0 && (
+              <View style={s.pickerSearch}>
+                <Search size={15} color="#94A3B8" />
+                <TextInput
+                  style={s.pickerSearchInput}
+                  placeholder="Search subscriptions…"
+                  placeholderTextColor="#94A3B8"
+                  value={paperSearch}
+                  onChangeText={setPaperSearch}
+                  autoFocus
+                />
+              </View>
+            )}
             <ScrollView showsVerticalScrollIndicator={false}>
-              {filteredPapers.map(paper => (
-                <TouchableOpacity key={paper} style={s.pickerItem} onPress={() => selectPaper(paper)}>
-                  <Text style={s.pickerItemTxt}>{paper}</Text>
-                  <ChevronRight size={16} color="#CBD5E1" />
-                </TouchableOpacity>
-              ))}
+              {customerPapers.length === 0 ? (
+                <View style={{ padding: 32, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center' }}>
+                    This customer has no active subscriptions yet.
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', marginTop: 8 }}>
+                    Please have them subscribe to newspapers first.
+                  </Text>
+                </View>
+              ) : (
+                filteredPapers.map(paper => (
+                  <TouchableOpacity key={paper} style={s.pickerItem} onPress={() => selectPaper(paper)}>
+                    <Text style={s.pickerItemTxt}>{paper}</Text>
+                    <ChevronRight size={16} color="#CBD5E1" />
+                  </TouchableOpacity>
+                ))
+              )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Screenshot Viewer Modal */}
+      <Modal visible={showScreenshotModal} transparent animationType="fade">
+        <View style={s.screenshotOverlay}>
+          <View style={s.screenshotSheet}>
+            <View style={s.screenshotHeader}>
+              <Text style={s.screenshotTitle}>Payment Screenshot</Text>
+              <TouchableOpacity onPress={() => setShowScreenshotModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, alignItems: 'center' }}>
+              {selectedScreenshotUrl && (
+                <Image 
+                  source={{ uri: selectedScreenshotUrl }} 
+                  style={s.screenshotImage}
+                  resizeMode="contain"
+                />
+              )}
+              {selectedBillForScreenshot?.paidAmount && (
+                <View style={s.paidAmountBadge}>
+                  <Text style={s.paidAmountText}>Customer paid: ₹{selectedBillForScreenshot.paidAmount}</Text>
+                </View>
+              )}
+            </ScrollView>
+            <View style={s.screenshotFooter}>
+              <TouchableOpacity 
+                style={s.screenshotCloseBtn}
+                onPress={() => setShowScreenshotModal(false)}
+              >
+                <Text style={s.screenshotCloseBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -318,11 +413,11 @@ const s = StyleSheet.create({
   topActions: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   topTab: { paddingBottom: 12, marginRight: 20, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   topTabActive: { borderBottomColor: '#2563EB' },
-  topTabTxt: { fontSize: 14, fontWeight: '600', color: '#94A3B8' },
-  topTabTxtActive: { color: '#2563EB' },
+  topTabTxt: { fontSize: 14, fontWeight: '600', color: '#64748B' },
+  topTabTxtActive: { color: '#2563EB', fontWeight: '700' },
   sectionLabel: { fontSize: 13, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   emptyTxt: { fontSize: 13, color: '#94A3B8', fontStyle: 'italic', marginBottom: 8 },
-  billRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', gap: 10 },
+  billRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', gap: 10 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   billAmount: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
   billMonthTxt: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
@@ -335,6 +430,8 @@ const s = StyleSheet.create({
   paidBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, gap: 4 },
   paidTxt: { fontSize: 11, fontWeight: '700', color: '#065F46' },
   input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 12, fontSize: 14, color: '#0F172A' },
+  dateInput: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 12, gap: 12 },
+  dateText: { fontSize: 14, color: '#0F172A', fontWeight: '600' },
   itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   removeBtn: { padding: 10, backgroundColor: '#FEF2F2', borderRadius: 10 },
   addItemBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 6 },
@@ -352,4 +449,14 @@ const s = StyleSheet.create({
   pickerSearchInput: { flex: 1, padding: 10, fontSize: 14, color: '#0F172A' },
   pickerItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
   pickerItemTxt: { fontSize: 15, color: '#0F172A', fontWeight: '500' },
+  screenshotOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  screenshotSheet: { backgroundColor: '#FFF', borderRadius: 16, width: '100%', maxHeight: '80%' },
+  screenshotHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  screenshotTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+  screenshotImage: { width: '100%', height: 300, borderRadius: 8, marginBottom: 12 },
+  paidAmountBadge: { backgroundColor: '#DCFCE7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginTop: 8 },
+  paidAmountText: { fontSize: 14, fontWeight: '700', color: '#065F46' },
+  screenshotFooter: { padding: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  screenshotCloseBtn: { backgroundColor: '#F1F5F9', paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  screenshotCloseBtnText: { fontSize: 14, fontWeight: '700', color: '#64748B' },
 });

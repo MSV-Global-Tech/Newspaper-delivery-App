@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, Platform, Linking, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, Platform, Linking, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { LogOut, UploadCloud, CheckCircle, Clock, FileText, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { LogOut, UploadCloud, CheckCircle, Clock, FileText, ArrowLeft, ChevronDown, ChevronUp, X, CreditCard } from 'lucide-react-native';
 import { store, User } from '../../utils/store';
 import { updateVendor, VendorDoc, VendorPayment, VendorBill, VendorBillItem } from '../../database/vendors';
 import { uploadImage } from '../../database/storageHelper';
@@ -20,6 +20,8 @@ export default function VendorDashboard() {
   const [vendor, setVendor] = useState<VendorDoc | null>(user?.vendorData || null);
   const [uploading, setUploading] = useState(false);
   const [selectedBill, setSelectedBill] = useState<VendorBill | null>(null);
+  const [isPaymentAmountModalOpen, setIsPaymentAmountModalOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
 
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
@@ -55,6 +57,16 @@ export default function VendorDashboard() {
   };
 
   const handleUploadScreenshot = async () => {
+    setPaymentAmount(vendor.paymentAmount?.toString() || '');
+    setIsPaymentAmountModalOpen(true);
+  };
+
+  const handleProcessPaymentUpload = async () => {
+    if (!paymentAmount || isNaN(Number(paymentAmount)) || Number(paymentAmount) <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+      return;
+    }
+
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -74,7 +86,7 @@ export default function VendorDashboard() {
         // Update Vendor's payment history with new Pending payment
         const newPayment: VendorPayment = {
           id: `pay_${timestamp}`,
-          amount: vendor.paymentAmount || 0,
+          amount: Number(paymentAmount),
           date: new Date().toISOString(),
           status: 'Pending',
           screenshot: screenshotUrl,
@@ -84,6 +96,8 @@ export default function VendorDashboard() {
           paymentHistory: [newPayment, ...(vendor.paymentHistory || [])],
         });
 
+        setIsPaymentAmountModalOpen(false);
+        setPaymentAmount('');
         Alert.alert('Success', 'Payment screenshot uploaded! Waiting for admin approval.');
       }
     } catch (e: any) {
@@ -303,6 +317,73 @@ export default function VendorDashboard() {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* Payment Amount Modal */}
+      <Modal visible={isPaymentAmountModalOpen} transparent animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+        >
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <CreditCard size={18} color="#2563EB" />
+                <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A' }}>Enter Payment Amount</Text>
+              </View>
+              <TouchableOpacity
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => {
+                  setIsPaymentAmountModalOpen(false);
+                  setPaymentAmount('');
+                }}
+              >
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>Amount Paid (₹)</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 12, height: 48, gap: 10 }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: '#64748B', marginRight: 8 }}>₹</Text>
+                <TextInput
+                  style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#0F172A' }}
+                  placeholder="0.00"
+                  placeholderTextColor="#94A3B8"
+                  value={paymentAmount}
+                  onChangeText={setPaymentAmount}
+                  keyboardType="decimal-pad"
+                  autoFocus
+                />
+              </View>
+              {vendor && (
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>
+                  Due Amount: ₹{vendor.paymentAmount}
+                </Text>
+              )}
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10, paddingTop: 12 }}>
+              <TouchableOpacity
+                style={{ flex: 1, height: 48, borderRadius: 14, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => {
+                  setIsPaymentAmountModalOpen(false);
+                  setPaymentAmount('');
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748B' }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ flex: 2, height: 48, borderRadius: 14, backgroundColor: '#2563EB', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, shadowColor: '#2563EB', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
+                onPress={handleProcessPaymentUpload}
+                disabled={uploading}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>{uploading ? 'Uploading...' : 'Upload Screenshot'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

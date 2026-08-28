@@ -73,12 +73,28 @@ export default function NewspaperDetailScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Full Width Image Banner */}
-        <View style={{ width: '100%', height: 200, backgroundColor: paper.category === 'Paper' ? '#F8FAFC' : '#FAF5FF' }}>
+        <View
+          style={{
+            width: '100%',
+            height: 320,
+            backgroundColor: paper.category === 'Paper' ? '#F8FAFC' : '#FAF5FF',
+            overflow: 'hidden',
+          }}
+        >
           {paper.src ? (
-            <Image source={paper.src} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <Image
+              source={paper.src}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <PaperLogo name={paper.name} id={newspaper_id as string} size="lg" />
+              <PaperLogo
+                name={paper.name}
+                id={newspaper_id as string}
+                imageSrc={(paper as any).imageSrc ?? null}
+                size={240}
+              />
             </View>
           )}
         </View>

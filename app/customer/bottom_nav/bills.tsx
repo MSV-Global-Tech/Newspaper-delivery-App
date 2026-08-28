@@ -9,6 +9,8 @@ import {
   Alert,
   Linking,
   Platform,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -23,6 +25,7 @@ import {
   CheckCircle,
   ChevronDown,
   Receipt,
+  X,
 } from 'lucide-react-native';
 
 export default function BillsScreen() {
@@ -31,6 +34,9 @@ export default function BillsScreen() {
   const [selectedBill, setSelectedBill] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'unpaid' | 'history'>('unpaid');
+  const [isPaymentAmountModalOpen, setIsPaymentAmountModalOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [billForPayment, setBillForPayment] = useState<any>(null);
 
   useEffect(() => {
     // Listen to store for user info updates
@@ -64,6 +70,17 @@ export default function BillsScreen() {
     .sort((a: any, b: any) => new Date(b.paidAt || b.date || 0).getTime() - new Date(a.paidAt || a.date || 0).getTime());
 
   const handleUploadScreenshot = async (bill: any) => {
+    setBillForPayment(bill);
+    setPaymentAmount(bill.totalAmount?.toString() || '');
+    setIsPaymentAmountModalOpen(true);
+  };
+
+  const handleProcessPaymentUpload = async () => {
+    if (!paymentAmount || isNaN(Number(paymentAmount)) || Number(paymentAmount) <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+      return;
+    }
+
     try {
       const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!granted) {
@@ -81,9 +98,13 @@ export default function BillsScreen() {
       const publicUrl = await uploadImage(result.assets[0].uri, `payment_screenshots/${user?.phone}_${Date.now()}.jpg`);
 
       const updatedBills = bills.map((b: any) =>
-        b.id === bill.id ? { ...b, paymentProof: publicUrl } : b
+        b.id === billForPayment.id ? { ...b, paymentProof: publicUrl, paidAmount: Number(paymentAmount) } : b
       );
       await updateCustomerBill(user?.phone, updatedBills);
+      
+      setIsPaymentAmountModalOpen(false);
+      setPaymentAmount('');
+      setBillForPayment(null);
       Alert.alert('Uploaded!', 'Screenshot sent. Admin will verify and mark your bill as paid.');
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Upload failed.');
@@ -226,6 +247,75 @@ export default function BillsScreen() {
         )}
       </ScrollView>
 
+      {/* Payment Amount Modal */}
+      <Modal visible={isPaymentAmountModalOpen} transparent animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+        >
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <CreditCard size={18} color="#2563EB" />
+                <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A' }}>Enter Payment Amount</Text>
+              </View>
+              <TouchableOpacity
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => {
+                  setIsPaymentAmountModalOpen(false);
+                  setPaymentAmount('');
+                  setBillForPayment(null);
+                }}
+              >
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>Amount Paid (₹)</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 12, height: 48, gap: 10 }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: '#64748B', marginRight: 8 }}>₹</Text>
+                <TextInput
+                  style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#0F172A' }}
+                  placeholder="0.00"
+                  placeholderTextColor="#94A3B8"
+                  value={paymentAmount}
+                  onChangeText={setPaymentAmount}
+                  keyboardType="decimal-pad"
+                  autoFocus
+                />
+              </View>
+              {billForPayment && (
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>
+                  Bill Amount: ₹{billForPayment.totalAmount}
+                </Text>
+              )}
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10, paddingTop: 12 }}>
+              <TouchableOpacity
+                style={{ flex: 1, height: 48, borderRadius: 14, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => {
+                  setIsPaymentAmountModalOpen(false);
+                  setPaymentAmount('');
+                  setBillForPayment(null);
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748B' }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ flex: 2, height: 48, borderRadius: 14, backgroundColor: '#2563EB', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, shadowColor: '#2563EB', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
+                onPress={handleProcessPaymentUpload}
+                disabled={isUploading}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>{isUploading ? 'Uploading...' : 'Upload Screenshot'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* DMart Style Bill Modal */}
       <Modal visible={!!selectedBill} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -302,8 +392,8 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   activeTab: { borderBottomColor: '#2563EB' },
-  tabText: { fontSize: 14, fontWeight: '600', color: '#94A3B8' },
-  activeTabText: { color: '#2563EB' },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
+  activeTabText: { color: '#2563EB', fontWeight: '700' },
   scrollContent: { padding: 16, paddingBottom: 40 },
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#334155', marginTop: 16, marginBottom: 6 },

@@ -401,8 +401,26 @@ export const store = {
     quantity?: number;
     location?: { lat: number; lng: number };
   }) {
-    if (!currentUser) return;
-    const imageSrc = sub.imageSrc ?? '';
+    if (!currentUser) {
+      console.error('[Store] Cannot add subscription: No current user');
+      return;
+    }
+    if (!currentUser.phone) {
+      console.error('[Store] Cannot add subscription: User has no phone number');
+      return;
+    }
+
+    // Use imageSrc if provided, otherwise try to derive from imageSource
+    const imageSrc = sub.imageSrc ?? (typeof sub.imageSource === 'string' ? sub.imageSource : '');
+
+    console.log('[Store] Adding subscription:', {
+      name: currentUser.name,
+      phone: currentUser.phone,
+      paperName: sub.paperName,
+      plan: sub.plan,
+      category: sub.category,
+    });
+
     addDelivery({
       name: currentUser.name,
       phone: currentUser.phone,
@@ -421,7 +439,13 @@ export const store = {
       quantity: sub.quantity ?? 1,
       homeImageUri: sub.homeImageUri,
       location: sub.location,
-    }).catch(console.warn);
+    })
+      .then((id) => {
+        console.log('[Store] Subscription added successfully with ID:', id);
+      })
+      .catch((error) => {
+        console.error('[Store] Failed to add subscription:', error);
+      });
   },
 
   updateDeliveryStatus(id: string, status: 'Pending' | 'Delivered' | 'Skipped') {
