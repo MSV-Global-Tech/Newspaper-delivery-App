@@ -110,11 +110,6 @@ export default function AdminScreen() {
   const [selectedDelivery, setSelectedDelivery] = useState<typeof deliveries[0] | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
 
-  // Skip/Pause Modal
-  const [skipPauseModalOpen, setSkipPauseModalOpen] = useState(false);
-  const [skipPauseType, setSkipPauseType] = useState<'skipped' | 'paused'>('skipped');
-  const [selectedSkipPauseCustomer, setSelectedSkipPauseCustomer] = useState<typeof deliveries | null>(null);
-
   // Maintenance Tab State
   const [storageUsage, setStorageUsage] = useState({
     totalBills: 0,
@@ -535,6 +530,8 @@ export default function AdminScreen() {
     return Array.from(grouped.values());
   })();
 
+  const [selectedSkipCustomer, setSelectedSkipCustomer] = useState<any>(null);
+
   const computeChange = (current: number, previous: number | null | undefined) => {
     if (previous == null) return { label: null as string | null, trend: null as 'up' | 'down' | null };
     if (previous === 0) {
@@ -689,8 +686,8 @@ export default function AdminScreen() {
             { key: 'payments', label: 'Payments', icon: CreditCard },
             { key: 'papers', label: 'Papers', icon: BookOpen },
             { key: 'vendors', label: 'Vendors', icon: Briefcase },
-            { key: 'access', label: 'Access', icon: Shield },
             { key: 'skipped', label: 'Skipped', icon: SkipForward },
+            { key: 'access', label: 'Access', icon: Shield },
             { key: 'maintenance', label: 'Maintenance', icon: Settings },
           ] as const).map(({ key, label, icon: Icon }) => {
             const isActive = activeTab === key;
@@ -774,38 +771,6 @@ export default function AdminScreen() {
                 </View>
                 <ChevronRight size={16} color="#94A3B8" />
               </TouchableOpacity>
-
-              {/* Skipped/Paused Section */}
-              {pausedByCustomer.length > 0 && (
-                <View style={{ marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B', marginBottom: 8 }}>
-                    ⏸️ Skipped/Paused ({pausedByCustomer.length} customers)
-                  </Text>
-                  {pausedByCustomer.slice(0, 5).map((items, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: idx < pausedByCustomer.length - 1 ? 1 : 0, borderBottomColor: '#F1F5F9' }}
-                      onPress={() => {
-                        setSelectedSkipPauseCustomer(items);
-                        setSkipPauseModalOpen(true);
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#1E293B' }}>{items[0].name}</Text>
-                        <Text style={{ fontSize: 11, color: '#64748B' }}>{items[0].paperName}</Text>
-                      </View>
-                      <View style={{ backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#EF4444' }}>{items.length} skipped</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                  {pausedByCustomer.length > 5 && (
-                    <Text style={{ fontSize: 11, color: '#64748B', textAlign: 'center', marginTop: 8 }}>
-                      +{pausedByCustomer.length - 5} more customers
-                    </Text>
-                  )}
-                </View>
-              )}
             </View>
           </View>
         )}
@@ -1405,6 +1370,40 @@ export default function AdminScreen() {
           </View>
         )}
 
+        {activeTab === 'skipped' && (
+          <View style={styles.container}>
+            <Text style={styles.sectionTitle}>Skipped Deliveries</Text>
+            {pausedByCustomer.length === 0 ? (
+              <View style={{ alignItems: 'center', padding: 40 }}>
+                <SkipForward size={48} color="#CBD5E1" />
+                <Text style={{ fontSize: 14, color: '#64748B', marginTop: 12 }}>No skipped deliveries today</Text>
+              </View>
+            ) : (
+              pausedByCustomer.map((items, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.paperCatalogItem}
+                  onPress={() => setSelectedSkipCustomer(items[0])}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.paperLogoBox, { backgroundColor: '#FEF2F2', width: 40, height: 40, borderRadius: 20 }]}>
+                    <SkipForward size={20} color="#EF4444" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.custName}>{items[0].name}</Text>
+                    <Text style={styles.custAddress}>+91 {items[0].phone}</Text>
+                    <Text style={styles.custAddress}>{items[0].address}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#EF4444' }}>{items.length}</Text>
+                    <Text style={{ fontSize: 11, color: '#64748B' }}>skipped</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
+
         {activeTab === 'access' && (
           <View style={styles.container}>
             <Text style={styles.sectionTitle}>Manage Admin Access</Text>
@@ -1472,6 +1471,42 @@ export default function AdminScreen() {
             })}
           </View>
         )}
+
+        {/* Customer Detail Modal */}
+        <Modal
+          visible={!!selectedSkipCustomer}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSelectedSkipCustomer(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={styles.modalTitle}>Customer Details</Text>
+                <TouchableOpacity onPress={() => setSelectedSkipCustomer(null)}>
+                  <X size={20} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              {selectedSkipCustomer && (
+                <>
+                  <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, marginBottom: 8 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>{selectedSkipCustomer.name}</Text>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>+91 {selectedSkipCustomer.phone}</Text>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{selectedSkipCustomer.address}</Text>
+                  </View>
+                  <View style={{ backgroundColor: '#FEF2F2', padding: 10, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#DC2626', marginBottom: 4 }}>
+                      🗑️ Skipped: {selectedSkipCustomer.paperName}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#64748B' }}>
+                      {selectedSkipCustomer.plan} • ₹{selectedSkipCustomer.priceMonth}/mo
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
 
         {activeTab === 'maintenance' && (
           <View style={styles.container}>
@@ -2224,43 +2259,6 @@ export default function AdminScreen() {
         customer={selectedCustomerForBilling}
         onClose={() => setSelectedCustomerForBilling(null)}
       />
-
-      {/* Skip/Pause Details Modal */}
-      <Modal
-        visible={skipPauseModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSkipPauseModalOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={styles.modalTitle}>Skipped Details</Text>
-              <TouchableOpacity onPress={() => setSkipPauseModalOpen(false)}>
-                <X size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            {selectedSkipPauseCustomer && (
-              <View style={{ backgroundColor: '#F8FAFC', borderRadius: 8, padding: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>{selectedSkipPauseCustomer[0].name}</Text>
-                  <Text style={{ fontSize: 12, color: '#64748B', marginLeft: 8 }}>{selectedSkipPauseCustomer[0].phone}</Text>
-                </View>
-                <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>{selectedSkipPauseCustomer[0].address}</Text>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: '#1E293B', marginBottom: 4 }}>Skipped Papers:</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                  {selectedSkipPauseCustomer.map((item, i) => (
-                    <View key={i} style={{ backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#EF4444' }}>{item.paperName}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
 
     </SafeAreaView>
   );
