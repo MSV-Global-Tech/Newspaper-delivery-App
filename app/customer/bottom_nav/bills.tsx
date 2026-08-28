@@ -64,10 +64,10 @@ export default function BillsScreen() {
     };
   }, []);
 
-  const unpaidBills = bills.filter((b: any) => b.status !== 'Paid');
-  const paidBills = bills
+  const unpaidBills = user ? bills.filter((b: any) => b.status !== 'Paid') : [];
+  const paidBills = user ? bills
     .filter((b: any) => b.status === 'Paid')
-    .sort((a: any, b: any) => new Date(b.paidAt || b.date || 0).getTime() - new Date(a.paidAt || a.date || 0).getTime());
+    .sort((a: any, b: any) => new Date(b.paidAt || b.date || 0).getTime() - new Date(a.paidAt || a.date || 0).getTime()) : [];
 
   const handleUploadScreenshot = async (bill: any) => {
     setBillForPayment(bill);

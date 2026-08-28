@@ -1,53 +1,27 @@
 /**
- * database/storageHelper.ts
- *
- * Uploads newspaper logos (and other images) from a local device URI to
- * Firebase Storage, then returns the public HTTPS download URL so that
- * EVERY user's device can render the image (not just the admin's phone).
- *
- * Why this fix matters:
- *   Before: uploadNewspaperLogo() just returned the local `content://` or
- *           `file://` URI from expo-image-picker.  That path only exists on
- *           the admin's device.  Other phones downloaded the same string from
- *           Firestore, tried to load `{ uri: "content://..." }` and got
- *           nothing — only the paper's name was visible.
- *   After:  We read the local file as a Blob, upload it to Firebase Storage
- *           at `newspaper_logos/<name>_<ts>.<ext>`, and call getDownloadURL().
- *           The resulting `https://firebasestorage.googleapis.com/...` URL is
- *           publicly accessible from any device.
- *
- * Firebase Storage security rules (set in Firebase Console → Storage → Rules):
- *   To make this work your bucket must allow public read + authenticated
- *   (or admin) write.  A good ruleset for this app:
- *
- *       rules_version = '2';
- *       service firebase.storage {
- *         match /b/{bucket}/o {
- *           match /newspaper_logos/{allPaths=**} {
- *             allow read;
- *             allow write: if true;   // tighten to admin-only if you add auth
- *           }
- *         }
- *       }
+ * Firebase Free Tier Optimizations
+ * 
+ * Free Tier Limits:
+ * - Firestore: 50K reads/day, 20K writes/day  
+ * - Storage: 5GB total
+ * - Document size: 1MB max
+ * 
+ * Current Setup:
+ * - USE_STORAGE = false (uses base64 in Firestore to stay within limits)
+ * - Max image size: 900KB (safe under 1MB document limit)
+ * - Compression: 0.8 quality for screenshots
  */
 
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from './firebase';
+import { compressImageForUpload } from '../utils/imageCompression';
 
 const NEWSPAPER_LOGOS_FOLDER = 'newspaper_logos';
 
 /**
- * Whether to use Firebase Storage (if enabled) OR encode images as base64
- * data-URLs and store them directly inside Firestore documents.
- *
- * Firebase Console shows an "upgrade plan" prompt for Storage on the free
- * Spark plan, meaning Storage isn't enabled for the project.  In that case
- * we can still sync logos across every user's device: Firestore documents
- * are already synced via the free tier, so base64 data URLs embedded in
- * `newspapers.imageSrc` propagate to all client phones naturally.
- *
- * Tradeoff: Firestore docs max out at 1 MiB.  WEBP/JPEG logos at 500×500
- * are typically 20–70 KB, which fits comfortably.
+ * Storage disabled for free tier optimization.
+ * Using base64 encoding in Firestore documents instead.
+ * This keeps us within the 5GB storage limit.
  */
 export const USE_STORAGE = false;
 
@@ -121,13 +95,18 @@ export async function uploadNewspaperLogo(
   // we embed the logo directly into the Firestore document so every user's
   // device still gets the image via Firestore sync.
   if (!USE_STORAGE) {
-    const dataUrl = await uriToBase64(localUri);
+    // Compress image first if it's large
+    const compressed = await compressImageForUpload(localUri, 300, 300, 70);
+    const uriToUse = compressed.wasCompressed ? compressed.uri : localUri;
+
+    const dataUrl = await uriToBase64(uriToUse);
     const sizeKB = Math.round(dataUrl.length / 1.33 / 1024);
-    if (sizeKB > 900) {
+    // Reduced from 900KB to 800KB for safety margin
+    if (sizeKB > 800) {
       throw new Error(
-        `Logo is too large (~${sizeKB} KB after encoding).  ` +
+        `Image is too large (~${sizeKB} KB after encoding).  ` +
         'Firestore documents are limited to 1 MB.  Please choose a smaller ' +
-        'image or enable Firebase Storage.'
+        'image or compress it further.'
       );
     }
     return dataUrl;
@@ -159,13 +138,18 @@ export async function uploadImage(localUri: string, fullStoragePath: string): Pr
   if (!localUri) return '';
 
   if (!USE_STORAGE) {
-    const dataUrl = await uriToBase64(localUri);
+    // Compress image first if it's large (e.g., payment screenshots)
+    const compressed = await compressImageForUpload(localUri, 800, 800, 60);
+    const uriToUse = compressed.wasCompressed ? compressed.uri : localUri;
+
+    const dataUrl = await uriToBase64(uriToUse);
     const sizeKB = Math.round(dataUrl.length / 1.33 / 1024);
-    if (sizeKB > 900) {
+    // Reduced from 900KB to 800KB for safety margin
+    if (sizeKB > 800) {
       throw new Error(
         `Image is too large (~${sizeKB} KB after encoding).  ` +
         'Firestore documents are limited to 1 MB.  Please choose a smaller ' +
-        'image or enable Firebase Storage.'
+        'image or compress it further.'
       );
     }
     return dataUrl;

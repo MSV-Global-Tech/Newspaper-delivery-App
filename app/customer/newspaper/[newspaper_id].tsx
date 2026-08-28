@@ -48,7 +48,9 @@ export default function NewspaperDetailScreen() {
 
   const isSubscribed = user ? deliveries.some(d => d.paperName === paper.name && d.name === user.name) : false;
   const tags = TAG_BY_LANGUAGE[paper.language] || ['Local', 'Popular'];
-  if (paper.category === 'Magazine') tags.unshift('Weekly / Monthly');
+  if (paper.category === 'Magazine' && !tags.includes('Weekly / Monthly')) {
+    tags.unshift('Weekly / Monthly');
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>

@@ -98,6 +98,11 @@ export default function ProfileScreen() {
       return;
     }
 
+    if (!user?.phone) {
+      Alert.alert('Error', 'User not logged in. Please login again.');
+      return;
+    }
+
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
@@ -116,9 +121,9 @@ export default function ProfileScreen() {
       setIsUploading(true);
       const uri = result.assets[0].uri;
 
-      const publicUrl = await uploadImage(uri, `payment_screenshots/${user?.phone}_${Date.now()}.jpg`);
+      const publicUrl = await uploadImage(uri, `payment_screenshots/${user.phone}_${Date.now()}.jpg`);
 
-      await updateCustomerBill(user?.phone as string, [
+      await updateCustomerBill(user.phone, [
         ...((user as any)?.bills?.map((b: any) =>
           b.id === billForPayment.id ? { ...b, paymentProof: publicUrl, paidAmount: Number(paymentAmount) } : b
         ) || []),
@@ -256,7 +261,9 @@ export default function ProfileScreen() {
           store.setUser(null);
           // Force navigation after a small delay to ensure state updates
           setTimeout(() => {
-            router.replace('/customer/login');
+            if (router.canGoBack()) {
+              router.replace('/customer/login');
+            }
           }, 100);
         },
       },

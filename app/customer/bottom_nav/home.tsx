@@ -21,6 +21,7 @@ import {
   ChevronRight,
   PauseCircle,
   SkipForward,
+  X,
 } from 'lucide-react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -95,6 +96,8 @@ export default function HomeScreen() {
   const [papers, setPapers] = useState(store.getPapers());
   const [appSettings, setAppSettings] = useState(store.getAppSettings());
   const [updateInfo, setUpdateInfo] = useState<RemoteVersionInfo | null>(null);
+  const [showBillAlert, setShowBillAlert] = useState(false);
+  const [unpaidBillsCount, setUnpaidBillsCount] = useState(0);
 
   // ── Check for updates from GitHub on mount ──────────────────────────────────
   useEffect(() => {
@@ -129,15 +132,27 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
-      setUser(store.getUser());
+      const currentUser = store.getUser();
+      setUser(currentUser);
       setDeliveries(store.getDeliveries());
       setPapers(store.getPapers());
       setAppSettings(store.getAppSettings());
+
+      // Check for unpaid bills - only if user exists
+      if (currentUser && (currentUser as any)?.bills) {
+        const unpaid = (currentUser as any).bills.filter((b: any) => b.status !== 'Paid');
+        setUnpaidBillsCount(unpaid.length);
+        setShowBillAlert(unpaid.length > 0);
+      } else {
+        // Reset if no user
+        setUnpaidBillsCount(0);
+        setShowBillAlert(false);
+      }
     });
     return unsubscribe;
   }, []);
 
-  const customerDeliveries = (deliveries || []).filter((d) => d?.name === user?.name && d?.plan !== 'One-time');
+  const customerDeliveries = user ? (deliveries || []).filter((d) => d?.name === user?.name && d?.plan !== 'One-time') : [];
   const currentDelivery = customerDeliveries[0] || null;
   const showOnlinePay =
     !!user &&
@@ -260,9 +275,23 @@ export default function HomeScreen() {
           </Text>
           <Text style={styles.mainTitle}>{GREETING}!</Text>
         </View>
-        <TouchableOpacity style={styles.bellBtn} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.bellBtn}
+          activeOpacity={0.7}
+          onPress={() => {
+            if (unpaidBillsCount > 0) {
+              setShowBillAlert(!showBillAlert);
+            } else {
+              router.push('/customer/bottom_nav/bills');
+            }
+          }}
+        >
           <Bell size={20} color="#0F172A" />
-          <View style={styles.badgeDot} />
+          {unpaidBillsCount > 0 && (
+            <View style={styles.badgeDot}>
+              <Text style={styles.badgeText}>{unpaidBillsCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -284,6 +313,35 @@ export default function HomeScreen() {
         </Text>
         <ChevronDown size={13} color="#2563EB" />
       </TouchableOpacity>
+
+      {/* ── PAYMENT DUE ALERT CARD ─────────────────────────────── */}
+      {showBillAlert && unpaidBillsCount > 0 && (
+        <View style={styles.billAlertCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <View style={styles.billAlertIcon}>
+              <Bell size={16} color="#DC2626" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.billAlertTitle}>Payment Due</Text>
+              <Text style={styles.billAlertText}>
+                You have {unpaidBillsCount} unpaid bill{unpaidBillsCount > 1 ? 's' : ''}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.billAlertBtn}
+            onPress={() => router.push('/customer/bottom_nav/bills')}
+          >
+            <Text style={styles.billAlertBtnText}>Pay Now</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ marginLeft: 8 }}
+            onPress={() => setShowBillAlert(false)}
+          >
+            <X size={16} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -627,8 +685,52 @@ const styles = StyleSheet.create({
   },
   badgeDot: {
     position: 'absolute', top: 9, right: 9,
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: '#2563EB', borderWidth: 1.5, borderColor: '#FFFFFF',
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#DC2626', borderWidth: 1.5, borderColor: '#FFFFFF',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  badgeText: {
+    fontSize: 10, fontWeight: '700', color: '#FFFFFF',
+  },
+  billAlertCard: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  billAlertIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  billAlertTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  billAlertText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  billAlertBtn: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  billAlertBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 
   body: { paddingHorizontal: 16, paddingTop: 16 },

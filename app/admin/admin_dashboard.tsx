@@ -37,6 +37,10 @@ import {
   Truck,
   Navigation,
   Briefcase,
+  Settings,
+  Database,
+  PauseCircle,
+  SkipForward,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
@@ -46,11 +50,12 @@ import { IMAGES, resolvePaperImage } from '../../assets/images';
 import { store } from '../../utils/store';
 import { getAdminOverviewSnapshot, setAdminOverviewSnapshot, type AdminOverviewSnapshot } from '../../utils/session';
 import { uploadNewspaperLogo, deleteImage, listenUsers, updateUser } from '../../database';
+import { cleanupOldScreenshots, getCleanupStats, getStorageUsage } from '../../database/cleanup';
 import AdminVendorsTab from '../../components/AdminVendorsTab';
 import AdminCustomerBillingModal from '../../components/AdminCustomerBillingModal';
 
 export default function AdminScreen() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'deliveries' | 'payments' | 'papers' | 'access' | 'vendors'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'deliveries' | 'payments' | 'papers' | 'access' | 'vendors' | 'maintenance' | 'skipped'>('overview');
   const [search, setSearch] = useState('');
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [papersList, setPapersList] = useState(store.getPapers());
@@ -105,6 +110,48 @@ export default function AdminScreen() {
   const [selectedDelivery, setSelectedDelivery] = useState<typeof deliveries[0] | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
 
+  // Skip/Pause Modal
+  const [skipPauseModalOpen, setSkipPauseModalOpen] = useState(false);
+  const [skipPauseType, setSkipPauseType] = useState<'skipped' | 'paused'>('skipped');
+  const [selectedSkipPauseCustomer, setSelectedSkipPauseCustomer] = useState<typeof deliveries | null>(null);
+
+  // Maintenance Tab State
+  const [storageUsage, setStorageUsage] = useState({
+    totalBills: 0,
+    billsWithScreenshots: 0,
+    totalPayments: 0,
+    paymentsWithScreenshots: 0,
+    estimatedSizeMB: 0,
+  });
+  const [cleanupStats, setCleanupStats] = useState({
+    billsOlderThan30Days: 0,
+    paymentsOlderThan30Days: 0,
+    totalOldScreenshots: 0,
+    storageToFreeMB: 0,
+    cutoffDate: new Date(),
+  });
+  const [isCleaning, setIsCleaning] = useState(false);
+
+  // Limit alerts
+  const storagePercent = Math.round((storageUsage.estimatedSizeMB / 5000) * 100);
+  const isStorageWarning = storagePercent > 70;
+  const isStorageCritical = storagePercent > 90;
+
+  const estimatedReads = Math.round(usersList.length * 1.5);
+  const readsPercent = Math.round((estimatedReads / 50000) * 100);
+  const isReadsWarning = readsPercent > 70;
+  const isReadsCritical = readsPercent > 90;
+
+  const estimatedWrites = Math.round(storageUsage.totalBills * 0.1);
+  const writesPercent = Math.round((estimatedWrites / 20000) * 100);
+  const isWritesWarning = writesPercent > 70;
+  const isWritesCritical = writesPercent > 90;
+
+  const estimatedAuth = Math.round(usersList.length * 0.5);
+  const authPercent = Math.round((estimatedAuth / 10000) * 100);
+  const isAuthWarning = authPercent > 70;
+  const isAuthCritical = authPercent > 90;
+
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
       setDeliveries(store.getDeliveries());
@@ -123,6 +170,58 @@ export default function AdminScreen() {
   useEffect(() => {
     getAdminOverviewSnapshot().then(setPrevOverview).catch(() => { });
   }, []);
+
+  // Load storage and cleanup stats when maintenance tab is active
+  useEffect(() => {
+    if (activeTab === 'maintenance') {
+      loadMaintenanceStats();
+    }
+  }, [activeTab]);
+
+  const loadMaintenanceStats = async () => {
+    try {
+      const [usage, stats] = await Promise.all([
+        getStorageUsage(),
+        getCleanupStats(),
+      ]);
+      setStorageUsage(usage);
+      setCleanupStats(stats);
+    } catch (error) {
+      console.error('[Admin] Error loading maintenance stats:', error);
+    }
+  };
+
+  const handleCleanup = async () => {
+    Alert.alert(
+      'Confirm Cleanup',
+      `This will delete ${cleanupStats.totalOldScreenshots} screenshots older than 30 days, freeing ~${cleanupStats.storageToFreeMB} MB. This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setIsCleaning(true);
+            try {
+              const result = await cleanupOldScreenshots();
+              Alert.alert(
+                result.success ? 'Cleanup Complete' : 'Cleanup Finished',
+                result.message,
+                [{ text: 'OK' }]
+              );
+              // Reload stats
+              await loadMaintenanceStats();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to run cleanup. Please try again.');
+              console.error('[Admin] Cleanup error:', error);
+            } finally {
+              setIsCleaning(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
 
   const pickImage = async () => {
@@ -421,6 +520,20 @@ export default function AdminScreen() {
     0
   );
   const pendingCount = deliveries.filter(d => d.status === 'Pending').length;
+  const skippedCount = deliveries.filter(d => d.status === 'Skipped').length;
+
+  // Group paused and skipped by customer
+  const pausedByCustomer = (() => {
+    const grouped = new Map<string, typeof deliveries>();
+    deliveries.filter(d => d.status === 'Skipped').forEach(d => {
+      const key = `${d.name}_${d.phone}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(d);
+    });
+    return Array.from(grouped.values());
+  })();
 
   const computeChange = (current: number, previous: number | null | undefined) => {
     if (previous == null) return { label: null as string | null, trend: null as 'up' | 'down' | null };
@@ -461,6 +574,7 @@ export default function AdminScreen() {
     { label: 'Active Subs', value: activeSubs.toString(), change: subsChange.label, trend: subsChange.trend, icon: Check, bg: '#ECFDF5', color: '#059669' },
     { label: 'Monthly Revenue', value: `₹${totalMonthlyRevenue.toLocaleString('en-IN')}`, change: revenueChange.label, trend: revenueChange.trend, icon: DollarSign, bg: '#FEF2F2', color: '#DC2626' },
     { label: 'Pending Delivery', value: pendingCount.toString(), change: pendingChange.label, trend: pendingChange.trend, icon: FileText, bg: '#FFF7ED', color: '#D97706' },
+    { label: 'Skipped Today', value: skippedCount.toString(), change: null, trend: null, icon: SkipForward, bg: '#FEF2F2', color: '#EF4444' },
   ];
 
   const paymentCustomerRows = (() => {
@@ -576,6 +690,8 @@ export default function AdminScreen() {
             { key: 'papers', label: 'Papers', icon: BookOpen },
             { key: 'vendors', label: 'Vendors', icon: Briefcase },
             { key: 'access', label: 'Access', icon: Shield },
+            { key: 'skipped', label: 'Skipped', icon: SkipForward },
+            { key: 'maintenance', label: 'Maintenance', icon: Settings },
           ] as const).map(({ key, label, icon: Icon }) => {
             const isActive = activeTab === key;
             return (
@@ -658,6 +774,38 @@ export default function AdminScreen() {
                 </View>
                 <ChevronRight size={16} color="#94A3B8" />
               </TouchableOpacity>
+
+              {/* Skipped/Paused Section */}
+              {pausedByCustomer.length > 0 && (
+                <View style={{ marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B', marginBottom: 8 }}>
+                    ⏸️ Skipped/Paused ({pausedByCustomer.length} customers)
+                  </Text>
+                  {pausedByCustomer.slice(0, 5).map((items, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: idx < pausedByCustomer.length - 1 ? 1 : 0, borderBottomColor: '#F1F5F9' }}
+                      onPress={() => {
+                        setSelectedSkipPauseCustomer(items);
+                        setSkipPauseModalOpen(true);
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#1E293B' }}>{items[0].name}</Text>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>{items[0].paperName}</Text>
+                      </View>
+                      <View style={{ backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#EF4444' }}>{items.length} skipped</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                  {pausedByCustomer.length > 5 && (
+                    <Text style={{ fontSize: 11, color: '#64748B', textAlign: 'center', marginTop: 8 }}>
+                      +{pausedByCustomer.length - 5} more customers
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -1325,6 +1473,248 @@ export default function AdminScreen() {
           </View>
         )}
 
+        {activeTab === 'maintenance' && (
+          <View style={styles.container}>
+            <Text style={styles.sectionTitle}>Database Maintenance</Text>
+
+            {/* Storage Usage Card */}
+            <View style={[
+              { backgroundColor: '#F8FAFC', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
+              isStorageCritical && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+              isStorageWarning && !isStorageCritical && { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }
+            ]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <Database size={20} color={isStorageCritical ? '#DC2626' : isStorageWarning ? '#D97706' : '#2563EB'} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Storage Usage</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={[
+                    { fontSize: 24, fontWeight: '700', color: '#2563EB' },
+                    isStorageCritical && { color: '#DC2626' },
+                    isStorageWarning && !isStorageCritical && { color: '#D97706' }
+                  ]}>{storageUsage.estimatedSizeMB} MB</Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>of 5,000 MB free tier</Text>
+                </View>
+                <View style={[
+                  { backgroundColor: '#DBEAFE', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+                  isStorageCritical && { backgroundColor: '#FECACA' },
+                  isStorageWarning && !isStorageCritical && { backgroundColor: '#FDE68A' }
+                ]}>
+                  <Text style={[
+                    { fontSize: 12, fontWeight: '600', color: '#2563EB' },
+                    isStorageCritical && { color: '#DC2626' },
+                    isStorageWarning && !isStorageCritical && { color: '#D97706' }
+                  ]}>{storagePercent}%</Text>
+                </View>
+              </View>
+              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+                {isStorageCritical ? (
+                  <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>
+                    ⚠️ CRITICAL: Only ~{Math.round((5000 - storageUsage.estimatedSizeMB) / 0.2)} screenshots remaining. Run cleanup now!
+                  </Text>
+                ) : isStorageWarning ? (
+                  <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '500' }}>
+                    ⚠️ WARNING: ~{Math.round((5000 - storageUsage.estimatedSizeMB) / 0.2)} screenshots remaining. Consider cleanup soon.
+                  </Text>
+                ) : (
+                  <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '500' }}>
+                    ✅ You can still store ~{Math.round((5000 - storageUsage.estimatedSizeMB) / 0.2)} more screenshots
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* User Usage Stats */}
+            <View style={{ backgroundColor: '#F8FAFC', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <Users size={20} color="#2563EB" />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>User Usage</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <View>
+                  <Text style={{ fontSize: 13, color: '#64748B' }}>Total Users</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#1E293B' }}>{usersList.length}</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 13, color: '#64748B' }}>Total Bills</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#1E293B' }}>{storageUsage.totalBills}</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 13, color: '#64748B' }}>Total Payments</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#1E293B' }}>{storageUsage.totalPayments}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Screenshot Stats */}
+            <View style={{ backgroundColor: '#F8FAFC', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <ImageIcon size={20} color="#2563EB" />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Screenshots</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <View>
+                  <Text style={{ fontSize: 13, color: '#64748B' }}>Bills with screenshots</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#1E293B' }}>{storageUsage.billsWithScreenshots}</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 13, color: '#64748B' }}>Payments with screenshots</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#1E293B' }}>{storageUsage.paymentsWithScreenshots}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Text Data Stats */}
+            <View style={{ backgroundColor: '#F8FAFC', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <FileText size={20} color="#2563EB" />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Text Data (Records)</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <View>
+                  <Text style={{ fontSize: 13, color: '#64748B' }}>Est. Size</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#1E293B' }}>{Math.round((storageUsage.totalBills + storageUsage.totalPayments) * 0.26)} KB</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 13, color: '#64748B' }}>% of Storage</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#10B981' }}>&lt; 1%</Text>
+                </View>
+              </View>
+              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+                <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '500' }}>
+                  ✅ Unlimited capacity - text data negligible
+                </Text>
+              </View>
+            </View>
+
+            {/* Daily Operations */}
+            <View style={[
+              { backgroundColor: '#F8FAFC', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
+              (isReadsCritical || isWritesCritical) && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+              ((isReadsWarning || isWritesWarning) && !(isReadsCritical || isWritesCritical)) && { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }
+            ]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <TrendingUp size={20} color={(isReadsCritical || isWritesCritical) ? '#DC2626' : (isReadsWarning || isWritesWarning) ? '#D97706' : '#2563EB'} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Daily Operations</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <View>
+                  <Text style={{ fontSize: 13, color: '#64748B' }}>Reads</Text>
+                  <Text style={[
+                    { fontSize: 16, fontWeight: '600', color: '#1E293B' },
+                    isReadsCritical && { color: '#DC2626' },
+                    isReadsWarning && !isReadsCritical && { color: '#D97706' }
+                  ]}>{estimatedReads}/50,000</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 13, color: '#64748B' }}>Writes</Text>
+                  <Text style={[
+                    { fontSize: 16, fontWeight: '600', color: '#1E293B' },
+                    isWritesCritical && { color: '#DC2626' },
+                    isWritesWarning && !isWritesCritical && { color: '#D97706' }
+                  ]}>{estimatedWrites}/20,000</Text>
+                </View>
+              </View>
+              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+                {(isReadsCritical || isWritesCritical) ? (
+                  <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>
+                    ⚠️ CRITICAL: Only {Math.round(50000 - estimatedReads)} reads & {Math.round(20000 - estimatedWrites)} writes remaining today
+                  </Text>
+                ) : (isReadsWarning || isWritesWarning) ? (
+                  <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '500' }}>
+                    ⚠️ WARNING: {Math.round(50000 - estimatedReads)} reads & {Math.round(20000 - estimatedWrites)} writes remaining today
+                  </Text>
+                ) : (
+                  <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '500' }}>
+                    ✅ {Math.round(50000 - estimatedReads)} reads & {Math.round(20000 - estimatedWrites)} writes remaining today
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* Monthly Auth */}
+            <View style={[
+              { backgroundColor: '#F8FAFC', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
+              isAuthCritical && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+              isAuthWarning && !isAuthCritical && { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }
+            ]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <Shield size={20} color={isAuthCritical ? '#DC2626' : isAuthWarning ? '#D97706' : '#2563EB'} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Monthly Auth</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={[
+                    { fontSize: 24, fontWeight: '700', color: '#2563EB' },
+                    isAuthCritical && { color: '#DC2626' },
+                    isAuthWarning && !isAuthCritical && { color: '#D97706' }
+                  ]}>{estimatedAuth}</Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>of 10,000 verifications</Text>
+                </View>
+                <View style={[
+                  { backgroundColor: '#DBEAFE', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+                  isAuthCritical && { backgroundColor: '#FECACA' },
+                  isAuthWarning && !isAuthCritical && { backgroundColor: '#FDE68A' }
+                ]}>
+                  <Text style={[
+                    { fontSize: 12, fontWeight: '600', color: '#2563EB' },
+                    isAuthCritical && { color: '#DC2626' },
+                    isAuthWarning && !isAuthCritical && { color: '#D97706' }
+                  ]}>{authPercent}%</Text>
+                </View>
+              </View>
+              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+                {isAuthCritical ? (
+                  <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>
+                    ⚠️ CRITICAL: Only {Math.round(10000 - estimatedAuth)} user logins remaining this month
+                  </Text>
+                ) : isAuthWarning ? (
+                  <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '500' }}>
+                    ⚠️ WARNING: {Math.round(10000 - estimatedAuth)} user logins remaining this month
+                  </Text>
+                ) : (
+                  <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '500' }}>
+                    ✅ {Math.round(10000 - estimatedAuth)} user logins remaining this month
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* Cleanup Stats */}
+            <View style={{ backgroundColor: '#FEF3C7', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#FCD34D', marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <Trash2 size={20} color="#D97706" />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#92400E', marginLeft: 8 }}>Old Screenshots (30+ days)</Text>
+              </View>
+              <Text style={{ fontSize: 24, fontWeight: '700', color: '#D97706' }}>{cleanupStats.totalOldScreenshots}</Text>
+              <Text style={{ fontSize: 12, color: '#92400E', marginTop: 2 }}>
+                Can free ~{cleanupStats.storageToFreeMB} MB of storage
+              </Text>
+            </View>
+
+            {/* Cleanup Button */}
+            <TouchableOpacity
+              style={[styles.addPaperBtn, { backgroundColor: '#DC2626', marginBottom: 12 }]}
+              onPress={handleCleanup}
+              disabled={isCleaning}
+            >
+              {isCleaning ? (
+                <Text style={styles.addPaperBtnText}>Cleaning...</Text>
+              ) : (
+                <>
+                  <Trash2 size={16} color="#FFFFFF" />
+                  <Text style={styles.addPaperBtnText}>Run 30-Day Cleanup</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <Text style={{ fontSize: 11, color: '#64748B', textAlign: 'center', marginTop: 8 }}>
+              This will permanently delete screenshots older than 30 days
+            </Text>
+          </View>
+        )}
+
 
       </ScrollView>
 
@@ -1834,6 +2224,43 @@ export default function AdminScreen() {
         customer={selectedCustomerForBilling}
         onClose={() => setSelectedCustomerForBilling(null)}
       />
+
+      {/* Skip/Pause Details Modal */}
+      <Modal
+        visible={skipPauseModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSkipPauseModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={styles.modalTitle}>Skipped Details</Text>
+              <TouchableOpacity onPress={() => setSkipPauseModalOpen(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {selectedSkipPauseCustomer && (
+              <View style={{ backgroundColor: '#F8FAFC', borderRadius: 8, padding: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>{selectedSkipPauseCustomer[0].name}</Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginLeft: 8 }}>{selectedSkipPauseCustomer[0].phone}</Text>
+                </View>
+                <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>{selectedSkipPauseCustomer[0].address}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#1E293B', marginBottom: 4 }}>Skipped Papers:</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                  {selectedSkipPauseCustomer.map((item, i) => (
+                    <View key={i} style={{ backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#EF4444' }}>{item.paperName}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );
