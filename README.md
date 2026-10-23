@@ -1,1 +1,0 @@
-# Newspaper-delivery-App

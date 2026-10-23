@@ -24,6 +24,7 @@ export interface UserDoc {
   createdAt?: any;
   bills?: CustomerBill[];
   paymentHistory?: CustomerPayment[];
+  email?: string;
 }
 
 export interface CustomerBillItem {

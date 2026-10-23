@@ -1,11 +1,11 @@
-import { Stack, usePathname } from 'expo-router';
+import { Stack } from 'expo-router';
 import '../global.css';
 import { useEffect, useRef } from 'react';
 import { store } from '../utils/store';
 import { getSessionUser } from '../utils/session';
+import { checkAndShowUpdateAlert } from '../utils/appUpdates';
 
 export default function RootLayout() {
-  const pathname = usePathname();
   const bootedRef = useRef(false);
 
   // Restore the session user into the store once (covers deep-link entries).
@@ -20,6 +20,9 @@ export default function RootLayout() {
         if (sessionUser && !store.getUser()) store.setUser(sessionUser as any);
       })
       .catch(() => {});
+
+    // Check for app updates
+    checkAndShowUpdateAlert().catch(() => {});
   }, []);
 
 

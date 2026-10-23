@@ -18,9 +18,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
+import { Paths, File } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import { uploadImage } from '../../../database/storageHelper';
 import * as Location from 'expo-location';
+import { checkAndShowUpdateAlert, getRuntimeVersion } from '../../../utils/appUpdates';
 import {
   User,
   MapPin,
@@ -48,6 +50,8 @@ import {
   FileText,
   UploadCloud,
   CheckCircle,
+  DownloadCloud,
+  RefreshCw,
 } from 'lucide-react-native';
 import { store } from '../../../utils/store';
 import { fetchVendorByCode, updateVendor } from '../../../database';
@@ -59,6 +63,7 @@ export default function ProfileScreen() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [loadingGps, setLoadingGps] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
   const [appSettings, setAppSettings] = useState(store.getAppSettings());
 
   // Editable fields in modal
@@ -78,6 +83,10 @@ export default function ProfileScreen() {
       setAppSettings(store.getAppSettings());
     });
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    getRuntimeVersion().then(setAppVersion).catch(() => {});
   }, []);
 
   const [isUploading, setIsUploading] = useState(false);
@@ -150,9 +159,9 @@ export default function ProfileScreen() {
         return;
       }
 
-      const fileUri = FileSystem.documentDirectory + 'qr_code.png';
-      const { uri } = await FileSystem.downloadAsync(qrUrl, fileUri);
-      await MediaLibrary.saveToLibraryAsync(uri);
+      const fileUri = new File(Paths.cache, 'qr_code.png').uri;
+      const downloadedFile = await FileSystem.downloadAsync(qrUrl, fileUri);
+      await MediaLibrary.saveToLibraryAsync(downloadedFile.uri);
 
       Alert.alert('Success', 'QR Code saved to gallery!');
     } catch (e: any) {
@@ -272,6 +281,14 @@ export default function ProfileScreen() {
 
   const handleSupport = () => {
     Linking.openURL('tel:9972505709');
+  };
+
+  const handleCheckForUpdates = async () => {
+    try {
+      await checkAndShowUpdateAlert();
+    } catch (error) {
+      console.error('Error checking for updates:', error);
+    }
   };
 
   const getInitials = (str?: string) => {
@@ -597,6 +614,19 @@ export default function ProfileScreen() {
               <Text style={styles.menuSub}>Contact Customer care (Agent/Owner)</Text>
             </View>
             <ChevronRight size={18} color="#CBD5E1" />
+          </TouchableOpacity>
+
+          <View style={styles.itemSeparator} />
+
+          <TouchableOpacity style={styles.menuRow} activeOpacity={0.7} onPress={handleCheckForUpdates}>
+            <View style={[styles.menuIconContainer, { backgroundColor: '#EFF6FF' }]}>
+              <DownloadCloud size={18} color="#2563EB" />
+            </View>
+            <View style={styles.menuTextContent}>
+              <Text style={styles.menuTitle}>Check for Updates</Text>
+              <Text style={styles.menuSub}>Version {appVersion}</Text>
+            </View>
+            <RefreshCw size={18} color="#CBD5E1" />
           </TouchableOpacity>
 
           <View style={styles.itemSeparator} />

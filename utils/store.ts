@@ -46,6 +46,7 @@ export interface User {
   isVendor?: boolean;
   vendorData?: VendorDoc;
   sessionToken?: string;
+  email?: string;
 }
 
 export interface Delivery {

@@ -156,7 +156,7 @@ export default function NewspaperDetailScreen() {
             isSubscribed && { backgroundColor: '#16A34A' },
             paper.category === 'Magazine' && !isSubscribed && { backgroundColor: '#9333EA' }
           ]}
-          onPress={() => !isSubscribed && router.push(`/customer/subscribe/${newspaper_id}`)}
+          onPress={() => !isSubscribed && router.push(`/customer/subscribe/${newspaper_id}` as any)}
           activeOpacity={isSubscribed ? 1 : 0.85}
         >
           <Text style={styles.subscribeBtnText}>
