@@ -70,18 +70,18 @@ function initAuthInstance() {
 }
 
 let authInstance: any = null;
+let authInitialized = false;
 
-// Initialize auth immediately
-try {
-  authInstance = initAuthInstance();
-  console.log('Firebase Auth initialized:', authInstance ? 'Success' : 'Failed');
-} catch (error) {
-  console.log('Auth initialization error:', error);
-}
-
+// Initialize auth only when needed (lazy initialization)
 export function getFirebaseAuth() {
-  if (authInstance) return authInstance;
-  authInstance = initAuthInstance();
+  if (authInitialized) return authInstance;
+  try {
+    authInstance = initAuthInstance();
+    authInitialized = true;
+    console.log('Firebase Auth initialized:', authInstance ? 'Success' : 'Failed');
+  } catch (error) {
+    console.log('Auth initialization error:', error);
+  }
   return authInstance;
 }
 

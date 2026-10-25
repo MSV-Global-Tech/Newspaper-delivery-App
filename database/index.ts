@@ -6,6 +6,8 @@
 export { db } from './firebase';
 export { listenDeliveries, addDelivery, updateDeliveryStatus, seedDeliveries } from './deliveries';
 export type { DeliveryDoc } from './deliveries';
+export { saveUser, fetchUser, fetchUserByEmail, listUsers, listenUsers, updateUser, deleteUser, listenUser, updateCustomerBill } from './users';
+export type { UserDoc } from './users';
 export { listenPapers, addPaper, updatePaper, deletePaper, seedPapers } from './papers';
 export type { NewspaperDoc } from './papers';
 export {
@@ -17,8 +19,6 @@ export {
   seedSettings,
 } from './settings';
 export type { AdminUserDoc, AppSettingsDoc } from './settings';
-export { saveUser, fetchUser, listUsers, listenUsers, listenUser, updateUser, deleteUser, updateCustomerBill } from './users';
-export type { UserDoc } from './users';
 export { uploadNewspaperLogo, uploadImage, deleteImage } from './storageHelper';
 export { listenPayments, addPayment, updatePayment } from './payments';
 export type { PaymentDoc } from './payments';

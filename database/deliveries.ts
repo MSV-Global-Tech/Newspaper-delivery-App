@@ -13,7 +13,6 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { store } from '../utils/store';
 
 export interface DeliveryDoc {
   id: string;
@@ -112,18 +111,18 @@ export async function addDelivery(delivery: Omit<DeliveryDoc, 'id'>) {
 export async function updateDeliveryStatus(
   id: string,
   status: 'Pending' | 'Delivered' | 'Skipped',
+  phone: string,
+  category: string,
 ) {
-  // Find the order in the local store so we know which sub-collection it belongs to
-  const localDel = store.getDeliveries().find(d => d.id === id);
-  if (!localDel || !localDel.phone) {
-     console.error("Cannot update delivery: phone number or category unknown.");
-     return;
-  }
-  
   let categorySub = 'newspaper';
-  if (localDel.category === 'Milk') categorySub = 'milk';
-  if (localDel.category === 'Water') categorySub = 'watercan';
+  if (category === 'Milk') categorySub = 'milk';
+  if (category === 'Water') categorySub = 'watercan';
 
-  const docRef = doc(db, COL, localDel.phone, categorySub, id);
+  if (!phone) {
+    console.error("Cannot update delivery: phone number required.");
+    return;
+  }
+
+  const docRef = doc(db, COL, phone, categorySub, id);
   await updateDoc(docRef, { status });
 }

@@ -25,6 +25,7 @@ export interface UserDoc {
   bills?: CustomerBill[];
   paymentHistory?: CustomerPayment[];
   email?: string;
+  password?: string; // Store password for login verification
 }
 
 export interface CustomerBillItem {
@@ -63,6 +64,13 @@ export async function saveUser(user: UserDoc) {
 export async function fetchUser(phone: string): Promise<UserDoc | null> {
   const snap = await getDoc(doc(db, COL, phone));
   return snap.exists() ? (snap.data() as UserDoc) : null;
+}
+
+// ── Fetch a user profile by email ────────────────────────────────────────────
+export async function fetchUserByEmail(email: string): Promise<UserDoc | null> {
+  const snap = await getDocs(collection(db, COL));
+  const users = snap.docs.map((d) => d.data() as UserDoc);
+  return users.find((u) => u.email === email) || null;
 }
 
 export async function listUsers(): Promise<UserDoc[]> {

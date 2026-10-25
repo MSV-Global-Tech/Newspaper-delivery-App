@@ -451,10 +451,16 @@ export const store = {
 
   updateDeliveryStatus(id: string, status: 'Pending' | 'Delivered' | 'Skipped') {
     // Optimistic local update for instant UI feedback
+    const delivery = deliveries.find(d => d.id === id);
+    if (!delivery || !delivery.phone || !delivery.category) {
+      console.error('Cannot update delivery: missing phone or category');
+      return;
+    }
+
     deliveries = deliveries.map((d) => (d.id === id ? { ...d, status } : d));
     notify();
-    // Sync to Firestore
-    fbUpdateDeliveryStatus(id, status).catch(console.warn);
+    // Sync to Firestore with phone and category (now required parameters)
+    fbUpdateDeliveryStatus(id, status, delivery.phone, delivery.category).catch(console.warn);
   },
 
   getAdminNumbers() {
