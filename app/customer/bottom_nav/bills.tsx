@@ -117,7 +117,7 @@ export default function BillsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Bills</Text>
-        <Text style={styles.headerSub}>{user.name}</Text>
+        <Text style={styles.headerSub}>{user?.name || 'Loading...'}</Text>
       </View>
 
       {/* Tab Toggle */}

@@ -72,6 +72,9 @@ export const PAPERS_CATALOG: CatalogEntry[] = [
   { name: 'Indian Express',      language: 'English',  category: 'Paper', priceDay: 8,  priceMonth: 240, rating: 4.4, image: 'indianexpress.webp'  },
   { name: 'Wealth',              language: 'English',  category: 'Paper', priceDay: 10, priceMonth: 300, rating: 4.7, image: 'wealth.webp'          },
 
+  // ─── HINDI PAPERS ───
+  { name: 'Rajasthan Patrika',   language: 'Hindi',    category: 'Paper', priceDay: 5, priceMonth: 150, rating: 4.2, image: 'rajasthanpatrika.webp' },
+
   // ─── TELUGU PAPERS ───
   { name: 'Sakshi',              language: 'Telugu',   category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'sakshi.webp'        },
   { name: 'Andra Jyothi',        language: 'Telugu',   category: 'Paper', priceDay: 6, priceMonth: 180, rating: 4.4, image: 'andrajyothy.webp'    },
@@ -83,11 +86,8 @@ export const PAPERS_CATALOG: CatalogEntry[] = [
   { name: 'Thanthi (Daily)',     language: 'Tamil',    category: 'Paper', priceDay: 6, priceMonth: 170, rating: 4.5, image: 'thanti.webp'        },
 
   // ─── MALAYALAM PAPERS ───
-  { name: 'Malayala Manorama (Malabar)',  language: 'Malayalam', category: 'Paper', priceDay: 7, priceMonth: 200, rating: 4.5, image: 'prajavani.webp'  },
-  { name: 'Malayala Manorama (Kottayam)', language: 'Malayalam', category: 'Paper', priceDay: 7, priceMonth: 200, rating: 4.5, image: 'vijayavani.webp' },
-
-  // ─── HINDI PAPERS ───
-  { name: 'Rajasthan Patrika',   language: 'Hindi',    category: 'Paper', priceDay: 5, priceMonth: 150, rating: 4.2, image: 'rajasthanpatrika.webp' },
+  { name: 'Malayala Manorama (Malabar)',  language: 'Malayalam', category: 'Paper', priceDay: 7, priceMonth: 200, rating: 4.5, image: 'malayala.webp'  },
+  { name: 'Malayala Manorama (Kottayam)', language: 'Malayalam', category: 'Paper', priceDay: 7, priceMonth: 200, rating: 4.5, image: 'malayala.webp' },
 
   // ─── KANNADA MAGAZINES ───
   { name: 'Kasturi',             language: 'Kannada',  category: 'Magazine', priceDay: 0, priceMonth: 40, rating: 4.5, image: 'kasturi.webp'     },
@@ -109,7 +109,7 @@ export const PAPERS_CATALOG: CatalogEntry[] = [
   { name: 'Thuglak',             language: 'Tamil',    category: 'Magazine', priceDay: 0, priceMonth: 40, rating: 4.6, image: 'thuglak.webp'     },
 
   // ─── MALAYALAM MAGAZINES ───
-  { name: 'Malayalam Book',      language: 'Malayalam', category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.3, image: 'vijayavani.webp' },
+  { name: 'Malayalam Book',      language: 'Malayalam', category: 'Magazine', priceDay: 0, priceMonth: 60, rating: 4.3, image: 'malayalammagzine.webp' },
 ];
 
 // Stable numeric IDs (same for Firestore seed AND local fallback).

@@ -44,25 +44,40 @@ export default function OnboardingScreen() {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const [hasSeenOnboarding, sessionUser] = await Promise.all([
-        getHasSeenOnboarding(),
-        getSessionUser(),
-      ]);
+      try {
+        const [hasSeenOnboarding, sessionUser] = await Promise.all([
+          getHasSeenOnboarding(),
+          getSessionUser(),
+        ]);
 
-      if (sessionUser) store.setUser(sessionUser as any);
-      if (!mounted) return;
+        console.log('[Index] Session check:', { hasSeenOnboarding, sessionUser: sessionUser?.phone });
 
-      if (!hasSeenOnboarding) {
-        setShowOnboarding(true);
-        return;
+        if (sessionUser) {
+          console.log('[Index] Restoring session for:', sessionUser.phone);
+          store.setUser(sessionUser as any);
+        }
+        if (!mounted) return;
+
+        if (!hasSeenOnboarding) {
+          console.log('[Index] Showing onboarding');
+          setShowOnboarding(true);
+          return;
+        }
+
+        if (sessionUser) {
+          console.log('[Index] Routing to home (session valid)');
+          router.replace('/customer/bottom_nav/home');
+          return;
+        }
+
+        console.log('[Index] Routing to login (no session)');
+        router.replace('/customer/login');
+      } catch (error) {
+        console.error('[Index] Session check failed:', error);
+        if (mounted) {
+          router.replace('/customer/login');
+        }
       }
-
-      if (sessionUser) {
-        router.replace('/customer/bottom_nav/home');
-        return;
-      }
-
-      router.replace('/customer/login');
     })();
     return () => {
       mounted = false;
@@ -71,7 +86,12 @@ export default function OnboardingScreen() {
 
   const goNext = () => {
     const next = Math.min(activeIndex + 1, SLIDES.length - 1);
-    listRef.current?.scrollToIndex({ index: next, animated: true });
+    if (listRef.current) {
+      listRef.current.scrollToOffset({
+        offset: next * width,
+        animated: true,
+      });
+    }
     setActiveIndex(next);
   };
 

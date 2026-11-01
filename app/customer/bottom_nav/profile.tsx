@@ -21,14 +21,11 @@ import * as FileSystem from 'expo-file-system';
 import { Paths, File } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { uploadImage } from '../../../database/storageHelper';
-import * as Location from 'expo-location';
-import { checkAndShowUpdateAlert, getRuntimeVersion } from '../../../utils/appUpdates';
 import {
   User,
   MapPin,
   Phone,
   LogOut,
-  CheckCircle2,
   Calendar,
   CreditCard,
   HelpCircle,
@@ -42,7 +39,6 @@ import {
   Award,
   X,
   Save,
-  LocateFixed,
   ArrowLeft,
   Eye,
   EyeOff,
@@ -62,13 +58,17 @@ export default function ProfileScreen() {
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
-  const [loadingGps, setLoadingGps] = useState(false);
-  const [appVersion, setAppVersion] = useState('');
+  const [appVersion, setAppVersion] = useState('1.0.5');
   const [appSettings, setAppSettings] = useState(store.getAppSettings());
 
   // Editable fields in modal
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  // Structured address fields (4 fields)
+  const [editHouseNo, setEditHouseNo] = useState('');
+  const [editArea, setEditArea] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editPincode, setEditPincode] = useState('');
 
   // Vendor Login states
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
@@ -86,7 +86,7 @@ export default function ProfileScreen() {
   }, []);
 
   useEffect(() => {
-    getRuntimeVersion().then(setAppVersion).catch(() => {});
+    // App version will be shown from build info
   }, []);
 
   const [isUploading, setIsUploading] = useState(false);
@@ -172,40 +172,15 @@ export default function ProfileScreen() {
   const openEditModal = () => {
     setEditName(user?.name || '');
     setEditAddress(user?.address || '');
+    
+    // Parse existing address into structured fields (4 fields)
+    const addressParts = (user?.address || '').split(',').map(p => p.trim());
+    setEditHouseNo(addressParts[0] || '');
+    setEditArea(addressParts[1] || '');
+    setEditCity(addressParts[2] || '');
+    setEditPincode(addressParts[3] || '');
+    
     setIsEditModalOpen(true);
-  };
-
-  const handleFetchGps = async () => {
-    setLoadingGps(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Please enable location access.');
-        return;
-      }
-      const loc = await Location.getCurrentPositionAsync({});
-      const geo = await Location.reverseGeocodeAsync({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
-
-      if (geo.length > 0 && geo[0]) {
-        const a = geo[0];
-        const parts = [];
-        if (a?.name && !a.name.includes('+') && isNaN(Number(a.name))) parts.push(a.name);
-        if (a?.street && a.street !== a.name) parts.push(a.street);
-        if (a?.district) parts.push(a.district); else if (a?.subregion) parts.push(a.subregion);
-        if (a?.city) parts.push(a.city);
-        if (a?.postalCode) parts.push(a.postalCode);
-
-        const fullAddr = parts.filter(Boolean).join(', ');
-        if (fullAddr) setEditAddress(fullAddr);
-      }
-    } catch {
-      Alert.alert('GPS Error', 'Could not detect location automatically.');
-    } finally {
-      setLoadingGps(false);
-    }
   };
 
   const handleSaveModal = () => {
@@ -213,7 +188,16 @@ export default function ProfileScreen() {
       Alert.alert('Required', 'Please enter your full name.');
       return;
     }
-    if (!editAddress.trim()) {
+    
+    // Combine structured address fields (4 fields)
+    const fullAddress = [
+      editHouseNo.trim(),
+      editArea.trim(),
+      editCity.trim(),
+      editPincode.trim(),
+    ].filter(Boolean).join(', ');
+    
+    if (!fullAddress.trim()) {
       Alert.alert('Required', 'Please enter your delivery address.');
       return;
     }
@@ -221,7 +205,7 @@ export default function ProfileScreen() {
     store.setUser({
       name: editName.trim(),
       phone: user?.phone || '9876543210',
-      address: editAddress.trim(),
+      address: fullAddress.trim(),
       isAdmin: user?.isAdmin || false,
     });
 
@@ -284,11 +268,7 @@ export default function ProfileScreen() {
   };
 
   const handleCheckForUpdates = async () => {
-    try {
-      await checkAndShowUpdateAlert();
-    } catch (error) {
-      console.error('Error checking for updates:', error);
-    }
+    Linking.openURL('https://play.google.com/store/apps/details?id=com.newspaper.deliveryapp');
   };
 
   const getInitials = (str?: string) => {
@@ -313,8 +293,8 @@ export default function ProfileScreen() {
           <Text style={{ fontSize: 24, fontWeight: '800', color: '#0F172A', marginBottom: 12, textAlign: 'center' }}>
             Welcome, Guest!
           </Text>
-          <Text style={{ fontSize: 15, color: '#64748B', textAlign: 'center', marginBottom: 40, lineHeight: 22 }}>
-            Log in to manage your newspaper subscriptions, track your daily deliveries, and view your monthly bill.
+          <Text style={{ fontSize: 15, color: '#475569', textAlign: 'center', marginBottom: 40, lineHeight: 22 }}>
+            Log in to manage your newspaper subscriptions and track your daily deliveries.
           </Text>
           <TouchableOpacity
             style={{ backgroundColor: '#2563EB', paddingVertical: 18, paddingHorizontal: 32, borderRadius: 16, width: '100%', alignItems: 'center', shadowColor: '#2563EB', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 4 }}
@@ -331,7 +311,27 @@ export default function ProfileScreen() {
   // User-dependent calculations - only run if user exists
   const userDeliveries = (deliveries || []).filter((d) => d?.name === user?.name);
   const activeCount = userDeliveries.length;
-  const totalMonthlyCost = userDeliveries.reduce((acc, d) => acc + (d?.priceMonth || 180), 0);
+
+  // Calculate member since date
+  const getMemberSince = () => {
+    const createdAt = (user as any)?.createdAt;
+    if (createdAt) {
+      const date = new Date(createdAt);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${months[date.getMonth()]} ${date.getFullYear()}`;
+    }
+    // Fallback to first delivery startDate if createdAt not available
+    if (userDeliveries.length > 0) {
+      const firstDelivery = userDeliveries[0];
+      const startDate = firstDelivery.startDate;
+      if (startDate) {
+        const date = new Date(startDate);
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${months[date.getMonth()]} ${date.getFullYear()}`;
+      }
+    }
+    return 'New';
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -403,10 +403,10 @@ export default function ProfileScreen() {
 
           <View style={styles.statBox}>
             <View style={[styles.statIconCircle, { backgroundColor: '#F0FDF4' }]}>
-              <CheckCircle2 size={16} color="#16A34A" />
+              <Calendar size={16} color="#16A34A" />
             </View>
-            <Text style={styles.statNumber}>₹{totalMonthlyCost}</Text>
-            <Text style={styles.statLabel}>Monthly Cost</Text>
+            <Text style={styles.statNumber}>{getMemberSince()}</Text>
+            <Text style={styles.statLabel}>Member Since</Text>
           </View>
         </View>
 
@@ -537,8 +537,8 @@ export default function ProfileScreen() {
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Registered Mobile Number</Text>
             <View style={styles.infoDisplayRow}>
-              <Phone size={16} color="#64748B" />
-              <Text style={[styles.infoDisplayText, { color: '#64748B' }]}>
+              <Phone size={16} color="#475569" />
+              <Text style={[styles.infoDisplayText, { color: '#475569' }]}>
                 +91 {user?.phone || '9876543210'}
               </Text>
               <View style={styles.verifiedLock}>
@@ -558,7 +558,7 @@ export default function ProfileScreen() {
               <Text style={styles.menuTitle}>Are You a Vendor?</Text>
               <Text style={styles.menuSub}>Login to vendor dashboard</Text>
             </View>
-            <ChevronRight size={18} color="#CBD5E1" />
+            <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
         </View>
 
@@ -579,7 +579,7 @@ export default function ProfileScreen() {
               <Text style={styles.menuTitle}>Pause / Skip Deliveries</Text>
               <Text style={styles.menuSub}>Manage dates & vacation pauses</Text>
             </View>
-            <ChevronRight size={18} color="#CBD5E1" />
+            <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
 
           <View style={styles.itemSeparator} />
@@ -597,7 +597,7 @@ export default function ProfileScreen() {
               <Text style={styles.menuTitle}>Billing & History</Text>
               <Text style={styles.menuSub}>Monthly invoices and receipts</Text>
             </View>
-            <ChevronRight size={18} color="#CBD5E1" />
+            <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
         </View>
 
@@ -613,7 +613,7 @@ export default function ProfileScreen() {
               <Text style={styles.menuTitle}>Help & Support</Text>
               <Text style={styles.menuSub}>Contact Customer care (Agent/Owner)</Text>
             </View>
-            <ChevronRight size={18} color="#CBD5E1" />
+            <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
 
           <View style={styles.itemSeparator} />
@@ -626,7 +626,7 @@ export default function ProfileScreen() {
               <Text style={styles.menuTitle}>Check for Updates</Text>
               <Text style={styles.menuSub}>Version {appVersion}</Text>
             </View>
-            <RefreshCw size={18} color="#CBD5E1" />
+            <RefreshCw size={18} color="#94A3B8" />
           </TouchableOpacity>
 
           <View style={styles.itemSeparator} />
@@ -637,9 +637,9 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.menuTextContent}>
               <Text style={styles.menuTitle}>Terms & Privacy</Text>
-              <Text style={styles.menuSub}>PaperFresh service agreements</Text>
+              <Text style={styles.menuSub}>Newspaper Delivery service agreements</Text>
             </View>
-            <ChevronRight size={18} color="#CBD5E1" />
+            <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
         </View>
 
@@ -650,7 +650,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <View style={{ alignItems: 'center', marginTop: 20 }}>
-          <Text style={styles.versionFooter}>PaperFresh Customer App • v1.0.4</Text>
+          <Text style={styles.versionFooter}>Newspaper Delivery • v1.0.4</Text>
           <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '800', marginTop: 4 }}>
             Developed by MSV Global Tech
           </Text>
@@ -701,28 +701,55 @@ export default function ProfileScreen() {
 
             {/* Input: Delivery Address */}
             <View style={styles.modalFieldGroup}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <Text style={styles.modalLabel}>Delivery Address</Text>
-                <TouchableOpacity
-                  style={styles.gpsAutoBtn}
-                  onPress={handleFetchGps}
-                  activeOpacity={0.7}
-                >
-                  <LocateFixed size={12} color="#2563EB" />
-                  <Text style={styles.gpsAutoText}>
-                    {loadingGps ? 'Locating...' : 'Auto-GPS'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <View style={[styles.modalInputRow, { height: 74, alignItems: 'flex-start', paddingTop: 10 }]}>
-                <MapPin size={16} color="#2563EB" style={{ marginTop: 2 }} />
+              <Text style={styles.modalLabel}>Delivery Address</Text>
+
+              {/* House/Flat No */}
+              <View style={styles.modalInputRow}>
+                <MapPin size={16} color="#2563EB" />
                 <TextInput
-                  style={[styles.modalTextInput, { height: '100%', textAlignVertical: 'top' }]}
-                  value={editAddress}
-                  onChangeText={setEditAddress}
-                  placeholder="House #, Street, Area, City"
+                  style={styles.modalTextInput}
+                  value={editHouseNo}
+                  onChangeText={setEditHouseNo}
+                  placeholder="House/Flat No."
                   placeholderTextColor="#94A3B8"
-                  multiline
+                />
+              </View>
+
+              {/* Area/Street */}
+              <View style={styles.modalInputRow}>
+                <MapPin size={16} color="#2563EB" />
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={editArea}
+                  onChangeText={setEditArea}
+                  placeholder="Area/Street"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              {/* City */}
+              <View style={styles.modalInputRow}>
+                <MapPin size={16} color="#2563EB" />
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={editCity}
+                  onChangeText={setEditCity}
+                  placeholder="City"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              {/* Pincode */}
+              <View style={[styles.modalInputRow, { marginBottom: 0 }]}>
+                <MapPin size={16} color="#2563EB" />
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={editPincode}
+                  onChangeText={setEditPincode}
+                  placeholder="Pincode (6 digits)"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="number-pad"
+                  maxLength={6}
                 />
               </View>
             </View>
@@ -774,19 +801,28 @@ export default function ProfileScreen() {
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>1. Acceptance of Terms</Text>
-              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>By accessing and using the PaperFresh application, you agree to comply with and be bound by these terms and conditions.</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>By accessing and using the Newspaper Delivery application, you agree to comply with and be bound by these terms and conditions.</Text>
 
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>2. Subscription & Billing</Text>
-              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>A one-time booking fee of ₹50 is required to initiate a subscription. Your monthly newspaper/magazine bills are generated at the end of each month and collected directly by your delivery vendor. Failure to pay may result in suspension of deliveries.</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>2. Account Registration</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>You must register with a valid 10-digit Indian phone number (starting with 6, 7, 8, or 9), a valid email address, your full name, and delivery address. Phone numbers are used as unique identifiers for your account.</Text>
 
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>3. Deliveries</Text>
-              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>Deliveries are typically completed between 5:30 AM and 7:00 AM daily. We are not responsible for delays caused by extreme weather, strikes, or supply chain issues.</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>3. Subscription Process</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>To subscribe to a newspaper, you must first contact the owner via phone or WhatsApp. After confirming delivery details with the owner, you can proceed to pay a one-time subscription fee of ₹50 via Razorpay. All payments are processed securely through Razorpay.</Text>
 
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>4. Vacation Pauses & Skips</Text>
-              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>You can pause or skip deliveries using the app. You will not be billed for days that are successfully skipped prior to the delivery cutoff time (usually 9:00 PM the previous day).</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>4. Deliveries</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>Newspaper deliveries are typically completed between 5:30 AM and 7:00 AM daily. We are not responsible for delays caused by extreme weather, strikes, or supply chain issues. Delivery arrangements are confirmed directly with the owner.</Text>
 
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>5. Privacy Policy</Text>
-              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>We collect your name, phone number, and address strictly for the purpose of managing your deliveries. Your data is not shared with third parties for marketing purposes.</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>5. Payments & Refunds</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>The ₹50 subscription fee is a one-time payment processed through Razorpay. Once paid, this fee is non-refundable. Any disputes regarding payments should be raised with Razorpay directly.</Text>
+
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>6. Privacy Policy</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>We collect your name, phone number, email, address, and GPS location for delivery purposes. Your data is stored securely in Firebase Firestore. We do not share your personal information with third parties for marketing purposes. Payment information is processed by Razorpay and is not stored on our servers.</Text>
+
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>7. Contact Information</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>For support, billing inquiries, or delivery issues, please contact us at 9972505709 or via email at support@newspaperdelivery.com.</Text>
+
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>8. Governing Law</Text>
+              <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 16 }}>These terms and conditions are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in India.</Text>
             </ScrollView>
             <View style={{ paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9', marginTop: 10 }}>
               <TouchableOpacity
@@ -1351,28 +1387,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 48,
     gap: 10,
+    marginBottom: 6,
   },
   modalTextInput: {
     flex: 1,
     fontSize: 14,
     fontWeight: '600',
     color: '#0F172A',
-  },
-  gpsAutoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  gpsAutoText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#2563EB',
   },
   modalActionRow: {
     flexDirection: 'row',

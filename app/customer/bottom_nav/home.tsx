@@ -513,7 +513,7 @@ export default function HomeScreen() {
                     </View>
                     <View style={{ flex: 1, marginLeft: 14 }}>
                       <Text style={styles.activeName}>{delivery?.paperName || 'Newspaper'}</Text>
-                      <Text style={styles.activeMeta}>₹{delivery?.priceMonth || 0}/mo  •  {delivery?.plan || 'Monthly'}</Text>
+                      <Text style={styles.activeMeta}>{delivery?.plan || 'Monthly'}</Text>
                       <Text style={styles.activeNext}>Next Delivery: Tomorrow</Text>
                     </View>
                     <View>
@@ -591,7 +591,6 @@ export default function HomeScreen() {
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={styles.contactTitle}>Customer Support</Text>
-                <Text style={styles.contactSub}>7 AM – 9 PM daily</Text>
               </View>
             </View>
 

@@ -17,9 +17,18 @@ export default function RootLayout() {
 
     getSessionUser()
       .then((sessionUser) => {
-        if (sessionUser && !store.getUser()) store.setUser(sessionUser as any);
+        if (sessionUser) {
+          console.log('[RootLayout] Session user found:', sessionUser.phone);
+          if (!store.getUser()) {
+            store.setUser(sessionUser as any);
+          }
+        } else {
+          console.log('[RootLayout] No session user found');
+        }
       })
-      .catch(() => {});
+      .catch((error) => {
+        console.error('[RootLayout] Failed to get session user:', error);
+      });
 
     // Check for app updates
     checkAndShowUpdateAlert().catch(() => {});

@@ -17,6 +17,19 @@ export default function SubscriptionsScreen() {
   const [user, setUser] = useState(store.getUser());
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
 
+  // Language display mapping (Kannada/English)
+  const getLanguageDisplay = (lang: string) => {
+    const langMap: Record<string, string> = {
+      'Kannada': 'ಕನ್ನಡ/Kannada',
+      'English': 'English',
+      'Hindi': 'हिंदी/Hindi',
+      'Tamil': 'தமிழ்/Tamil',
+      'Telugu': 'తెలుగు/Telugu',
+      'Malayalam': 'മലയാളം/Malayalam',
+    };
+    return langMap[lang] || lang;
+  };
+
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
       setUser(store.getUser());
@@ -130,8 +143,8 @@ export default function SubscriptionsScreen() {
                     </View>
                     <View style={{ marginLeft: 12, flex: 1 }}>
                       <Text style={{ fontWeight: '700', color: '#111827', fontSize: 15 }}>{sub.name}</Text>
-                      <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 1 }}>{sub.language} | {sub.category}</Text>
-                      <Text style={{ color: '#6B7280', fontSize: 12 }}>Plan: {sub.plan} · ₹{sub.price}/mo</Text>
+                      <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 1 }}>{getLanguageDisplay(sub.language)} | {sub.category}</Text>
+                      <Text style={{ color: '#6B7280', fontSize: 12 }}>Plan: {sub.plan}</Text>
                     </View>
                   </View>
                   <View style={{ backgroundColor: sub.status === 'Skipped' ? '#FEE2E2' : '#DCFCE7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>

@@ -47,6 +47,19 @@ export default function NewspaperDetailScreen() {
   };
 
   const isSubscribed = user ? deliveries.some(d => d.paperName === paper.name && d.name === user.name) : false;
+  // Language display mapping (Kannada/English)
+  const getLanguageDisplay = (lang: string) => {
+    const langMap: Record<string, string> = {
+      'Kannada': 'ಕನ್ನಡ/Kannada',
+      'English': 'English',
+      'Hindi': 'हिंदी/Hindi',
+      'Tamil': 'தமிழ்/Tamil',
+      'Telugu': 'తెలుగు/Telugu',
+      'Malayalam': 'മലയാളം/Malayalam',
+    };
+    return langMap[lang] || lang;
+  };
+
   const tags = TAG_BY_LANGUAGE[paper.language] || ['Local', 'Popular'];
   if (paper.category === 'Magazine' && !tags.includes('Weekly / Monthly')) {
     tags.unshift('Weekly / Monthly');
@@ -103,7 +116,7 @@ export default function NewspaperDetailScreen() {
 
         <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
           <Text style={styles.paperName}>{paper.name}</Text>
-          <Text style={styles.paperSub}>{paper.language} {paper.category}</Text>
+          <Text style={styles.paperSub}>{getLanguageDisplay(paper.language)} {paper.category}</Text>
 
           {/* Tags */}
           <View style={styles.tagRow}>
@@ -128,23 +141,8 @@ export default function NewspaperDetailScreen() {
           {/* About */}
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.aboutText}>
-            {DEFAULT_ABOUT[paper.category as string]} {paper.name} brings you the latest updates from {paper.language}-speaking communities.
+            {DEFAULT_ABOUT[paper.category as string]} {paper.name} brings you the latest updates from {getLanguageDisplay(paper.language)}-speaking communities.
           </Text>
-
-          {/* Pricing Box */}
-          <Text style={styles.sectionTitle}>Pricing</Text>
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-            {paper.priceDay > 0 && (
-              <View style={styles.priceCard}>
-                <Text style={{ fontSize: 24, fontWeight: '900', color: '#0F172A' }}>₹{paper.priceDay}</Text>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2, fontWeight: '500' }}>Per Day</Text>
-              </View>
-            )}
-            <View style={[styles.priceCard, paper.priceDay === 0 && { flex: 1 }]}>
-              <Text style={{ fontSize: 24, fontWeight: '900', color: '#0F172A' }}>₹{paper.priceMonth}</Text>
-              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2, fontWeight: '500' }}>Per Month</Text>
-            </View>
-          </View>
         </View>
       </ScrollView>
 

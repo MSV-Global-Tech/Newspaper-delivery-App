@@ -2,7 +2,7 @@
   "expo": {
     "name": "Newspaper Delivery",
     "slug": "newspaper-delivery-app",
-    "version": "1.0.1",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
@@ -17,14 +17,13 @@
     "android": {
       "package": "com.newspaper.deliveryapp",
       "googleServicesFile": "./google-services.json",
+      "icon": "./assets/logo.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#2563EB",
+        "monochromeImage": "./assets/logo.png"
       },
       "permissions": []
-    },
-    "web": {
-      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
@@ -54,14 +53,13 @@
           },
           "android": {
             "abiFilters": [
-              "armeabi-v7a",
               "arm64-v8a"
             ],
-            "enableProguardInReleaseBuilds": false,
+            "enableProguardInReleaseBuilds": true,
             "buildTypes": {
               "release": {
-                "minifyEnabled": false,
-                "shrinkResources": false,
+                "minifyEnabled": true,
+                "shrinkResources": true,
                 "debuggable": false
               }
             }

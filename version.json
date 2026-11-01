@@ -1,8 +1,8 @@
 {
-  "version": "1.0.0",
-  "versionCode": 1,
+  "version": "1.0.5",
+  "versionCode": 5,
   "mandatory": false,
-  "releaseNotes": "Initial release of Newspaper Delivery app.",
+  "releaseNotes": "Simplified address form to 4 fields (House/Flat No, Area/Street, City, Pincode) for better user experience.",
   "downloadUrl": "https://github.com/MSV-Global-Tech/Newspaper-delivery-App/releases/latest",
   "minSupportedVersionCode": 1
 }

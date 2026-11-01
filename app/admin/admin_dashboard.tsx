@@ -12,6 +12,7 @@ import {
   Share,
   Linking,
 } from 'react-native';
+import * as Location from 'expo-location';
 import {
   Users,
   TrendingUp,
@@ -28,6 +29,7 @@ import {
   LogOut,
   ArrowLeft,
   PlusCircle,
+  Plus,
   Image as ImageIcon,
   Phone,
   Trash2,
@@ -49,7 +51,7 @@ import { router } from 'expo-router';
 import { IMAGES, resolvePaperImage } from '../../assets/images';
 import { store } from '../../utils/store';
 import { getAdminOverviewSnapshot, setAdminOverviewSnapshot, type AdminOverviewSnapshot } from '../../utils/session';
-import { uploadNewspaperLogo, deleteImage, listenUsers, updateUser } from '../../database';
+import { uploadNewspaperLogo, deleteImage, listenUsers, updateUser, deleteUser, saveUser } from '../../database';
 import { cleanupOldScreenshots, getCleanupStats, getStorageUsage } from '../../database/cleanup';
 import AdminVendorsTab from '../../components/AdminVendorsTab';
 import AdminCustomerBillingModal from '../../components/AdminCustomerBillingModal';
@@ -66,6 +68,20 @@ export default function AdminScreen() {
   const [newAdminPhone, setNewAdminPhone] = useState('');
   const [newAdminName, setNewAdminName] = useState('');
   const [selectedCustomerForBilling, setSelectedCustomerForBilling] = useState<any>(null);
+  const [editingAliasCustomer, setEditingAliasCustomer] = useState<any>(null);
+  const [aliasModalVisible, setAliasModalVisible] = useState(false);
+  const [aliasText, setAliasText] = useState('');
+
+  // Add Customer State
+  const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    password: '',
+  });
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   // Add Paper State
   const [isAddingPaper, setIsAddingPaper] = useState(false);
@@ -286,6 +302,87 @@ export default function AdminScreen() {
       ]);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleAddCustomer = async () => {
+    if (!newCustomer.name.trim()) {
+      Alert.alert('Error', 'Please enter customer name');
+      return;
+    }
+    if (!newCustomer.phone.trim() || newCustomer.phone.length !== 10) {
+      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+      return;
+    }
+    if (!newCustomer.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newCustomer.email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+    if (!newCustomer.address.trim()) {
+      Alert.alert('Error', 'Please enter delivery address');
+      return;
+    }
+    if (!newCustomer.password.trim() || newCustomer.password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      await saveUser({
+        name: newCustomer.name.trim(),
+        phone: newCustomer.phone.trim(),
+        email: newCustomer.email.trim(),
+        address: newCustomer.address.trim(),
+        password: newCustomer.password.trim(),
+        isAdmin: false,
+        customerKind: 'legacy',
+        approvalStatus: 'approved',
+        createdAt: new Date().toISOString(),
+      });
+
+      Alert.alert('Success', 'Customer added successfully!');
+      setIsAddCustomerModalOpen(false);
+      setNewCustomer({ name: '', phone: '', email: '', address: '', password: '' });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add customer. Phone number may already exist.');
+    }
+  };
+
+  const handleDetectLocation = async () => {
+    setIsDetectingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Please enable location access.');
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      const geo = await Location.reverseGeocodeAsync({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+
+      if (geo.length > 0 && geo[0]) {
+        const a = geo[0];
+        const parts = [];
+        if (a?.name && !a.name.includes('+') && isNaN(Number(a.name))) parts.push(a.name);
+        if (a?.street && a.street !== a.name) parts.push(a.street);
+        if (a?.subregion && !a.subregion.includes('Division')) parts.push(a.subregion);
+        if (a?.city) parts.push(a.city);
+        if (a?.district && a.district !== a.city) parts.push(a.district);
+        if (a?.postalCode) parts.push(a.postalCode);
+        if (a?.region && !a.region.includes('Division')) parts.push(a.region);
+
+        const fullAddr = parts.filter(Boolean).join(', ');
+        if (fullAddr) {
+          setNewCustomer({ ...newCustomer, address: fullAddr });
+          Alert.alert('Location Detected', 'Address has been auto-filled');
+        }
+      }
+    } catch {
+      Alert.alert('GPS Error', 'Could not detect location automatically.');
+    } finally {
+      setIsDetectingLocation(false);
     }
   };
 
@@ -516,6 +613,10 @@ export default function AdminScreen() {
   );
   const pendingCount = deliveries.filter(d => d.status === 'Pending').length;
   const skippedCount = deliveries.filter(d => d.status === 'Skipped').length;
+  
+  // Calculate total subscription fees collected (₹50 per subscription)
+  const subscriptionFeePerUser = 50;
+  const totalSubscriptionFees = activeSubs * subscriptionFeePerUser;
 
   // Group paused and skipped by customer
   const pausedByCustomer = (() => {
@@ -551,6 +652,7 @@ export default function AdminScreen() {
   const subsChange = computeChange(activeSubs, prevOverview?.activeSubs);
   const revenueChange = computeChange(totalMonthlyRevenue, prevOverview?.totalMonthlyRevenue);
   const pendingChange = computeChange(pendingCount, prevOverview?.pendingCount);
+  const subscriptionFeesChange = computeChange(totalSubscriptionFees, prevOverview?.totalSubscriptionFees);
 
   useEffect(() => {
     const snapshot: AdminOverviewSnapshot = {
@@ -558,18 +660,20 @@ export default function AdminScreen() {
       activeSubs,
       totalMonthlyRevenue,
       pendingCount,
+      totalSubscriptionFees,
       capturedAt: Date.now(),
     };
     const t = setTimeout(() => {
       setAdminOverviewSnapshot(snapshot).catch(() => { });
     }, 800);
     return () => clearTimeout(t);
-  }, [totalCustomers, activeSubs, totalMonthlyRevenue, pendingCount]);
+  }, [totalCustomers, activeSubs, totalMonthlyRevenue, pendingCount, totalSubscriptionFees]);
 
   const dynamicStats = [
     { label: 'Total Customers', value: totalCustomers.toString(), change: customerChange.label, trend: customerChange.trend, icon: Users, bg: '#EFF6FF', color: '#2563EB' },
     { label: 'Active Subs', value: activeSubs.toString(), change: subsChange.label, trend: subsChange.trend, icon: Check, bg: '#ECFDF5', color: '#059669' },
     { label: 'Monthly Revenue', value: `₹${totalMonthlyRevenue.toLocaleString('en-IN')}`, change: revenueChange.label, trend: revenueChange.trend, icon: DollarSign, bg: '#FEF2F2', color: '#DC2626' },
+    { label: 'Subscription Fees', value: `₹${totalSubscriptionFees.toLocaleString('en-IN')}`, change: subscriptionFeesChange.label, trend: subscriptionFeesChange.trend, icon: CreditCard, bg: '#F0F9FF', color: '#0EA5E9' },
     { label: 'Pending Delivery', value: pendingCount.toString(), change: pendingChange.label, trend: pendingChange.trend, icon: FileText, bg: '#FFF7ED', color: '#D97706' },
     { label: 'Skipped Today', value: skippedCount.toString(), change: null, trend: null, icon: SkipForward, bg: '#FEF2F2', color: '#EF4444' },
   ];
@@ -858,6 +962,16 @@ export default function AdminScreen() {
                     )}
                   </View>
 
+                  {/* Add Customer Button */}
+                  <TouchableOpacity
+                    style={styles.addCustomerBtn}
+                    onPress={() => setIsAddCustomerModalOpen(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Plus size={16} color="#FFFFFF" />
+                    <Text style={styles.addCustomerBtnText}>Add Customer</Text>
+                  </TouchableOpacity>
+
                   {/* Customer List */}
                   {filtered.length === 0 ? (
                     <View style={styles.custEmptyBox}>
@@ -872,6 +986,7 @@ export default function AdminScreen() {
                       const isActive = u?.customerKind === 'legacy' && u?.approvalStatus === 'approved';
                       const isRejected = u?.approvalStatus === 'rejected';
                       const accentColor = isActive ? '#16A34A' : isRejected ? '#EF4444' : isPending ? '#F59E0B' : '#2563EB';
+                      const displayName = u?.alias || u?.name || 'Customer';
 
                       return (
                         <TouchableOpacity
@@ -884,7 +999,19 @@ export default function AdminScreen() {
                             <Text style={[styles.custAvatarText, { color: ac.text }]}>{getInitials(u.name || 'C')}</Text>
                           </View>
                           <View style={{ flex: 1, marginLeft: 10 }}>
-                            <Text style={styles.custName}>{u.name || 'Customer'}</Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                setEditingAliasCustomer(u);
+                                setAliasText(u?.alias || '');
+                                setAliasModalVisible(true);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.custName}>{displayName}</Text>
+                              {u?.alias && u?.alias !== u?.name && (
+                                <Text style={styles.custAlias}>({u.name})</Text>
+                              )}
+                            </TouchableOpacity>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
                               <Phone size={9} color="#CBD5E1" />
                               <Text style={styles.custMeta}>{u.phone}</Text>
@@ -902,7 +1029,26 @@ export default function AdminScreen() {
                                 <TouchableOpacity
                                   style={styles.rejectBtn}
                                   activeOpacity={0.85}
-                                  onPress={() => updateUser(u.phone, { customerKind: 'legacy', approvalStatus: 'rejected' } as any)}
+                                  onPress={() => {
+                                    Alert.alert(
+                                      'Reject Customer',
+                                      `Are you sure you want to reject and remove ${u.name} from the customer list? This action cannot be undone.`,
+                                      [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        {
+                                          text: 'Reject & Remove',
+                                          style: 'destructive',
+                                          onPress: () => deleteUser(u.phone).then(() => {
+                                            Alert.alert('Removed', `${u.name} has been removed from the customer list.`);
+                                          }).catch((e) => {
+                                            Alert.alert('Error', 'Failed to remove customer. Please try again.');
+                                            console.error('[Admin] Delete user error:', e);
+                                          })
+                                        },
+                                      ],
+                                      { cancelable: true }
+                                    );
+                                  }}
                                 >
                                   <X size={10} color="#EF4444" />
                                   <Text style={styles.rejectBtnText}>Reject</Text>
@@ -948,6 +1094,144 @@ export default function AdminScreen() {
             })()}
           </View>
         )}
+
+        {/* Alias Edit Modal */}
+        <Modal visible={aliasModalVisible} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Edit Customer Alias</Text>
+              <Text style={styles.modalSubtitle}>
+                Add an easy-to-remember alias for {editingAliasCustomer?.name || 'this customer'}
+              </Text>
+              
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g., John - Red Gate House"
+                placeholderTextColor="#94A3B8"
+                value={aliasText}
+                onChangeText={setAliasText}
+              />
+              
+              <Text style={styles.modalHint}>
+                Tip: Add location or landmark to help identify customers easily
+              </Text>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => {
+                    setAliasModalVisible(false);
+                    setEditingAliasCustomer(null);
+                    setAliasText('');
+                  }}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalSaveBtn}
+                  onPress={() => {
+                    if (editingAliasCustomer) {
+                      updateUser(editingAliasCustomer.phone, { alias: aliasText.trim() || null } as any);
+                      setAliasModalVisible(false);
+                      setEditingAliasCustomer(null);
+                      setAliasText('');
+                      Alert.alert('Saved', 'Customer alias has been updated.');
+                    }
+                  }}
+                >
+                  <Text style={styles.modalSaveText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Add Customer Modal */}
+        <Modal visible={isAddCustomerModalOpen} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Add Customer</Text>
+              <Text style={styles.modalSubtitle}>
+                Add a customer from your previous system
+              </Text>
+              
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Full Name"
+                placeholderTextColor="#94A3B8"
+                value={newCustomer.name}
+                onChangeText={(text) => setNewCustomer({ ...newCustomer, name: text })}
+              />
+              
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Phone Number (10 digits)"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                maxLength={10}
+                value={newCustomer.phone}
+                onChangeText={(text) => setNewCustomer({ ...newCustomer, phone: text })}
+              />
+              
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Email Address"
+                placeholderTextColor="#94A3B8"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={newCustomer.email}
+                onChangeText={(text) => setNewCustomer({ ...newCustomer, email: text })}
+              />
+              
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Delivery Address"
+                placeholderTextColor="#94A3B8"
+                value={newCustomer.address}
+                onChangeText={(text) => setNewCustomer({ ...newCustomer, address: text })}
+              />
+              
+              <TouchableOpacity
+                style={styles.autoDetectBtn}
+                onPress={handleDetectLocation}
+                disabled={isDetectingLocation}
+                activeOpacity={0.8}
+              >
+                <MapPin size={16} color="#2563EB" />
+                <Text style={styles.autoDetectBtnText}>
+                  {isDetectingLocation ? 'Detecting...' : 'Auto-detect Location'}
+                </Text>
+              </TouchableOpacity>
+              
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Password (min 6 characters)"
+                placeholderTextColor="#94A3B8"
+                secureTextEntry
+                value={newCustomer.password}
+                onChangeText={(text) => setNewCustomer({ ...newCustomer, password: text })}
+              />
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => {
+                    setIsAddCustomerModalOpen(false);
+                    setNewCustomer({ name: '', phone: '', email: '', address: '', password: '' });
+                  }}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalSaveBtn}
+                  onPress={handleAddCustomer}
+                >
+                  <Text style={styles.modalSaveText}>Add Customer</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {activeTab === 'deliveries' && (
           <View style={styles.container}>
@@ -2508,6 +2792,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   rejectBtnText: { color: '#EF4444', fontSize: 11, fontWeight: '800' },
+  custName: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
+  custAlias: { fontSize: 12, fontWeight: '500', color: '#64748B', marginTop: 1 },
   custEmptyBox: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -2552,6 +2838,38 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   searchInput: { flex: 1, marginLeft: 8, fontSize: 14, color: '#0F172A' },
+  addCustomerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563EB',
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+    gap: 8,
+  },
+  addCustomerBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  autoDetectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  autoDetectBtnText: {
+    color: '#2563EB',
+    fontSize: 13,
+    fontWeight: '600',
+  },
 
   custCard: {
     backgroundColor: '#FFFFFF',
@@ -2575,7 +2893,6 @@ const styles = StyleSheet.create({
     padding: 0,
     overflow: 'hidden',
   },
-  custName: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
   custAddress: { fontSize: 12, color: '#64748B', flex: 1 },
   custMeta: { fontSize: 11, color: '#64748B', marginTop: 4, fontWeight: '500' },
 
@@ -3085,6 +3402,45 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 16,
+  },
+  modalHint: {
+    fontSize: 12,
+    color: '#64748B',
+    fontStyle: 'italic',
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  modalSaveBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+  },
+  modalSaveText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   deleteBtn: {
     backgroundColor: '#FEF2F2',

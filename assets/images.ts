@@ -43,6 +43,9 @@ export const IMAGES: Record<string, any> = {
   'dinamalar.webp':      require('./dinamalar.webp'),
   'thanti.webp':         require('./thanti.webp'),
 
+  // ── Malayalam newspaper logos ──
+  'malayala.webp':        require('./malayala.webp'),
+
   // ── Hindi newspaper logos ──
   'rajasthanpatrika.webp': require('./rajasthanpatrika.webp'),
 
@@ -60,6 +63,7 @@ export const IMAGES: Record<string, any> = {
   'readersdigest.webp':  require('./magzines/readersdigest.webp'),
   'theweak.webp':        require('./magzines/theweak.webp'),
   'thuglak.webp':         require('./magzines/thuglak.webp'),
+  'malayalammagzine.webp': require('./magzines/malayalammagzine.webp'),
 };
 
 const LEGACY_ALIAS_TO_CANONICAL: Record<string, string> = {

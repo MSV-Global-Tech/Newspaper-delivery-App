@@ -10,6 +10,8 @@ import { IMAGES } from '../../assets/images';
 import { store } from '../../utils/store';
 
 const CATEGORIES = ['All', 'Paper', 'Magazine'] as const;
+// Karnataka-first language order
+const KARNATAKA_LANGUAGE_ORDER = ['Kannada', 'English', 'Hindi', 'Telugu', 'Tamil', 'Malayalam'];
 
 export default function NewspapersScreen() {
   const params = useLocalSearchParams<{ lang?: string }>();
@@ -56,7 +58,13 @@ export default function NewspapersScreen() {
 
   const papersForLanguage =
     activeCategory === 'All' ? papers : papers.filter((p) => p.category === activeCategory);
-  const LANGUAGES = ['All', ...Array.from(new Set(papersForLanguage.map((p) => p.language)))];
+  const availableLanguages = Array.from(new Set(papersForLanguage.map((p) => p.language)));
+  const sortedLanguages = availableLanguages.sort((a, b) => {
+    const indexA = KARNATAKA_LANGUAGE_ORDER.indexOf(a);
+    const indexB = KARNATAKA_LANGUAGE_ORDER.indexOf(b);
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
+  const LANGUAGES = ['All', ...sortedLanguages];
 
   useEffect(() => {
     if (activeLanguage !== 'All' && !LANGUAGES.includes(activeLanguage)) {
@@ -79,14 +87,19 @@ export default function NewspapersScreen() {
       n.name.toLowerCase().includes(search.toLowerCase())
   ).sort((a, b) => {
     if (activeLanguage === 'All') {
-      const ak = a.language === 'Kannada' ? 0 : 1;
-      const bk = b.language === 'Kannada' ? 0 : 1;
-      if (ak !== bk) return ak - bk;
+      // Karnataka-first language order
+      const indexA = KARNATAKA_LANGUAGE_ORDER.indexOf(a.language);
+      const indexB = KARNATAKA_LANGUAGE_ORDER.indexOf(b.language);
+      const langA = indexA === -1 ? 999 : indexA;
+      const langB = indexB === -1 ? 999 : indexB;
+      if (langA !== langB) return langA - langB;
+      // Papers before magazines
       const ac = a.category === 'Paper' ? 0 : 1;
       const bc = b.category === 'Paper' ? 0 : 1;
       if (ac !== bc) return ac - bc;
       return a.name.localeCompare(b.name);
     }
+    // When a specific language is selected, papers before magazines
     const ac2 = a.category === 'Paper' ? 0 : 1;
     const bc2 = b.category === 'Paper' ? 0 : 1;
     if (ac2 !== bc2) return ac2 - bc2;
@@ -233,11 +246,25 @@ export default function NewspapersScreen() {
 
 function PaperCard({ item, deliveries, user, requireAuth }: any) {
   const isSubscribed = user ? deliveries.some((d: any) => d.paperName === item.name && d.name === user.name) : false;
+
+  // Language display mapping (Kannada/English)
+  const getLanguageDisplay = (lang: string) => {
+    const langMap: Record<string, string> = {
+      'Kannada': 'ಕನ್ನಡ/Kannada',
+      'English': 'English',
+      'Hindi': 'हिंदी/Hindi',
+      'Tamil': 'தமிழ்/Tamil',
+      'Telugu': 'తెలుగు/Telugu',
+      'Malayalam': 'മലയാളം/Malayalam',
+    };
+    return langMap[lang] || lang;
+  };
+
   return (
     <TouchableOpacity
       style={styles.paperCard}
       activeOpacity={0.8}
-      onPress={() => requireAuth(() => router.push(`/customer/newspaper/${item.id}` as any))}
+      onPress={() => !isSubscribed && requireAuth(() => router.push(`/customer/subscribe/${item.id}` as any))}
     >
       <View style={[
         styles.logoTile,
@@ -249,24 +276,22 @@ function PaperCard({ item, deliveries, user, requireAuth }: any) {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <View style={{ flex: 1, marginRight: 8 }}>
             <Text style={styles.paperName}>{item.name}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 6, flexWrap: 'wrap' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6, flexWrap: 'wrap' }}>
               <Text style={[
                 styles.langBadge,
                 { backgroundColor: item.category === 'Paper' ? '#EFF6FF' : '#FAF5FF', color: item.category === 'Paper' ? '#2563EB' : '#9333EA' }
               ]}>
-                {item.language}
+                {getLanguageDisplay(item.language)}
               </Text>
               <Text style={styles.paperLang}>• {item.category}</Text>
             </View>
           </View>
-          </View>
+        </View>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <View>
-            {item.priceDay > 0 && <Text style={styles.priceText}>₹{item.priceDay} / day</Text>}
-            <Text style={styles.priceText}>₹{item.priceMonth} / month</Text>
+          <View style={styles.dailyBadge}>
+            <Text style={styles.dailyBadgeText}>Daily</Text>
           </View>
-
           <TouchableOpacity
             style={[
               styles.subBtn,
@@ -367,9 +392,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
     overflow: 'hidden',
+  },
+  dailyBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  dailyBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563EB',
   },
   sectionHeader: {
     flexDirection: 'row',

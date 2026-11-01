@@ -12,6 +12,7 @@ export type AdminOverviewSnapshot = {
   activeSubs: number;
   totalMonthlyRevenue: number;
   pendingCount: number;
+  totalSubscriptionFees: number;
   capturedAt: number;
 };
 
@@ -90,6 +91,7 @@ function isAdminOverviewSnapshot(v: unknown): v is AdminOverviewSnapshot {
     typeof s.activeSubs === 'number' &&
     typeof s.totalMonthlyRevenue === 'number' &&
     typeof s.pendingCount === 'number' &&
+    typeof s.totalSubscriptionFees === 'number' &&
     typeof s.capturedAt === 'number'
   );
 }

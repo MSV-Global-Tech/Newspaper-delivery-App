@@ -311,8 +311,16 @@ export const store = {
   setUser(user: User | null) {
     currentUser = user;
     // Persist to Firestore in background (no await — non-blocking)
-    if (user) saveUser(user).catch(console.warn);
-    setSessionUser(user).catch(() => {});
+    if (user) {
+      console.log('[Store] Setting user:', user.phone);
+      saveUser(user).catch(console.warn);
+      setSessionUser(user).catch((error) => {
+        console.error('[Store] Failed to save session:', error);
+      });
+    } else {
+      console.log('[Store] Clearing user');
+      setSessionUser(null).catch(console.warn);
+    }
     startPaymentsListener(user);
     startUserListener(user);
     notify();

@@ -26,6 +26,7 @@ export interface UserDoc {
   paymentHistory?: CustomerPayment[];
   email?: string;
   password?: string; // Store password for login verification
+  alias?: string; // Admin alias for easy identification
 }
 
 export interface CustomerBillItem {
@@ -95,9 +96,14 @@ export async function updateUser(phone: string, data: Partial<UserDoc>) {
   await updateDoc(doc(db, COL, phone), data);
 }
 
-// ── Delete a user profile ────────────────────────────────────────────────────
+// ── Delete a user profile and related data ──────────────────────────────────
 export async function deleteUser(phone: string) {
+  // Delete the user document
   await deleteDoc(doc(db, COL, phone));
+  
+  // Note: Related data in other collections (deliveries, payments, bills) 
+  // should be cleaned up separately if needed to optimize database storage.
+  // This can be implemented when database size becomes a concern.
 }
 
 // ── Real-time listener for a single user (for customers to receive bill updates) ──
