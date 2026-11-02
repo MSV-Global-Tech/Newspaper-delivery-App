@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, Linking, Alert } from 'react-native';
-import { SkipForward, PauseCircle, Calendar, CreditCard, AlertCircle, ChevronRight, ArrowLeft } from 'lucide-react-native';
-import { FontAwesome } from '@expo/vector-icons';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, Linking } from 'react-native';
+import { Calendar, CreditCard, ChevronRight, ArrowLeft } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { store } from '../../../utils/store';
 
 const ACTIONS = [
-  { label: 'Skip', icon: SkipForward },
-  { label: 'Pause', icon: PauseCircle },
   { label: 'Calendar', icon: Calendar },
   { label: 'Payments', icon: CreditCard },
 ];
@@ -70,7 +67,7 @@ export default function SubscriptionsScreen() {
         language,
         category,
         status: d.status === 'Pending' ? 'Active' : d.status,
-        nextDelivery: d.status === 'Skipped' ? 'Paused' : 'Tomorrow',
+        nextDelivery: 'Tomorrow',
         plan: d.plan || 'Monthly',
         price: d.priceMonth || 180,
         logo_text,
@@ -79,8 +76,12 @@ export default function SubscriptionsScreen() {
       };
     });
 
-  const contactAgent = () => {
-    Linking.openURL('tel:9972505709');
+  const handleAction = (sub: any, action: string) => {
+    if (action === 'Calendar') {
+      router.push('/customer/bottom_nav/calendar');
+    } else if (action === 'Payments') {
+      router.push('/customer/bottom_nav/bills');
+    }
   };
 
   if (!user) {
@@ -147,17 +148,8 @@ export default function SubscriptionsScreen() {
                       <Text style={{ color: '#6B7280', fontSize: 12 }}>Plan: {sub.plan}</Text>
                     </View>
                   </View>
-                  <View style={{ backgroundColor: sub.status === 'Skipped' ? '#FEE2E2' : '#DCFCE7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                    <Text style={{ color: sub.status === 'Skipped' ? '#EF4444' : '#16A34A', fontSize: 11, fontWeight: '700' }}>{sub.status}</Text>
-                  </View>
-                </View>
-
-                {/* Next delivery */}
-                <View style={{ marginHorizontal: 16, marginBottom: 14, backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center' }}>
-                  <AlertCircle size={16} color="#2563EB" />
-                  <View style={{ marginLeft: 10, flex: 1 }}>
-                    <Text style={{ color: '#2563EB', fontSize: 12, fontWeight: '700' }}>Next Delivery</Text>
-                    <Text style={{ color: '#1E40AF', fontSize: 13, fontWeight: '600', marginTop: 2 }}>{sub.nextDelivery}</Text>
+                  <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                    <Text style={{ color: '#16A34A', fontSize: 11, fontWeight: '700' }}>{sub.status}</Text>
                   </View>
                 </View>
 
@@ -175,6 +167,7 @@ export default function SubscriptionsScreen() {
                         backgroundColor: '#FFFFFF',
                       }}
                       activeOpacity={0.6}
+                      onPress={() => handleAction(sub, action.label)}
                     >
                       <action.icon size={18} color="#2563EB" />
                       <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 4, fontWeight: '500' }}>{action.label}</Text>
@@ -190,26 +183,8 @@ export default function SubscriptionsScreen() {
             </View>
           )}
 
-          {/* View Details button */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F3F4F6' }}
-            activeOpacity={0.7}
-          >
-            <Text style={{ color: '#111827', fontWeight: '600', fontSize: 14 }}>Subscription Details & Billing</Text>
-            <ChevronRight size={18} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          {/* Contact Agent button */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEF2FF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E0E7FF', marginTop: 12, gap: 8 }}
-            activeOpacity={0.7}
-            onPress={contactAgent}
-          >
-            <FontAwesome name="phone" size={18} color="#2563EB" />
-            <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 15 }}>Contact Agent (Customer care)</Text>
-          </TouchableOpacity>
+          <View style={{ height: 24 }} />
         </View>
-        <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
   );

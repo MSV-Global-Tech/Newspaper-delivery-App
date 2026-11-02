@@ -8,6 +8,7 @@ import { store, User } from '../../utils/store';
 import { updateVendor, VendorDoc, VendorPayment, VendorBill, VendorBillItem } from '../../database/vendors';
 import { uploadImage } from '../../database/storageHelper';
 import { setSessionUser } from '../../utils/session';
+import { setAdminOverviewSnapshot } from '../../utils/session';
 
 const DashedLine = () => (
   <Text style={{ color: '#9CA3AF', marginVertical: 8, fontSize: 14, opacity: 0.7 }} numberOfLines={1} ellipsizeMode="clip">
@@ -45,8 +46,8 @@ export default function VendorDashboard() {
     return (
       <SafeAreaView style={s.center}>
         <Text>Not authorized</Text>
-        <TouchableOpacity style={s.btn} onPress={() => router.replace('/customer/login')}>
-          <Text style={s.btnTxt}>Go to Login</Text>
+        <TouchableOpacity style={s.btn} onPress={() => router.replace('/vendor/login')}>
+          <Text style={s.btnTxt}>Go to Vendor Login</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -54,6 +55,13 @@ export default function VendorDashboard() {
 
   const handleBack = () => {
     router.back();
+  };
+
+  const handleLogout = () => {
+    store.setUser(null);
+    setSessionUser(null);
+    setAdminOverviewSnapshot(null);
+    router.replace('/vendor/login');
   };
 
   const handleUploadScreenshot = async () => {
@@ -118,9 +126,14 @@ export default function VendorDashboard() {
           <Text style={s.greeting}>Hello, {vendor.name}</Text>
           <Text style={s.subtitle}>Vendor Dashboard</Text>
         </View>
-        <TouchableOpacity onPress={handleBack} style={s.backBtn}>
-          <ArrowLeft size={20} color="#374151" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity onPress={handleLogout} style={s.logoutBtn}>
+            <LogOut size={20} color="#374151" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleBack} style={s.backBtn}>
+            <ArrowLeft size={20} color="#374151" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={s.content}>
@@ -400,6 +413,7 @@ const s = StyleSheet.create({
   greeting: { fontSize: 20, fontWeight: '800', color: '#111827' },
   subtitle: { fontSize: 13, color: '#6B7280', marginTop: 2, fontWeight: '500' },
   backBtn: { padding: 8, backgroundColor: '#F3F4F6', borderRadius: 8 },
+  logoutBtn: { padding: 8, backgroundColor: '#F3F4F6', borderRadius: 8 },
   content: { padding: 16, paddingBottom: 60 },
   card: { backgroundColor: '#FFF', borderRadius: 12, padding: 12, marginBottom: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
 

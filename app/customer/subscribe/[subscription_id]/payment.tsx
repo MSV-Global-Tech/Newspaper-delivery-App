@@ -1,12 +1,17 @@
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Alert, Modal, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Alert, Modal, Linking, Share, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ArrowLeft, CheckCircle, X, Phone, MapPin } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle, X, Phone, MapPin, Download, Share2 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WebView } from 'react-native-webview';
+import { captureRef } from 'react-native-view-shot';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import PaperLogo from '../../../../components/PaperLogo';
 import { store } from '../../../../utils/store';
 import { IMAGES } from '../../../../assets/images';
+import { addDelivery } from '../../../../database/deliveries';
+import { addPayment } from '../../../../database/payments';
+import { updateUser } from '../../../../database/users';
 
 const SUBSCRIPTION_FEE = 50; // Fixed 50 Rs
 
@@ -15,6 +20,10 @@ export default function PaymentScreen() {
   const [papers, setPapers] = useState(store.getPapers());
   const [showPayment, setShowPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentId, setPaymentId] = useState('');
+  const [paymentDate, setPaymentDate] = useState('');
+  const [savingBill, setSavingBill] = useState(false);
+  const billRef = useRef<View>(null);
 
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
@@ -59,9 +68,82 @@ export default function PaymentScreen() {
     setShowPayment(true);
   };
 
-  const handlePaymentSuccess = (paymentId: string) => {
+  const handlePaymentSuccess = async (paymentId: string) => {
     setShowPayment(false);
     setPaymentSuccess(true);
+    setPaymentId(paymentId);
+    setPaymentDate(new Date().toLocaleDateString('en-IN', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric' 
+    }));
+
+    // Save subscription to database
+    try {
+      const user = store.getUser();
+      if (!user?.phone) {
+        console.error('User phone not found');
+        return;
+      }
+
+      const userPhone = user.phone;
+
+      // Add delivery subscription
+      const deliveryId = await addDelivery({
+        name: user.name || '',
+        phone: userPhone,
+        address: user.address || '',
+        paperName: paper.name,
+        imageSrc: paper.imageSrc || '',
+        status: 'Pending',
+        time: 'Daily',
+        plan: 'Daily',
+        startDate: new Date().toISOString(),
+        paymentMethod: 'Razorpay',
+        category: 'Newspaper',
+      });
+
+      // Save payment record
+      await addPayment({
+        customerName: user.name || '',
+        customerPhone: userPhone,
+        amount: SUBSCRIPTION_FEE,
+        method: 'Razorpay',
+        txnId: paymentId,
+        status: 'Paid',
+        forMonth: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+        category: 'Newspaper',
+        paperName: paper.name, // Store the specific paper name
+      });
+
+      // Save bill to user's bills array
+      const currentBills = (user as any).bills || [];
+      const newBill = {
+        id: paymentId,
+        month: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+        totalAmount: SUBSCRIPTION_FEE,
+        status: 'Paid',
+        paidAt: new Date().toISOString(),
+        items: [{
+          id: deliveryId,
+          name: `${paper.name} Subscription`,
+          amount: SUBSCRIPTION_FEE,
+        }],
+        paperName: paper.name,
+        paymentMethod: 'Razorpay',
+        txnId: paymentId,
+      };
+
+      await updateUser(userPhone, {
+        bills: [...currentBills, newBill],
+      } as any);
+
+      console.log('Subscription saved successfully:', deliveryId);
+    } catch (error) {
+      console.error('Error saving subscription:', error);
+      Alert.alert('Error', 'Payment successful but failed to save subscription. Please contact support.');
+    }
+
     Alert.alert('Payment Successful', `Your subscription has been activated! Payment ID: ${paymentId}`);
   };
 
@@ -72,6 +154,74 @@ export default function PaymentScreen() {
 
   const handleCallOwner = () => {
     Linking.openURL(`tel:${ownerContact.phone}`);
+  };
+
+  const handleSaveBill = async () => {
+    try {
+      setSavingBill(true);
+      
+      // Request permission
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant photo library permission to save the bill.');
+        setSavingBill(false);
+        return;
+      }
+
+      // Small delay to ensure view is rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Capture the bill as image
+      const uri = await captureRef(billRef, {
+        format: 'png',
+        quality: 1,
+      });
+
+      // Save to gallery
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      
+      Alert.alert(
+        'Bill Saved!',
+        'Your bill has been saved to your photo gallery.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {},
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error saving bill:', error);
+      Alert.alert('Error', 'Failed to save bill. Please try again.');
+    } finally {
+      setSavingBill(false);
+    }
+  };
+
+  const handleShareBill = async () => {
+    try {
+      setSavingBill(true);
+      
+      // Small delay to ensure view is rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Capture the bill as image
+      const uri = await captureRef(billRef, {
+        format: 'png',
+        quality: 1,
+      });
+
+      // Share the image
+      await Share.share({
+        url: uri,
+        title: 'Newspaper Delivery Bill',
+      });
+    } catch (error) {
+      console.error('Error sharing bill:', error);
+      Alert.alert('Error', 'Failed to share bill. Please try again.');
+    } finally {
+      setSavingBill(false);
+    }
   };
 
   // Razorpay HTML for payment
@@ -85,7 +235,7 @@ export default function PaymentScreen() {
     <body>
       <script>
         var options = {
-          key: 'rzp_live_SuVsRVG2xaLYv4',
+          key: 'rzp_test_SuVuCcW1RgCWJ2',
           amount: ${SUBSCRIPTION_FEE * 100},
           currency: 'INR',
           name: 'Newspaper Delivery',
@@ -114,6 +264,7 @@ export default function PaymentScreen() {
   `;
 
   if (paymentSuccess) {
+    const user = store.getUser();
     return (
       <SafeAreaView style={s.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -135,14 +286,59 @@ export default function PaymentScreen() {
             <Text style={s.successText}>Your subscription for {paper.name} has been activated.</Text>
           </View>
 
-          {/* Newspaper Info */}
-          <View style={s.infoCard}>
-            <PaperLogo id={paper.id} name={paper.name} imageSrc={paper.imageSrc} size={80} />
-            <View style={s.infoText}>
-              <Text style={s.infoTitle}>{paper.name}</Text>
-              <Text style={s.infoSubtitle}>{getLanguageDisplay(paper.language)} • {paper.category}</Text>
-              <Text style={s.infoPrice}>₹{SUBSCRIPTION_FEE} Paid</Text>
-            </View>
+          {/* D-Mart Style Receipt */}
+          <View ref={billRef} style={s.receiptPaper}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
+              <Text style={s.receiptHeader}>NEWSPAPER DELIVERY</Text>
+              <Text style={s.receiptSubHeader}>TAX INVOICE</Text>
+              <Text style={s.dashedLine}>----------------------------------------</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={s.receiptMeta}>BILL NO: #{paymentId.slice(-8).toUpperCase()}</Text>
+                <Text style={s.receiptMeta}>DATE: {paymentDate}</Text>
+              </View>
+              <Text style={s.receiptMeta}>CUSTOMER: {user?.name?.toUpperCase() || 'CUSTOMER'}</Text>
+              <Text style={s.receiptMeta}>PHONE: {user?.phone || 'N/A'}</Text>
+              <Text style={s.receiptMeta}>ADDRESS: {user?.address?.toUpperCase() || 'N/A'}</Text>
+              <Text style={s.dashedLine}>----------------------------------------</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={[s.receiptMeta, { fontWeight: '700' }]}>ITEM</Text>
+                <Text style={[s.receiptMeta, { fontWeight: '700' }]}>AMOUNT</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                <Text style={s.receiptMeta}>{paper.name.toUpperCase()} ({paper.category.toUpperCase()})</Text>
+                <Text style={s.receiptMeta}>₹{SUBSCRIPTION_FEE}.00</Text>
+              </View>
+              <Text style={s.dashedLine}>----------------------------------------</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 }}>
+                <Text style={[s.receiptMeta, { fontSize: 16, fontWeight: '800' }]}>NET AMOUNT</Text>
+                <Text style={[s.receiptMeta, { fontSize: 16, fontWeight: '800' }]}>₹{SUBSCRIPTION_FEE}.00</Text>
+              </View>
+              <Text style={s.dashedLine}>----------------------------------------</Text>
+              <Text style={[s.receiptMeta, { textAlign: 'center', marginTop: 12, fontWeight: '700' }]}>*** THANK YOU ***</Text>
+              <Text style={[s.receiptMeta, { textAlign: 'center', marginTop: 4, fontSize: 10 }]}>Payment ID: {paymentId}</Text>
+              <Text style={[s.receiptMeta, { textAlign: 'center', marginTop: 4, fontSize: 10 }]}>Owner: {ownerContact.phone}</Text>
+            </ScrollView>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={s.actionButtons}>
+            <TouchableOpacity 
+              style={[s.actionButton, s.saveButton]}
+              onPress={handleSaveBill}
+              disabled={savingBill}
+            >
+              <Download size={18} color="#FFFFFF" />
+              <Text style={s.actionButtonText}>{savingBill ? 'Saving...' : 'Save Bill'}</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[s.actionButton, s.shareButton]}
+              onPress={handleShareBill}
+              disabled={savingBill}
+            >
+              <Share2 size={18} color="#FFFFFF" />
+              <Text style={s.actionButtonText}>{savingBill ? 'Sharing...' : 'Share Bill'}</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Owner Contact */}
@@ -493,38 +689,72 @@ const s = StyleSheet.create({
     color: '#166534',
     textAlign: 'center',
   },
-  infoCard: {
-    backgroundColor: '#FFFFFF',
+  receiptPaper: {
+    backgroundColor: '#FAFAFA',
     borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 4,
   },
-  infoText: {
+  receiptHeader: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 18,
+    fontWeight: '900',
+    textAlign: 'center',
+    color: '#000',
+    letterSpacing: 1,
+  },
+  receiptSubHeader: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#374151',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  dashedLine: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 10,
+    color: '#000',
+    marginVertical: 4,
+  },
+  receiptMeta: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 11,
+    color: '#000',
+    marginBottom: 2,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  actionButton: {
     flex: 1,
-    marginLeft: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 8,
   },
-  infoTitle: {
-    fontSize: 16,
+  saveButton: {
+    backgroundColor: '#2563EB',
+  },
+  shareButton: {
+    backgroundColor: '#16A34A',
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 3,
-  },
-  infoSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    marginBottom: 3,
-  },
-  infoPrice: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#16A34A',
   },
   contactCard: {
     backgroundColor: '#FFFFFF',

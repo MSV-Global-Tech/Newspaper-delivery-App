@@ -40,8 +40,6 @@ import {
   X,
   Save,
   ArrowLeft,
-  Eye,
-  EyeOff,
   Store,
   FileText,
   UploadCloud,
@@ -50,7 +48,6 @@ import {
   RefreshCw,
 } from 'lucide-react-native';
 import { store } from '../../../utils/store';
-import { fetchVendorByCode, updateVendor } from '../../../database';
 import { updateCustomerBill } from '../../../database/users';
 
 export default function ProfileScreen() {
@@ -58,7 +55,7 @@ export default function ProfileScreen() {
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
-  const [appVersion, setAppVersion] = useState('1.0.5');
+  const [appVersion, setAppVersion] = useState('1.0.6');
   const [appSettings, setAppSettings] = useState(store.getAppSettings());
 
   // Editable fields in modal
@@ -69,12 +66,6 @@ export default function ProfileScreen() {
   const [editArea, setEditArea] = useState('');
   const [editCity, setEditCity] = useState('');
   const [editPincode, setEditPincode] = useState('');
-
-  // Vendor Login states
-  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
-  const [vendorCode, setVendorCode] = useState('');
-  const [showVendorCode, setShowVendorCode] = useState(false);
-  const [isVerifyingVendor, setIsVerifyingVendor] = useState(false);
 
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
@@ -211,37 +202,6 @@ export default function ProfileScreen() {
 
     setIsEditModalOpen(false);
     Alert.alert('Updated', 'Profile details updated successfully!');
-  };
-
-  const handleVendorLogin = async () => {
-    if (vendorCode.trim().length === 0) return;
-    setIsVerifyingVendor(true);
-    try {
-      const vendor = await fetchVendorByCode(vendorCode.trim());
-      if (vendor) {
-        const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        await updateVendor(vendor.id, { currentSessionToken: sessionToken });
-
-        store.setUser({
-          name: vendor.name,
-          phone: vendor.phone || '',
-          address: vendor.address || '',
-          isAdmin: false,
-          isVendor: true,
-          vendorData: { ...vendor, currentSessionToken: sessionToken },
-          sessionToken: sessionToken,
-        });
-        Alert.alert('Success', 'Vendor Login successful!');
-        setIsVendorModalOpen(false);
-        router.push('/vendor/dashboard' as any);
-      } else {
-        Alert.alert('Error', 'Invalid secret code');
-      }
-    } catch (e) {
-      Alert.alert('Error', 'Login failed');
-    } finally {
-      setIsVerifyingVendor(false);
-    }
   };
 
   const handleLogout = () => {
@@ -541,16 +501,18 @@ export default function ProfileScreen() {
               <Text style={[styles.infoDisplayText, { color: '#475569' }]}>
                 +91 {user?.phone || '9876543210'}
               </Text>
-              <View style={styles.verifiedLock}>
-                <Text style={styles.verifiedLockText}>Verified</Text>
-              </View>
+              {user?.contactedOwner && (
+                <View style={styles.verifiedLock}>
+                  <Text style={styles.verifiedLockText}>Verified</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
 
         {/* ── VENDOR LOGIN SECTION ── */}
         <View style={styles.sectionCard}>
-          <TouchableOpacity style={styles.menuRow} activeOpacity={0.7} onPress={() => setIsVendorModalOpen(true)}>
+          <TouchableOpacity style={styles.menuRow} activeOpacity={0.7} onPress={() => router.push('/vendor/login')}>
             <View style={[styles.menuIconContainer, { backgroundColor: '#F3E8FF' }]}>
               <Store size={18} color="#9333EA" />
             </View>
@@ -565,24 +527,6 @@ export default function ProfileScreen() {
         {/* ── PREFERENCES ── */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionHeaderTitle}>Subscription Controls</Text>
-
-          {/* Manage Subscriptions */}
-          <TouchableOpacity
-            style={styles.menuRow}
-            onPress={() => router.push('/customer/bottom_nav/papers')}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.menuIconContainer, { backgroundColor: '#F0FDF4' }]}>
-              <Calendar size={18} color="#16A34A" />
-            </View>
-            <View style={styles.menuTextContent}>
-              <Text style={styles.menuTitle}>Pause / Skip Deliveries</Text>
-              <Text style={styles.menuSub}>Manage dates & vacation pauses</Text>
-            </View>
-            <ChevronRight size={18} color="#94A3B8" />
-          </TouchableOpacity>
-
-          <View style={styles.itemSeparator} />
 
           {/* Payment Details */}
           <TouchableOpacity
@@ -835,72 +779,6 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
-      </Modal>
-
-      {/* ── VENDOR LOGIN MODAL ── */}
-      <Modal
-        visible={isVendorModalOpen}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsVendorModalOpen(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Store size={18} color="#9333EA" />
-                <Text style={styles.modalTitle}>Vendor Login</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setIsVendorModalOpen(false)}
-                activeOpacity={0.7}
-              >
-                <X size={18} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalFieldGroup}>
-              <Text style={styles.modalLabel}>Secret Vendor Code</Text>
-              <View style={styles.modalInputRow}>
-                <TextInput
-                  style={[styles.modalTextInput, { letterSpacing: 1 }]}
-                  placeholder="Enter your secret code"
-                  placeholderTextColor="#94A3B8"
-                  value={vendorCode}
-                  onChangeText={setVendorCode}
-                  secureTextEntry={!showVendorCode}
-                  autoCapitalize="characters"
-                />
-                <TouchableOpacity onPress={() => setShowVendorCode(!showVendorCode)} style={{ padding: 4 }}>
-                  {showVendorCode ? <EyeOff size={18} color="#64748B" /> : <Eye size={18} color="#64748B" />}
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setIsVendorModalOpen(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalDoneBtn, { backgroundColor: '#9333EA', shadowColor: '#9333EA' }]}
-                onPress={handleVendorLogin}
-                activeOpacity={0.85}
-                disabled={isVerifyingVendor}
-              >
-                <Text style={styles.modalDoneText}>{isVerifyingVendor ? 'Verifying...' : 'Next'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── PAYMENT AMOUNT MODAL ── */}

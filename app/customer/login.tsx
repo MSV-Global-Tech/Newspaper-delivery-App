@@ -543,12 +543,16 @@ export default function LoginScreen() {
 
             {/* Terms & Privacy Links */}
             <View style={s.termsContainer}>
-              <TouchableOpacity style={s.termsLink} onPress={() => router.push('/terms')}>
+              <TouchableOpacity style={s.termsLink} onPress={() => {}}>
                 <Text style={s.termsLinkText}>Terms of Service</Text>
               </TouchableOpacity>
               <Text style={s.termsSeparator}>•</Text>
-              <TouchableOpacity style={s.termsLink} onPress={() => router.push('/privacy')}>
+              <TouchableOpacity style={s.termsLink} onPress={() => {}}>
                 <Text style={s.termsLinkText}>Privacy Policy</Text>
+              </TouchableOpacity>
+              <Text style={s.termsSeparator}>•</Text>
+              <TouchableOpacity style={s.termsLink} onPress={() => router.push('/vendor/login')}>
+                <Text style={s.termsLinkText}>Are you a vendor?</Text>
               </TouchableOpacity>
             </View>
           </View>

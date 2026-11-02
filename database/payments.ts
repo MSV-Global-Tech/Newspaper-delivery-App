@@ -21,6 +21,7 @@ export interface PaymentDoc {
   status: 'Paid' | 'Pending';
   forMonth: string;
   category?: 'Newspaper' | 'Milk' | 'Water';
+  paperName?: string;
   screenshotUrl?: string;
   createdAt?: any;
 }

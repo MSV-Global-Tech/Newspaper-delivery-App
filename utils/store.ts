@@ -47,6 +47,8 @@ export interface User {
   vendorData?: VendorDoc;
   sessionToken?: string;
   email?: string;
+  contactedOwner?: boolean;
+  hasNewBill?: boolean;
 }
 
 export interface Delivery {
@@ -457,7 +459,7 @@ export const store = {
       });
   },
 
-  updateDeliveryStatus(id: string, status: 'Pending' | 'Delivered' | 'Skipped') {
+  updateDeliveryStatus(id: string, status: 'Pending' | 'Delivered') {
     // Optimistic local update for instant UI feedback
     const delivery = deliveries.find(d => d.id === id);
     if (!delivery || !delivery.phone || !delivery.category) {

@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import PaperLogo from '../../../../components/PaperLogo';
 import { store } from '../../../../utils/store';
 import { IMAGES } from '../../../../assets/images';
+import { updateUser } from '../../../../database/users';
 
 const SUBSCRIPTION_FEE = 50; // Fixed 50 Rs
 
@@ -55,11 +56,21 @@ export default function ContactScreen() {
   const handleCallOwner = () => {
     Linking.openURL(`tel:${ownerContact.phone}`);
     setContacted(true);
+    // Save contacted status to Firestore
+    const user = store.getUser();
+    if (user?.phone) {
+      updateUser(user.phone, { contactedOwner: true } as any).catch(err => console.error('Error saving contacted status:', err));
+    }
   };
 
   const handleMessageOwner = () => {
     Linking.openURL(`whatsapp://send?phone=${ownerContact.phone}&text=Hi, I want to subscribe to ${paper.name}`);
     setContacted(true);
+    // Save contacted status to Firestore
+    const user = store.getUser();
+    if (user?.phone) {
+      updateUser(user.phone, { contactedOwner: true } as any).catch(err => console.error('Error saving contacted status:', err));
+    }
   };
 
   const handleProceedToPayment = () => {

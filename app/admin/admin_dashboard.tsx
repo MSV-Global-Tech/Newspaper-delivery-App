@@ -12,7 +12,6 @@ import {
   Share,
   Linking,
 } from 'react-native';
-import * as Location from 'expo-location';
 import {
   Users,
   TrendingUp,
@@ -41,8 +40,6 @@ import {
   Briefcase,
   Settings,
   Database,
-  PauseCircle,
-  SkipForward,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
@@ -77,11 +74,8 @@ export default function AdminScreen() {
   const [newCustomer, setNewCustomer] = useState({
     name: '',
     phone: '',
-    email: '',
     address: '',
-    password: '',
   });
-  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   // Add Paper State
   const [isAddingPaper, setIsAddingPaper] = useState(false);
@@ -314,16 +308,8 @@ export default function AdminScreen() {
       Alert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
-    if (!newCustomer.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newCustomer.email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
     if (!newCustomer.address.trim()) {
       Alert.alert('Error', 'Please enter delivery address');
-      return;
-    }
-    if (!newCustomer.password.trim() || newCustomer.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
       return;
     }
 
@@ -331,9 +317,7 @@ export default function AdminScreen() {
       await saveUser({
         name: newCustomer.name.trim(),
         phone: newCustomer.phone.trim(),
-        email: newCustomer.email.trim(),
         address: newCustomer.address.trim(),
-        password: newCustomer.password.trim(),
         isAdmin: false,
         customerKind: 'legacy',
         approvalStatus: 'approved',
@@ -342,47 +326,9 @@ export default function AdminScreen() {
 
       Alert.alert('Success', 'Customer added successfully!');
       setIsAddCustomerModalOpen(false);
-      setNewCustomer({ name: '', phone: '', email: '', address: '', password: '' });
+      setNewCustomer({ name: '', phone: '', address: '' });
     } catch (error) {
       Alert.alert('Error', 'Failed to add customer. Phone number may already exist.');
-    }
-  };
-
-  const handleDetectLocation = async () => {
-    setIsDetectingLocation(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Please enable location access.');
-        return;
-      }
-      const loc = await Location.getCurrentPositionAsync({});
-      const geo = await Location.reverseGeocodeAsync({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
-
-      if (geo.length > 0 && geo[0]) {
-        const a = geo[0];
-        const parts = [];
-        if (a?.name && !a.name.includes('+') && isNaN(Number(a.name))) parts.push(a.name);
-        if (a?.street && a.street !== a.name) parts.push(a.street);
-        if (a?.subregion && !a.subregion.includes('Division')) parts.push(a.subregion);
-        if (a?.city) parts.push(a.city);
-        if (a?.district && a.district !== a.city) parts.push(a.district);
-        if (a?.postalCode) parts.push(a.postalCode);
-        if (a?.region && !a.region.includes('Division')) parts.push(a.region);
-
-        const fullAddr = parts.filter(Boolean).join(', ');
-        if (fullAddr) {
-          setNewCustomer({ ...newCustomer, address: fullAddr });
-          Alert.alert('Location Detected', 'Address has been auto-filled');
-        }
-      }
-    } catch {
-      Alert.alert('GPS Error', 'Could not detect location automatically.');
-    } finally {
-      setIsDetectingLocation(false);
     }
   };
 
@@ -509,7 +455,7 @@ export default function AdminScreen() {
     );
   };
 
-  const handleUpdateStatus = (id: string, newStatus: 'Delivered' | 'Skipped') => {
+  const handleUpdateStatus = (id: string, newStatus: 'Delivered') => {
     store.updateDeliveryStatus(id, newStatus);
   };
 
@@ -612,26 +558,10 @@ export default function AdminScreen() {
     0
   );
   const pendingCount = deliveries.filter(d => d.status === 'Pending').length;
-  const skippedCount = deliveries.filter(d => d.status === 'Skipped').length;
   
   // Calculate total subscription fees collected (₹50 per subscription)
   const subscriptionFeePerUser = 50;
   const totalSubscriptionFees = activeSubs * subscriptionFeePerUser;
-
-  // Group paused and skipped by customer
-  const pausedByCustomer = (() => {
-    const grouped = new Map<string, typeof deliveries>();
-    deliveries.filter(d => d.status === 'Skipped').forEach(d => {
-      const key = `${d.name}_${d.phone}`;
-      if (!grouped.has(key)) {
-        grouped.set(key, []);
-      }
-      grouped.get(key)!.push(d);
-    });
-    return Array.from(grouped.values());
-  })();
-
-  const [selectedSkipCustomer, setSelectedSkipCustomer] = useState<any>(null);
 
   const computeChange = (current: number, previous: number | null | undefined) => {
     if (previous == null) return { label: null as string | null, trend: null as 'up' | 'down' | null };
@@ -675,7 +605,6 @@ export default function AdminScreen() {
     { label: 'Monthly Revenue', value: `₹${totalMonthlyRevenue.toLocaleString('en-IN')}`, change: revenueChange.label, trend: revenueChange.trend, icon: DollarSign, bg: '#FEF2F2', color: '#DC2626' },
     { label: 'Subscription Fees', value: `₹${totalSubscriptionFees.toLocaleString('en-IN')}`, change: subscriptionFeesChange.label, trend: subscriptionFeesChange.trend, icon: CreditCard, bg: '#F0F9FF', color: '#0EA5E9' },
     { label: 'Pending Delivery', value: pendingCount.toString(), change: pendingChange.label, trend: pendingChange.trend, icon: FileText, bg: '#FFF7ED', color: '#D97706' },
-    { label: 'Skipped Today', value: skippedCount.toString(), change: null, trend: null, icon: SkipForward, bg: '#FEF2F2', color: '#EF4444' },
   ];
 
   const paymentCustomerRows = (() => {
@@ -790,7 +719,6 @@ export default function AdminScreen() {
             { key: 'payments', label: 'Payments', icon: CreditCard },
             { key: 'papers', label: 'Papers', icon: BookOpen },
             { key: 'vendors', label: 'Vendors', icon: Briefcase },
-            { key: 'skipped', label: 'Skipped', icon: SkipForward },
             { key: 'access', label: 'Access', icon: Shield },
             { key: 'maintenance', label: 'Maintenance', icon: Settings },
           ] as const).map(({ key, label, icon: Icon }) => {
@@ -1175,41 +1103,10 @@ export default function AdminScreen() {
               
               <TextInput
                 style={styles.modalInput}
-                placeholder="Email Address"
-                placeholderTextColor="#94A3B8"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={newCustomer.email}
-                onChangeText={(text) => setNewCustomer({ ...newCustomer, email: text })}
-              />
-              
-              <TextInput
-                style={styles.modalInput}
                 placeholder="Delivery Address"
                 placeholderTextColor="#94A3B8"
                 value={newCustomer.address}
                 onChangeText={(text) => setNewCustomer({ ...newCustomer, address: text })}
-              />
-              
-              <TouchableOpacity
-                style={styles.autoDetectBtn}
-                onPress={handleDetectLocation}
-                disabled={isDetectingLocation}
-                activeOpacity={0.8}
-              >
-                <MapPin size={16} color="#2563EB" />
-                <Text style={styles.autoDetectBtnText}>
-                  {isDetectingLocation ? 'Detecting...' : 'Auto-detect Location'}
-                </Text>
-              </TouchableOpacity>
-              
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Password (min 6 characters)"
-                placeholderTextColor="#94A3B8"
-                secureTextEntry
-                value={newCustomer.password}
-                onChangeText={(text) => setNewCustomer({ ...newCustomer, password: text })}
               />
               
               <View style={styles.modalButtons}>
@@ -1217,7 +1114,7 @@ export default function AdminScreen() {
                   style={styles.modalCancelBtn}
                   onPress={() => {
                     setIsAddCustomerModalOpen(false);
-                    setNewCustomer({ name: '', phone: '', email: '', address: '', password: '' });
+                    setNewCustomer({ name: '', phone: '', address: '' });
                   }}
                 >
                   <Text style={styles.modalCancelText}>Cancel</Text>
@@ -1289,13 +1186,11 @@ export default function AdminScreen() {
                     )}
                     <View style={[
                       { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
-                      item.status === 'Delivered' ? { backgroundColor: '#ECFDF5' } :
-                        item.status === 'Skipped' ? { backgroundColor: '#FEF2F2' } : { backgroundColor: '#FFF7ED' }
+                      item.status === 'Delivered' ? { backgroundColor: '#ECFDF5' } : { backgroundColor: '#FFF7ED' }
                     ]}>
                       <Text style={[
                         { fontSize: 10, fontWeight: '700' },
-                        item.status === 'Delivered' ? { color: '#16A34A' } :
-                          item.status === 'Skipped' ? { color: '#EF4444' } : { color: '#D97706' }
+                        item.status === 'Delivered' ? { color: '#16A34A' } : { color: '#D97706' }
                       ]}>{item.status}</Text>
                     </View>
                     <ChevronRight size={14} color="#CBD5E1" />
@@ -1325,13 +1220,11 @@ export default function AdminScreen() {
               {/* Status badge */}
               <View style={[
                 { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-                selectedDelivery?.status === 'Delivered' ? { backgroundColor: '#ECFDF5' } :
-                  selectedDelivery?.status === 'Skipped' ? { backgroundColor: '#FEF2F2' } : { backgroundColor: '#FFF7ED' }
+                selectedDelivery?.status === 'Delivered' ? { backgroundColor: '#ECFDF5' } : { backgroundColor: '#FFF7ED' }
               ]}>
                 <Text style={[
                   { fontSize: 12, fontWeight: '800' },
-                  selectedDelivery?.status === 'Delivered' ? { color: '#16A34A' } :
-                    selectedDelivery?.status === 'Skipped' ? { color: '#EF4444' } : { color: '#D97706' }
+                  selectedDelivery?.status === 'Delivered' ? { color: '#16A34A' } : { color: '#D97706' }
                 ]}>{selectedDelivery?.status}</Text>
               </View>
             </View>
@@ -1654,40 +1547,6 @@ export default function AdminScreen() {
           </View>
         )}
 
-        {activeTab === 'skipped' && (
-          <View style={styles.container}>
-            <Text style={styles.sectionTitle}>Skipped Deliveries</Text>
-            {pausedByCustomer.length === 0 ? (
-              <View style={{ alignItems: 'center', padding: 40 }}>
-                <SkipForward size={48} color="#CBD5E1" />
-                <Text style={{ fontSize: 14, color: '#64748B', marginTop: 12 }}>No skipped deliveries today</Text>
-              </View>
-            ) : (
-              pausedByCustomer.map((items, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.paperCatalogItem}
-                  onPress={() => setSelectedSkipCustomer(items[0])}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.paperLogoBox, { backgroundColor: '#FEF2F2', width: 40, height: 40, borderRadius: 20 }]}>
-                    <SkipForward size={20} color="#EF4444" />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.custName}>{items[0].name}</Text>
-                    <Text style={styles.custAddress}>+91 {items[0].phone}</Text>
-                    <Text style={styles.custAddress}>{items[0].address}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#EF4444' }}>{items.length}</Text>
-                    <Text style={{ fontSize: 11, color: '#64748B' }}>skipped</Text>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
-        )}
-
         {activeTab === 'access' && (
           <View style={styles.container}>
             <Text style={styles.sectionTitle}>Manage Admin Access</Text>
@@ -1755,42 +1614,6 @@ export default function AdminScreen() {
             })}
           </View>
         )}
-
-        {/* Customer Detail Modal */}
-        <Modal
-          visible={!!selectedSkipCustomer}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setSelectedSkipCustomer(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={styles.modalTitle}>Customer Details</Text>
-                <TouchableOpacity onPress={() => setSelectedSkipCustomer(null)}>
-                  <X size={20} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              {selectedSkipCustomer && (
-                <>
-                  <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, marginBottom: 8 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>{selectedSkipCustomer.name}</Text>
-                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>+91 {selectedSkipCustomer.phone}</Text>
-                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{selectedSkipCustomer.address}</Text>
-                  </View>
-                  <View style={{ backgroundColor: '#FEF2F2', padding: 10, borderRadius: 8 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#DC2626', marginBottom: 4 }}>
-                      🗑️ Skipped: {selectedSkipCustomer.paperName}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: '#64748B' }}>
-                      {selectedSkipCustomer.plan} • ₹{selectedSkipCustomer.priceMonth}/mo
-                    </Text>
-                  </View>
-                </>
-              )}
-            </View>
-          </View>
-        </Modal>
 
         {activeTab === 'maintenance' && (
           <View style={styles.container}>
@@ -2092,8 +1915,8 @@ export default function AdminScreen() {
                         {s.plan || 'Monthly'}  •  ₹{Math.round((typeof s.priceMonth === 'number' && isFinite(s.priceMonth) ? s.priceMonth : 0)).toLocaleString('en-IN')}/mo
                       </Text>
                     </View>
-                    <View style={[styles.subStatusPill, s.status === 'Delivered' ? styles.subStatusDelivered : s.status === 'Skipped' ? styles.subStatusSkipped : styles.subStatusPending]}>
-                      <Text style={[styles.subStatusText, s.status === 'Delivered' ? styles.subStatusTextDelivered : s.status === 'Skipped' ? styles.subStatusTextSkipped : styles.subStatusTextPending]}>
+                    <View style={[styles.subStatusPill, s.status === 'Delivered' ? styles.subStatusDelivered : styles.subStatusPending]}>
+                      <Text style={[styles.subStatusText, s.status === 'Delivered' ? styles.subStatusTextDelivered : styles.subStatusTextPending]}>
                         {s.status}
                       </Text>
                     </View>
@@ -2853,23 +2676,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  autoDetectBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  autoDetectBtnText: {
-    color: '#2563EB',
-    fontSize: 13,
-    fontWeight: '600',
-  },
 
   custCard: {
     backgroundColor: '#FFFFFF',
@@ -2903,10 +2709,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   badgeDelivered: { backgroundColor: '#D1FAE5' },
-  badgeSkipped: { backgroundColor: '#FEE2E2' },
   badgeText: { fontSize: 10, fontWeight: '800', color: '#D97706' },
   badgeTextDelivered: { color: '#065F46' },
-  badgeTextSkipped: { color: '#991B1B' },
 
   custActions: {
     flexDirection: 'row',
@@ -3297,9 +3101,6 @@ const styles = StyleSheet.create({
   subStatusDelivered: {
     backgroundColor: '#D1FAE5',
   },
-  subStatusSkipped: {
-    backgroundColor: '#FEE2E2',
-  },
   subStatusPending: {
     backgroundColor: '#DBEAFE',
   },
@@ -3309,9 +3110,6 @@ const styles = StyleSheet.create({
   },
   subStatusTextDelivered: {
     color: '#065F46',
-  },
-  subStatusTextSkipped: {
-    color: '#991B1B',
   },
   subStatusTextPending: {
     color: '#1D4ED8',

@@ -14,7 +14,6 @@ import {
   ChevronRight,
   Calendar as CalendarIcon,
   XCircle,
-  PauseCircle,
   ArrowLeft,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -97,12 +96,7 @@ export default function CalendarScreen() {
 
   const toggleMarkNotDelivered = (dayNum: number) => {
     const dateKey = `${currentYear}-${currentMonth + 1}-${dayNum}`;
-    store.setCalendarMark(dateKey, 'Skipped');
-  };
-
-  const togglePauseDay = (dayNum: number) => {
-    const dateKey = `${currentYear}-${currentMonth + 1}-${dayNum}`;
-    store.setCalendarMark(dateKey, 'Paused');
+    store.setCalendarMark(dateKey, 'Not Delivered');
   };
 
   const selectedStatus = getDayStatus(selectedDay);
@@ -127,7 +121,7 @@ export default function CalendarScreen() {
             Calendar Access
           </Text>
           <Text style={{ fontSize: 15, color: '#64748B', textAlign: 'center', marginBottom: 40, lineHeight: 22 }}>
-            Log in to view your daily delivery schedule, pause deliveries for vacations, and track past orders.
+            Log in to view your daily delivery schedule and track past orders.
           </Text>
           <TouchableOpacity
             style={{ backgroundColor: '#2563EB', paddingVertical: 18, paddingHorizontal: 32, borderRadius: 16, width: '100%', alignItems: 'center', shadowColor: '#2563EB', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 4 }}
@@ -157,7 +151,7 @@ export default function CalendarScreen() {
 
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Delivery Calendar</Text>
-          <Text style={styles.headerSub}>Track & pause daily newspapers</Text>
+          <Text style={styles.headerSub}>Track daily newspapers</Text>
         </View>
 
         <TouchableOpacity style={styles.todayBtn} onPress={handleJumpToToday} activeOpacity={0.8}>
@@ -221,12 +215,8 @@ export default function CalendarScreen() {
                   bgColor = '#22C55E';
                   textColor = '#FFFFFF';
                   isMarked = true;
-                } else if (status === 'Skipped') {
+                } else if (status === 'Not Delivered') {
                   bgColor = '#EF4444';
-                  textColor = '#FFFFFF';
-                  isMarked = true;
-                } else if (status === 'Paused') {
-                  bgColor = '#F59E0B';
                   textColor = '#FFFFFF';
                   isMarked = true;
                 }
@@ -274,16 +264,8 @@ export default function CalendarScreen() {
                 <Text style={styles.legendText}>Delivered</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#2563EB' }]} />
-                <Text style={styles.legendText}>Scheduled</Text>
-              </View>
-              <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} />
-                <Text style={styles.legendText}>Skipped</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#D97706' }]} />
-                <Text style={styles.legendText}>Paused</Text>
+                <Text style={styles.legendText}>Not Delivered</Text>
               </View>
             </View>
           </View>
@@ -304,8 +286,7 @@ export default function CalendarScreen() {
                 style={[
                   styles.statusBadge,
                   selectedStatus === 'Delivered' && { backgroundColor: '#DCFCE7' },
-                  selectedStatus === 'Skipped' && { backgroundColor: '#FEE2E2' },
-                  selectedStatus === 'Paused' && { backgroundColor: '#FEF3C7' },
+                  selectedStatus === 'Not Delivered' && { backgroundColor: '#FEE2E2' },
                   (selectedStatus === 'Scheduled' || selectedStatus === 'Pending') && { backgroundColor: '#EFF6FF' },
                 ]}
               >
@@ -313,8 +294,7 @@ export default function CalendarScreen() {
                   style={[
                     styles.statusBadgeText,
                     selectedStatus === 'Delivered' && { color: '#15803D' },
-                    selectedStatus === 'Skipped' && { color: '#B91C1C' },
-                    selectedStatus === 'Paused' && { color: '#B45309' },
+                    selectedStatus === 'Not Delivered' && { color: '#B91C1C' },
                     (selectedStatus === 'Scheduled' || selectedStatus === 'Pending') && { color: '#1E40AF' },
                   ]}
                 >
@@ -347,7 +327,7 @@ export default function CalendarScreen() {
               <TouchableOpacity
                 style={[
                   styles.actionBtn,
-                  selectedStatus === 'Skipped' ? styles.actionBtnActiveRed : styles.actionBtnOutlineRed,
+                  selectedStatus === 'Not Delivered' ? styles.actionBtnActiveRed : styles.actionBtnOutlineRed,
                 ]}
                 onPress={() => toggleMarkNotDelivered(selectedDay)}
                 activeOpacity={0.8}
@@ -356,32 +336,13 @@ export default function CalendarScreen() {
                 <Text
                   style={[
                     styles.actionBtnText,
-                    selectedStatus === 'Skipped' ? styles.textWhite : { color: '#DC2626' },
+                    selectedStatus === 'Not Delivered' ? styles.textWhite : { color: '#DC2626' },
                   ]}
                 >
                   Not Delivered
                 </Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  selectedStatus === 'Paused' ? styles.actionBtnActiveYellow : styles.actionBtnOutlineYellow,
-                  { marginTop: 8 }
-                ]}
-                onPress={() => togglePauseDay(selectedDay)}
-                activeOpacity={0.8}
-              >
-                <PauseCircle size={13} color={selectedStatus === 'Paused' ? '#FFFFFF' : '#D97706'} />
-                <Text
-                  style={[
-                    styles.actionBtnText,
-                    selectedStatus === 'Paused' ? styles.textWhite : { color: '#D97706' },
-                  ]}
-                >
-                  {selectedStatus === 'Paused' ? 'End Pause' : 'Pause Date'}
-                </Text>
-              </TouchableOpacity>
           </View>
       </ScrollView>
     </SafeAreaView>

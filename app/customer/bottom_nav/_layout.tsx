@@ -3,6 +3,7 @@ import { Home, Newspaper, Calendar as CalendarIcon, User, Settings, Package, Rec
 import { useState, useEffect } from 'react';
 import { store } from '../../../utils/store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 
 export default function TabLayout() {
   const getInitialUser = () => {
@@ -82,7 +83,24 @@ export default function TabLayout() {
         name="bills"
         options={{
           title: 'My Bills',
-          tabBarIcon: ({ color }) => <Receipt size={22} color={color} />,
+          tabBarIcon: ({ color }) => (
+            <View>
+              <Receipt size={22} color={color} />
+              {user?.hasNewBill && (
+                <View style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  width: 10,
+                  height: 10,
+                  backgroundColor: '#EF4444',
+                  borderRadius: 5,
+                  borderWidth: 2,
+                  borderColor: '#FFFFFF',
+                }} />
+              )}
+            </View>
+          ),
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {

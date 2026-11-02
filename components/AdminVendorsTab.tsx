@@ -70,16 +70,28 @@ export default function AdminVendorsTab() {
   const handleCreateVendor = async () => {
     if (!newName.trim()) { Alert.alert('Error', 'Please enter a vendor name.'); return; }
     if (!newLocation.trim()) { Alert.alert('Error', 'Please enter a location.'); return; }
-    const secretCode = generateCode(vendors);
+    if (!newPhone.trim()) { Alert.alert('Error', 'Please enter a phone number.'); return; }
+    if (newPhone.trim().length !== 10) { Alert.alert('Error', 'Phone number must be 10 digits.'); return; }
+    
+    // Check if phone number already exists
+    const phoneExists = vendors.some(v => v.phone === newPhone.trim());
+    if (phoneExists) {
+      Alert.alert('Error', 'This phone number is already used by another vendor.');
+      return;
+    }
+    
+    const vendorId = generateCode(vendors); // VEND001, VEND002, etc.
+    const secretCode = newPhone.trim().slice(-4); // Last 4 digits as secret code
     const vendorData: VendorDoc = {
-      id: secretCode, name: newName.trim(), address: newLocation.trim(),
-      phone: newPhone.trim() || undefined,
-      secretCode, paymentHistory: [], createdAt: new Date().toISOString(),
+      id: vendorId, name: newName.trim(), address: newLocation.trim(),
+      phone: newPhone.trim(),
+      secretCode, // Last 4 digits of phone
+      paymentHistory: [], createdAt: new Date().toISOString(),
     };
     try {
       await saveVendor(vendorData);
       setNewName(''); setNewLocation(''); setNewPhone(''); setIsAddingVendor(false);
-      Alert.alert('Vendor Created!', `Secret Code: ${secretCode}\n\nTap the vendor card to set payment amount and deadline.`);
+      Alert.alert('Vendor Created!', `Vendor ID: ${vendorId}\nSecret Code: ${secretCode} (Last 4 digits of phone)\n\nTap the vendor card to set payment amount and deadline.`);
     } catch (e: any) { Alert.alert('Error', e.message); }
   };
 
@@ -245,7 +257,8 @@ export default function AdminVendorsTab() {
 
   const filteredVendors = vendors.filter(v => {
     const matchesSearch = v.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          v.secretCode.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          v.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          v.secretCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (v.address && v.address.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesLocation = selectedLocationFilter ? v.address?.trim() === selectedLocationFilter : true;
     return matchesSearch && matchesLocation;
@@ -305,7 +318,8 @@ export default function AdminVendorsTab() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.vendorRowName}>{vendor.name}</Text>
-                    <Text style={s.vendorRowCode}>{vendor.secretCode}</Text>
+                    <Text style={s.vendorRowCode}>Vendor ID: {vendor.id}</Text>
+                    <Text style={s.vendorRowCode}>Secret Code: {vendor.secretCode}</Text>
                     {vendor.address ? <Text style={s.vendorRowLoc}>{vendor.address}</Text> : null}
                     {vendor.phone ? <Text style={s.vendorRowLoc}>{vendor.phone}</Text> : null}
                   </View>
@@ -335,7 +349,8 @@ export default function AdminVendorsTab() {
             </TouchableOpacity>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={s.title}>{selectedVendor.name}</Text>
-              <Text style={s.detailCode}>{selectedVendor.secretCode}</Text>
+              <Text style={s.detailCode}>Vendor ID: {selectedVendor.id}</Text>
+              <Text style={s.detailCode}>Secret Code: {selectedVendor.secretCode}</Text>
             </View>
             <TouchableOpacity onPress={handleDeleteVendor} style={[s.backBtn, { backgroundColor: '#FEE2E2' }]}>
               <Trash2 size={18} color="#EF4444" />
@@ -481,8 +496,11 @@ export default function AdminVendorsTab() {
             <TextInput style={s.inp} value={newName} onChangeText={setNewName} placeholder="e.g. Masen Agencies" placeholderTextColor="#9CA3AF" autoFocus />
             <Text style={s.lbl}>Location *</Text>
             <TextInput style={s.inp} value={newLocation} onChangeText={setNewLocation} placeholder="e.g. Chennai, Anna Nagar" placeholderTextColor="#9CA3AF" />
-            <Text style={s.lbl}>Phone Number</Text>
-            <TextInput style={s.inp} value={newPhone} onChangeText={setNewPhone} placeholder="e.g. 9876543210" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" />
+            <Text style={s.lbl}>Phone Number *</Text>
+            <TextInput style={s.inp} value={newPhone} onChangeText={(text) => {
+              const numericText = text.replace(/[^0-9]/g, '');
+              setNewPhone(numericText);
+            }} placeholder="e.g. 9876543210" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" maxLength={10} />
             {uniqueLocations.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll} contentContainerStyle={s.chipContent}>
                 {uniqueLocations.map((loc, idx) => (
@@ -493,7 +511,7 @@ export default function AdminVendorsTab() {
               </ScrollView>
             )}
             <TouchableOpacity style={s.saveBtn} onPress={handleCreateVendor}>
-              <Text style={s.saveBtnTxt}>Create Vendor and Generate Code</Text>
+              <Text style={s.saveBtnTxt}>Create Vendor</Text>
             </TouchableOpacity>
           </View>
         </View>

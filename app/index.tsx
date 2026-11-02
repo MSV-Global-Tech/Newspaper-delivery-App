@@ -86,13 +86,13 @@ export default function OnboardingScreen() {
 
   const goNext = () => {
     const next = Math.min(activeIndex + 1, SLIDES.length - 1);
+    setActiveIndex(next);
     if (listRef.current) {
-      listRef.current.scrollToOffset({
-        offset: next * width,
+      listRef.current.scrollToIndex({
+        index: next,
         animated: true,
       });
     }
-    setActiveIndex(next);
   };
 
   const onGetStarted = async () => {

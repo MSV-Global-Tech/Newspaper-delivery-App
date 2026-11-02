@@ -19,8 +19,6 @@ import {
   ChevronDown,
   CheckCircle2,
   ChevronRight,
-  PauseCircle,
-  SkipForward,
   X,
 } from 'lucide-react-native';
 import { FontAwesome } from '@expo/vector-icons';
@@ -33,8 +31,8 @@ import { checkForUpdate, type RemoteVersionInfo } from '../../../utils/updateChe
 
 
 const QUICK_ACTIONS: any[] = [
-  { id: 'skip', label: 'Skip\nTomorrow', icon: SkipForward, bg: '#EEF2FF', color: '#2563EB' },
-  { id: 'pause', label: 'Pause', icon: PauseCircle, bg: '#FFF7ED', color: '#EA580C' },
+  { id: 'address', label: 'My Address', subtitle: 'Update location', icon: FontAwesome, iconName: 'home', bg: '#EEF2FF', color: '#2563EB' },
+  { id: 'subscribe', label: 'Subscribe Now', subtitle: 'Add new paper', icon: FontAwesome, iconName: 'check-circle', bg: '#FFF7ED', color: '#FB923C' },
   { id: 'call', label: 'Call Agent', subtitle: 'Customer care', icon: FontAwesome, iconName: 'phone', bg: '#EEF2FF', color: '#2563EB' },
   {
     id: 'whatsapp',
@@ -76,10 +74,10 @@ const APP_FEATURES = [
   },
   {
     id: '3',
-    tag: 'Flexibility',
-    title: 'Skip or Pause\nAnytime',
-    desc: 'Going on vacation? Skip delivery with a single tap.',
-    image: require('../../../assets/skip.webp'),
+    tag: 'Convenience',
+    title: 'Doorstep Delivery',
+    desc: 'Get your newspaper delivered to your doorstep every morning.',
+    image: require('../../../assets/delivery.webp'),
   },
   {
     id: '4',
@@ -121,7 +119,7 @@ export default function HomeScreen() {
         message:
           '📰 Daily newspaper delivery to your doorstep!\n\n' +
           'Subscribe to 40+ papers in Kannada, English, Hindi, Tamil, Telugu & Malayalam. ' +
-          'Skip or pause anytime. Get your paper by 6:30 AM every morning.\n\n' +
+          'Get your paper by 6:30 AM every morning.\n\n' +
           'Download the app now:\n' +
           'https://play.google.com/store/apps/details?id=com.newspaper.deliveryapp',
       });
@@ -185,24 +183,18 @@ export default function HomeScreen() {
       whatsappAgent();
       return;
     }
+    if (action.id === 'subscribe') {
+      router.push('/customer/newspapers');
+      return;
+    }
+    if (action.id === 'address') {
+      router.push('/customer/bottom_nav/profile');
+      return;
+    }
 
     if (action.route) {
       router.push(action.route);
       return;
-    }
-
-    if (!user && (action.id === 'skip' || action.id === 'pause')) {
-      router.push('/customer/login');
-      return;
-    }
-
-    if (!currentDelivery && (action.id === 'skip' || action.id === 'pause')) {
-      Alert.alert('No Subscription', 'You don\'t have any active deliveries to skip or pause.');
-      return;
-    }
-
-    if (action.id === 'skip' || action.id === 'pause') {
-      router.push('/customer/manage_subscription');
     }
   };
 
@@ -248,21 +240,9 @@ export default function HomeScreen() {
               <Text style={styles.updateBtnText}>Download Update</Text>
             </TouchableOpacity>
 
-            {!updateInfo?.mandatory && (
-              <TouchableOpacity
-                style={styles.updateSkipBtn}
-                onPress={() => setUpdateInfo(null)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.updateSkipText}>Remind me later</Text>
-              </TouchableOpacity>
-            )}
-
-            {updateInfo?.mandatory && (
-              <Text style={styles.updateMandatoryNote}>
-                This update is required to continue using the app.
-              </Text>
-            )}
+            <Text style={styles.updateMandatoryNote}>
+              This update is required to continue using the app.
+            </Text>
           </View>
         </View>
       </Modal>
@@ -505,7 +485,7 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={index}
                     style={styles.activeCard}
-                    onPress={() => router.push('/customer/manage_subscription')}
+                    onPress={() => router.push('/customer/bottom_nav/papers')}
                     activeOpacity={0.8}
                   >
                     <View style={styles.logoWrapper}>
@@ -556,16 +536,9 @@ export default function HomeScreen() {
               {
                 step: '3',
                 title: 'Delivered to Your Door',
-                desc: 'We drop your paper every morning by 6:30 AM — rain or shine, no excuses.',
+                desc: 'Your newspaper is delivered every morning to your doorstep.',
                 tintBg: '#FEF3C7',
                 tintText: '#B45309',
-              },
-              {
-                step: '4',
-                title: 'Skip or Pause Anytime',
-                desc: 'Going out of town? Skip a day or pause your subscription with a single tap.',
-                tintBg: '#F5F3FF',
-                tintText: '#6D28D9',
               },
             ].map((s, i) => (
               <View key={s.step} style={[styles.howPointRow, i !== 0 && styles.howPointRowDivider]}>
@@ -801,7 +774,7 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     borderWidth: 0,
     overflow: 'visible',
-    padding: 0,
+    padding: 8,
   },
   bannerMediaImage: {
     width: '100%',
@@ -916,7 +889,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    padding: 0,
+    padding: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1101,10 +1074,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  updateSkipBtn: {
+  updateRemindBtn: {
     paddingVertical: 8,
   },
-  updateSkipText: {
+  updateRemindText: {
     color: '#94A3B8',
     fontSize: 13,
     fontWeight: '600',

@@ -15,7 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../../../database/storageHelper';
-import { updateCustomerBill, listenUser } from '../../../database/users';
+import { updateCustomerBill, listenUser, updateUser } from '../../../database/users';
+import { listenPayments } from '../../../database/payments';
 import { store } from '../../../utils/store';
 import {
   FileText,
@@ -31,6 +32,7 @@ import {
 export default function BillsScreen() {
   const [user, setUser] = useState(store.getUser() as any);
   const [bills, setBills] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [selectedBill, setSelectedBill] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'unpaid' | 'history'>('unpaid');
@@ -44,30 +46,60 @@ export default function BillsScreen() {
       const u = store.getUser() as any;
       setUser(u);
       if (u?.bills) setBills(u.bills);
+      
+      // Clear the hasNewBill flag when bills screen is opened
+      if (u?.hasNewBill && u?.phone) {
+        updateUser(u.phone, { hasNewBill: false });
+      }
     });
 
     // Also directly listen to Firestore for this user's doc
     // This guarantees bills appear even if store listener hasn't merged yet
     const currentUser = store.getUser();
     let unsubFirestore: (() => void) | null = null;
+    let unsubPayments: (() => void) | null = null;
     if (currentUser?.phone) {
       unsubFirestore = listenUser(currentUser.phone, (doc) => {
         if (doc && (doc as any).bills) {
           setBills((doc as any).bills);
         }
       });
+
+      // Listen to payments for subscription payments
+      unsubPayments = listenPayments((paymentDocs) => {
+        setPayments(paymentDocs);
+      }, { customerPhone: currentUser.phone });
     }
 
     return () => {
       unsubStore();
       if (unsubFirestore) unsubFirestore();
+      if (unsubPayments) unsubPayments();
     };
   }, []);
 
   const unpaidBills = user ? bills.filter((b: any) => b.status !== 'Paid') : [];
-  const paidBills = user ? bills
-    .filter((b: any) => b.status === 'Paid')
-    .sort((a: any, b: any) => new Date(b.paidAt || b.date || 0).getTime() - new Date(a.paidAt || a.date || 0).getTime()) : [];
+  const paidBills = user ? [
+    ...bills
+      .filter((b: any) => b.status === 'Paid')
+      .sort((a: any, b: any) => new Date(b.paidAt || b.date || 0).getTime() - new Date(a.paidAt || a.date || 0).getTime())
+      .map((b: any) => ({
+        ...b,
+        source: 'bill',
+      })),
+    ...payments
+      .filter((p: any) => p.status === 'Paid')
+      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .map((p: any) => ({
+        id: p.id,
+        month: p.forMonth,
+        totalAmount: p.amount,
+        paidAt: p.createdAt,
+        status: 'Paid',
+        source: 'payment',
+        paperName: p.category === 'Newspaper' ? 'Newspaper Subscription' : p.category,
+      }))
+  ] : [];
 
   const handleUploadScreenshot = async (bill: any) => {
     setBillForPayment(bill);
@@ -223,7 +255,9 @@ export default function BillsScreen() {
                 <View key={bill.id} style={[styles.billCard, styles.paidBillCard]}>
                   <View style={styles.billTopRow}>
                     <View>
-                      <Text style={[styles.billMonth, { color: '#166534' }]}>{bill.month}</Text>
+                      <Text style={[styles.billMonth, { color: '#166534' }]}>
+                        {bill.source === 'payment' ? bill.paperName : bill.month}
+                      </Text>
                       <Text style={styles.billDate}>
                         Paid: {new Date(bill.paidAt || bill.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </Text>
@@ -234,7 +268,9 @@ export default function BillsScreen() {
                   </View>
                   <View style={styles.paidRow}>
                     <CheckCircle size={16} color="#10B981" />
-                    <Text style={styles.paidLabel}>Payment Verified by Admin</Text>
+                    <Text style={styles.paidLabel}>
+                      {bill.source === 'payment' ? 'Subscription Payment (Razorpay)' : 'Payment Verified by Admin'}
+                    </Text>
                   </View>
                   <TouchableOpacity style={styles.viewBillBtn} onPress={() => setSelectedBill(bill)}>
                     <FileText size={14} color="#475569" />
@@ -327,30 +363,48 @@ export default function BillsScreen() {
                   <Text style={styles.receiptSubHeader}>TAX INVOICE</Text>
                   <Text style={styles.dashedLine}>----------------------------------------</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={styles.receiptMeta}>BILL NO: {selectedBill.id.slice(-6).toUpperCase()}</Text>
-                    <Text style={styles.receiptMeta}>DATE: {new Date(selectedBill.date).toLocaleDateString()}</Text>
+                    <Text style={styles.receiptMeta}>BILL NO: #{selectedBill.id.slice(-8).toUpperCase()}</Text>
+                    <Text style={styles.receiptMeta}>DATE: {new Date(selectedBill.date || selectedBill.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
                   </View>
-                  <Text style={styles.receiptMeta}>CUSTOMER: {user?.name?.toUpperCase()}</Text>
-                  <Text style={styles.receiptMeta}>MONTH: {selectedBill.month?.toUpperCase()}</Text>
+                  <Text style={styles.receiptMeta}>CUSTOMER: {user?.name?.toUpperCase() || 'CUSTOMER'}</Text>
+                  <Text style={styles.receiptMeta}>PHONE: {user?.phone || 'N/A'}</Text>
+                  <Text style={styles.receiptMeta}>ADDRESS: {user?.address?.toUpperCase() || 'N/A'}</Text>
                   <Text style={styles.dashedLine}>----------------------------------------</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
                     <Text style={[styles.receiptMeta, { fontWeight: '700' }]}>ITEM</Text>
                     <Text style={[styles.receiptMeta, { fontWeight: '700' }]}>AMOUNT</Text>
                   </View>
-                  {(selectedBill.items || []).map((item: any) => (
-                    <View key={item.id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <Text style={styles.receiptMeta}>{item.name.toUpperCase()}</Text>
-                      <Text style={styles.receiptMeta}>₹{Number(item.amount).toFixed(2)}</Text>
+                  
+                  {selectedBill.source === 'payment' ? (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <Text style={styles.receiptMeta}>{selectedBill.paperName?.toUpperCase() || 'NEWSPAPER SUBSCRIPTION'}</Text>
+                      <Text style={styles.receiptMeta}>₹{Number(selectedBill.amount).toFixed(2)}</Text>
                     </View>
-                  ))}
+                  ) : (
+                    (selectedBill.items || []).map((item: any) => (
+                      <View key={item.id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <Text style={styles.receiptMeta}>{item.name.toUpperCase()}</Text>
+                        <Text style={styles.receiptMeta}>₹{Number(item.amount).toFixed(2)}</Text>
+                      </View>
+                    ))
+                  )}
+                  
                   <Text style={styles.dashedLine}>----------------------------------------</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 }}>
                     <Text style={[styles.receiptMeta, { fontSize: 16, fontWeight: '800' }]}>NET AMOUNT</Text>
-                    <Text style={[styles.receiptMeta, { fontSize: 16, fontWeight: '800' }]}>₹{Number(selectedBill.totalAmount).toFixed(2)}</Text>
+                    <Text style={[styles.receiptMeta, { fontSize: 16, fontWeight: '800' }]}>₹{Number(selectedBill.totalAmount || selectedBill.amount).toFixed(2)}</Text>
                   </View>
                   <Text style={styles.dashedLine}>----------------------------------------</Text>
                   <Text style={[styles.receiptMeta, { textAlign: 'center', marginTop: 12, fontWeight: '700' }]}>*** THANK YOU ***</Text>
-                  <Text style={[styles.receiptMeta, { textAlign: 'center', marginTop: 4, fontSize: 10 }]}>Please pay via UPI on the main screen</Text>
+                  {selectedBill.source === 'payment' && (
+                    <>
+                      <Text style={[styles.receiptMeta, { textAlign: 'center', marginTop: 4, fontSize: 10 }]}>Payment ID: {selectedBill.txnId || 'N/A'}</Text>
+                      <Text style={[styles.receiptMeta, { textAlign: 'center', marginTop: 4, fontSize: 10 }]}>Payment Method: {selectedBill.method?.toUpperCase() || 'RAZORPAY'}</Text>
+                    </>
+                  )}
+                  {selectedBill.source !== 'payment' && (
+                    <Text style={[styles.receiptMeta, { textAlign: 'center', marginTop: 4, fontSize: 10 }]}>Please pay via UPI on the main screen</Text>
+                  )}
                 </ScrollView>
                 <View style={styles.receiptFooter}>
                   <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedBill(null)}>

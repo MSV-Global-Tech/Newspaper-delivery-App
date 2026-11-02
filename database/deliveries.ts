@@ -21,7 +21,7 @@ export interface DeliveryDoc {
   address: string;
   paperName: string;
   imageSrc: string;
-  status: 'Pending' | 'Delivered' | 'Skipped';
+  status: 'Pending' | 'Delivered';
   time: string;
   priceDay?: number;
   priceMonth?: number;
@@ -110,7 +110,7 @@ export async function addDelivery(delivery: Omit<DeliveryDoc, 'id'>) {
 // ── Update delivery status ───────────────────────────────────────────────────
 export async function updateDeliveryStatus(
   id: string,
-  status: 'Pending' | 'Delivered' | 'Skipped',
+  status: 'Pending' | 'Delivered',
   phone: string,
   category: string,
 ) {

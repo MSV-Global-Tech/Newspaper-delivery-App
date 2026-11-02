@@ -27,6 +27,8 @@ export interface UserDoc {
   email?: string;
   password?: string; // Store password for login verification
   alias?: string; // Admin alias for easy identification
+  contactedOwner?: boolean; // Track if customer has contacted owner for subscription
+  hasNewBill?: boolean; // Flag for new bill notification badge
 }
 
 export interface CustomerBillItem {

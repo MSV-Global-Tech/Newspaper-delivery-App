@@ -2,7 +2,7 @@
   "expo": {
     "name": "Newspaper Delivery",
     "slug": "newspaper-delivery-app",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
@@ -10,8 +10,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Allow photo access to upload newspaper logos.",
-        "NSPhotoLibraryAddUsageDescription": "Allow saving newspaper logos to your photo library."
+        "NSPhotoLibraryUsageDescription": "Allow photo access to upload newspaper logos and save payment bills.",
+        "NSPhotoLibraryAddUsageDescription": "Allow saving newspaper logos and payment bills to your photo library."
       }
     },
     "android": {
@@ -20,8 +20,7 @@
       "icon": "./assets/logo.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
-        "backgroundColor": "#2563EB",
-        "monochromeImage": "./assets/logo.png"
+        "backgroundColor": "#2563EB"
       },
       "permissions": []
     },
@@ -29,6 +28,14 @@
       "expo-router",
       "expo-secure-store",
       "expo-updates",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow photo access to save payment bills.",
+          "savePhotosPermission": "Allow saving payment bills to your photo library.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
       [
         "@react-native-firebase/app",
         {

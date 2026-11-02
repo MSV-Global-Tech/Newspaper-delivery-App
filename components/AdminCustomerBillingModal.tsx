@@ -4,7 +4,7 @@ import {
   StyleSheet, Alert, Platform, Image
 } from 'react-native';
 import { X, PlusCircle, CheckCircle, Clock, Search, Trash2, ChevronRight, Eye, Calendar } from 'lucide-react-native';
-import { updateCustomerBill } from '../database/users';
+import { updateCustomerBill, updateUser } from '../database/users';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { store } from '../utils/store';
 
@@ -31,20 +31,14 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
   const [selectedBillForScreenshot, setSelectedBillForScreenshot] = useState<any>(null);
   const [customerPapers, setCustomerPapers] = useState<string[]>([]);
 
-  // Get customer's subscribed papers
+  // Get all papers and magazines from the store
   useEffect(() => {
-    if (visible && customer?.phone) {
-      const deliveries = store.getDeliveries();
-      const customerDeliveries = deliveries.filter((d) => d?.name === customer?.name && d?.phone === customer?.phone);
-      const subscribedPapers = [...new Set(customerDeliveries.map((d) => d?.paperName).filter(Boolean))];
-      setCustomerPapers(subscribedPapers);
-      
-      // If customer has only one subscription, auto-fill the first item
-      if (subscribedPapers.length === 1 && billItems.length === 1 && !billItems[0].name) {
-        setBillItems([{ id: Date.now().toString(), name: subscribedPapers[0], amount: '' }]);
-      }
+    if (visible) {
+      const papers = store.getPapers();
+      const allPaperNames = papers.map(p => p.name).filter(Boolean);
+      setCustomerPapers(allPaperNames);
     }
-  }, [visible, customer?.phone, customer?.name]);
+  }, [visible]);
 
   // Reset form when customer changes
   useEffect(() => {
@@ -68,10 +62,6 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
   const totalAmount = billItems.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
 
   const openPaperPicker = (id: string) => {
-    if (customerPapers.length === 0) {
-      Alert.alert('No Subscriptions', 'This customer has no active subscriptions. Please have them subscribe to newspapers first before generating bills.');
-      return;
-    }
     setPickerTargetId(id);
     setPaperSearch('');
     setShowPaperPicker(true);
@@ -122,7 +112,9 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
     try {
       setSaving(true);
       await updateCustomerBill(customer.phone, [newBill, ...allBills]);
-      Alert.alert('Success', 'Bill created! Customer will see it in their app.');
+      // Set hasNewBill flag to notify customer
+      await updateUser(customer.phone, { hasNewBill: true });
+      Alert.alert('Success', 'Bill created! Customer will see notification in their app.');
       resetForm();
       setView('bills');
     } catch (e: any) {
@@ -323,32 +315,27 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
         <View style={s.pickerOverlay}>
           <View style={s.pickerSheet}>
             <View style={s.pickerHeader}>
-              <Text style={s.pickerTitle}>Customer's Subscriptions</Text>
+              <Text style={s.pickerTitle}>All Papers & Magazines</Text>
               <TouchableOpacity onPress={() => setShowPaperPicker(false)}>
                 <X size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
-            {customerPapers.length > 0 && (
-              <View style={s.pickerSearch}>
-                <Search size={15} color="#94A3B8" />
-                <TextInput
-                  style={s.pickerSearchInput}
-                  placeholder="Search subscriptions…"
-                  placeholderTextColor="#94A3B8"
-                  value={paperSearch}
-                  onChangeText={setPaperSearch}
-                  autoFocus
-                />
-              </View>
-            )}
+            <View style={s.pickerSearch}>
+              <Search size={15} color="#94A3B8" />
+              <TextInput
+                style={s.pickerSearchInput}
+                placeholder="Search papers…"
+                placeholderTextColor="#94A3B8"
+                value={paperSearch}
+                onChangeText={setPaperSearch}
+                autoFocus
+              />
+            </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               {customerPapers.length === 0 ? (
                 <View style={{ padding: 32, alignItems: 'center' }}>
                   <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center' }}>
-                    This customer has no active subscriptions yet.
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', marginTop: 8 }}>
-                    Please have them subscribe to newspapers first.
+                    No papers or magazines available.
                   </Text>
                 </View>
               ) : (

@@ -47,7 +47,7 @@ export interface VendorDoc {
   name: string;
   phone?: string;
   address?: string;
-  secretCode: string;
+  secretCode: string; // Last 4 digits of phone
   paymentAmount?: number; // Kept for backwards compatibility
   deadline?: string; // ISO String
   bills?: VendorBill[];
