@@ -3,6 +3,6 @@
   "versionCode": 24,
   "mandatory": true,
   "releaseNotes": "Bug fixes and performance improvements",
-  "downloadUrl": "https://github.com/MSV-Global-Tech/Newspaper-delivery-App/releases/latest",
+  "downloadUrl": "https://github.com/MSV-Global-Tech/Newspaper-delivery-App/releases",
   "minSupportedVersionCode": 1
 }
