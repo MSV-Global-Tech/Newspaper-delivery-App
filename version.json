@@ -1,6 +1,6 @@
 {
-  "version": "1.0.6",
-  "versionCode": 25,
+  "version": "1.0.2",
+  "versionCode": 26,
   "mandatory": true,
   "releaseNotes": "Bug fixes and performance improvements",
   "downloadUrl": "https://github.com/MSV-Global-Tech/Newspaper-delivery-App/releases",
