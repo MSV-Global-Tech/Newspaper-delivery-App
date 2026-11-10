@@ -1,6 +1,6 @@
 {
   "version": "1.0.2",
-  "versionCode": 29,
+  "versionCode": 26,
   "mandatory": true,
   "releaseNotes": "Security improvements with Firebase Email Auth, location detection with full address, and bug fixes",
   "downloadUrl": "https://play.google.com/store/apps/details?id=com.newspaper.deliveryapp",
