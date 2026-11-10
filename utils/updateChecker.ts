@@ -16,8 +16,8 @@ export const GITHUB_VERSION_URL =
   'https://raw.githubusercontent.com/MSV-Global-Tech/Newspaper-delivery-App/main/version.json';
 
 // The current installed version of the app (keep this in sync with app.json → version)
-export const CURRENT_VERSION = '1.0.7';
-export const CURRENT_VERSION_CODE = 28;
+export const CURRENT_VERSION = '1.0.3';
+export const CURRENT_VERSION_CODE = 29;
 // ───────────────────────────────────────────────────────────────────────────────
 
 export interface RemoteVersionInfo {
