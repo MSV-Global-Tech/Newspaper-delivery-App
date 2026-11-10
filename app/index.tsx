@@ -88,8 +88,8 @@ export default function OnboardingScreen() {
     const next = Math.min(activeIndex + 1, SLIDES.length - 1);
     setActiveIndex(next);
     if (listRef.current) {
-      listRef.current.scrollToIndex({
-        index: next,
+      listRef.current.scrollToOffset({
+        offset: next * width,
         animated: true,
       });
     }

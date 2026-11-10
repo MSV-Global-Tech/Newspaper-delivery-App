@@ -15,9 +15,13 @@
 export const GITHUB_VERSION_URL =
   'https://raw.githubusercontent.com/MSV-Global-Tech/Newspaper-delivery-App/main/version.json';
 
+// Play Store URL for app updates
+export const PLAY_STORE_URL =
+  'https://play.google.com/store/apps/details?id=com.newspaper.deliveryapp';
+
 // The current installed version of the app (keep this in sync with app.json → version)
-export const CURRENT_VERSION = '1.0.3';
-export const CURRENT_VERSION_CODE = 29;
+export const CURRENT_VERSION = '1.0.2';
+export const CURRENT_VERSION_CODE = 26;
 // ───────────────────────────────────────────────────────────────────────────────
 
 export interface RemoteVersionInfo {

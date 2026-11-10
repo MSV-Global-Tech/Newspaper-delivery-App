@@ -75,25 +75,84 @@ export default function LoginScreen() {
         return;
       }
 
-      // Get current location
+      // Get current location with better accuracy
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced,
+        timeout: 15000,
       });
 
       const { latitude, longitude } = location.coords;
       setLocationCoords({ latitude, longitude });
+      console.log('Location detected:', latitude, longitude);
 
-      // Reverse geocoding to get address (using free Nominatim API)
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
-      );
-      const data = await response.json();
+      // Try multiple geocoding APIs
+      let addressData = null;
+      let lastError = null;
 
-      if (data && data.address) {
-        const addr = data.address;
+      // Try 1: Nominatim (OpenStreetMap)
+      try {
+        console.log('Trying Nominatim API...');
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+          {
+            headers: {
+              'User-Agent': 'NewspaperDeliveryApp/1.0',
+              'Accept-Language': 'en-IN,en'
+            }
+          }
+        );
+        
+        if (response.ok) {
+          addressData = await response.json();
+          console.log('Nominatim success:', addressData);
+        }
+      } catch (error) {
+        console.error('Nominatim failed:', error);
+        lastError = error;
+      }
+
+      // Try 2: Google Maps Geocoding (if Nominatim failed)
+      if (!addressData) {
+        try {
+          console.log('Trying Google Maps API...');
+          const response = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=AIzaSyDP_RxsRZSgIgsY3NYEoJgcJdNOgz-isF0&language=en`
+          );
+          
+          if (response.ok) {
+            const googleData = await response.json();
+            if (googleData.results && googleData.results.length > 0) {
+              const result = googleData.results[0];
+              addressData = {
+                display_name: result.formatted_address,
+                address: {
+                  city: result.address_components.find((c: any) => c.types.includes('locality'))?.long_name || '',
+                  town: result.address_components.find((c: any) => c.types.includes('locality'))?.long_name || '',
+                  village: result.address_components.find((c: any) => c.types.includes('locality'))?.long_name || '',
+                  state_district: result.address_components.find((c: any) => c.types.includes('administrative_area_level_2'))?.long_name || '',
+                  district: result.address_components.find((c: any) => c.types.includes('administrative_area_level_2'))?.long_name || '',
+                  state: result.address_components.find((c: any) => c.types.includes('administrative_area_level_1'))?.long_name || '',
+                  postcode: result.address_components.find((c: any) => c.types.includes('postal_code'))?.long_name || '',
+                  road: result.address_components.find((c: any) => c.types.includes('route'))?.long_name || '',
+                  suburb: result.address_components.find((c: any) => c.types.includes('sublocality'))?.long_name || '',
+                  neighbourhood: result.address_components.find((c: any) => c.types.includes('neighborhood'))?.long_name || '',
+                  house_number: result.address_components.find((c: any) => c.types.includes('street_number'))?.long_name || '',
+                }
+              };
+              console.log('Google Maps success:', addressData);
+            }
+          }
+        } catch (error) {
+          console.error('Google Maps failed:', error);
+          lastError = error;
+        }
+      }
+
+      if (addressData && addressData.address) {
+        const addr = addressData.address;
         
         // Extract address components
-        const fullAddress = addr.display_name || '';
+        const fullAddress = addressData.display_name || '';
         
         // Parse Indian address structure
         const parts = fullAddress.split(',').map(p => p.trim());
@@ -102,18 +161,29 @@ export default function LoginScreen() {
         const pincodeMatch = fullAddress.match(/\b\d{6}\b/);
         if (pincodeMatch) {
           setPincode(pincodeMatch[0]);
+        } else if (addr.postcode) {
+          setPincode(addr.postcode);
         }
 
-        // Try to extract city (usually one of the middle parts)
-        const cityCandidates = ['city', 'town', 'village', 'municipality'];
-        let detectedCity = addr.city || addr.town || addr.village || addr.municipality || '';
+        // Try to extract city/district (prioritize Indian address structure)
+        let detectedCity = addr.city || addr.town || addr.village || addr.municipality || addr.state_district || addr.district || '';
         if (!detectedCity && parts.length >= 2) {
-          detectedCity = parts[parts.length - 2] || '';
+          // Try to find the city from parts (usually 2nd or 3rd from end)
+          for (let i = parts.length - 2; i >= 0; i--) {
+            const part = parts[i];
+            if (part.length > 2 && !/\d/.test(part) && !part.includes('Pin')) {
+              detectedCity = part;
+              break;
+            }
+          }
         }
         setCity(detectedCity);
 
-        // Try to extract area/locality
-        const detectedArea = addr.suburb || addr.neighbourhood || addr.road || parts[0] || '';
+        // Try to extract area/locality (first meaningful part)
+        let detectedArea = addr.suburb || addr.neighbourhood || addr.road || addr.village || '';
+        if (!detectedArea && parts.length > 0) {
+          detectedArea = parts[0];
+        }
         setArea(detectedArea);
 
         // Try to extract house number
@@ -126,13 +196,20 @@ export default function LoginScreen() {
         setLocationDetected(true);
         showToast('Address detected successfully!');
       } else {
-        // Fallback: just use coordinates if geocoding fails
-        setLocationDetected(true);
-        showToast('Location detected. Please enter address manually.');
+        console.error('All geocoding attempts failed. Last error:', lastError);
+        Alert.alert(
+          'Location Detection Failed',
+          'Could not detect your address automatically. Please enter your address manually.',
+          [{ text: 'OK' }]
+        );
       }
     } catch (error) {
       console.error('Location error:', error);
-      showToast('Failed to detect location. Please try again.', false);
+      Alert.alert(
+        'Location Detection Failed',
+        'Could not detect your location. Please enable GPS and try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setIsDetectingLocation(false);
     }
@@ -271,20 +348,37 @@ export default function LoginScreen() {
         // Step 2: Authenticate with Firebase using email (for security token)
         if (userByPhone.email) {
           try {
+            console.log('Attempting Firebase Auth with email:', userByPhone.email);
             await auth().signInWithEmailAndPassword(userByPhone.email, password);
+            console.log('Firebase Auth successful');
           } catch (firebaseError: any) {
+            console.error('Firebase Auth error:', firebaseError.code, firebaseError.message);
+            
             // If Firebase user doesn't exist, create it
             if (firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/invalid-credential') {
               try {
+                console.log('Creating Firebase Auth user...');
                 await auth().createUserWithEmailAndPassword(userByPhone.email, password);
+                console.log('Firebase Auth user created successfully');
               } catch (createError: any) {
-                // If email already in use, just sign in
-                if (createError.code !== 'auth/email-already-in-use') {
-                  console.error('Firebase Auth error:', createError);
+                console.error('Firebase Auth create error:', createError.code, createError.message);
+                // If email already in use, this means the Firebase user exists but password doesn't match
+                // This is a critical error - show to user
+                if (createError.code === 'auth/email-already-in-use') {
+                  showToast('Email already registered with different password. Please use password reset.', false);
+                  setLoading(false);
+                  return;
                 }
+                // For other errors, log but continue (Firebase Auth is optional for basic functionality)
+                console.error('Firebase Auth failed, continuing without it');
               }
+            } else if (firebaseError.code === 'auth/wrong-password') {
+              showToast('Email password mismatch. Please reset your password.', false);
+              setLoading(false);
+              return;
             } else {
-              console.error('Firebase Auth error:', firebaseError);
+              // For other Firebase errors, log but continue
+              console.error('Firebase Auth error, continuing without it:', firebaseError.code);
             }
           }
         }
@@ -338,14 +432,26 @@ export default function LoginScreen() {
 
         // Create Firebase Auth user with email + password
         try {
+          console.log('Creating Firebase Auth user for signup...');
           await auth().createUserWithEmailAndPassword(email.trim(), password);
+          console.log('Firebase Auth user created successfully');
         } catch (firebaseError: any) {
+          console.error('Firebase Auth signup error:', firebaseError.code, firebaseError.message);
           if (firebaseError.code === 'auth/email-already-in-use') {
             showToast('This email is already registered. Please login.', false);
             setLoading(false);
             return;
+          } else if (firebaseError.code === 'auth/weak-password') {
+            showToast('Password is too weak. Use at least 6 characters.', false);
+            setLoading(false);
+            return;
+          } else if (firebaseError.code === 'auth/invalid-email') {
+            showToast('Invalid email address', false);
+            setLoading(false);
+            return;
           }
-          throw firebaseError;
+          // For other errors, continue without Firebase Auth (fallback to phone/password only)
+          console.error('Firebase Auth failed, continuing without it');
         }
 
         // Create user in Firestore with phone as document ID
@@ -372,7 +478,7 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       console.error('Auth error:', error);
-      showToast('Authentication failed', false);
+      showToast('Authentication failed. Please try again.', false);
     } finally {
       setLoading(false);
     }

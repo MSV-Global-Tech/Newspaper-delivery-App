@@ -85,22 +85,15 @@ export default function RootLayout() {
               </View>
               <Text style={styles.updateTitle}>Update Required</Text>
               <Text style={styles.updateSubtitle}>
-                A new version ({updateInfo.version}) is available. You must update to continue using the app.
+                Download the latest version of newspaper delivery
               </Text>
-
-              {!!updateInfo.releaseNotes && (
-                <View style={styles.updateNotesBox}>
-                  <Text style={styles.updateNotesTitle}>What's new</Text>
-                  <Text style={styles.updateNotesText}>{updateInfo.releaseNotes}</Text>
-                </View>
-              )}
 
               <TouchableOpacity
                 style={styles.updateBtn}
                 activeOpacity={0.85}
                 onPress={handleDownloadUpdate}
               >
-                <Text style={styles.updateBtnText}>Update Now</Text>
+                <Text style={styles.updateBtnText}>Download Update</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -223,14 +223,7 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 36 }}>🚀</Text>
             </View>
             <Text style={styles.updateTitle}>Update Available!</Text>
-            <Text style={styles.updateVersion}>Version {updateInfo?.version}</Text>
-
-            {!!updateInfo?.releaseNotes && (
-              <View style={styles.updateNotesBox}>
-                <Text style={styles.updateNotesTitle}>What's new</Text>
-                <Text style={styles.updateNotesText}>{updateInfo.releaseNotes}</Text>
-              </View>
-            )}
+            <Text style={styles.updateSubtitle}>Download the latest version of newspaper delivery</Text>
 
             <TouchableOpacity
               style={styles.updateBtn}
