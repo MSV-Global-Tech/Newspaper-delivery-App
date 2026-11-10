@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ────────────────────────────────────────────────────────────────────────
+    // FIRESTORE SECURITY RULES WITH FIREBASE EMAIL AUTH
+    // 
+    // This app uses a hybrid authentication system:
+    // - Phone number is the primary identifier (document ID in Firestore)
+    // - Email + password used for Firebase Auth (security token)
+    // - Users log in with phone + password (current system)
+    // - Firebase Auth called after successful phone login (for security)
+    // 
+    // This setup provides security while keeping the phone-number-based system.
+    // ────────────────────────────────────────────────────────────────────────
+    
+    // ────────────────────────────────────────────────────────────────────────
+    // Helper Functions
+    // ────────────────────────────────────────────────────────────────────────
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // ────────────────────────────────────────────────────────────────────────
+    // USERS COLLECTION (keyed by phone number)
+    // ────────────────────────────────────────────────────────────────────────
+    
+    match /users/{phone} {
+      // READ: Require authentication
+      allow read: if isAuthenticated();
+      
+      // CREATE: Allow for signup (before auth established)
+      allow create: if request.resource.data.phone == phone;
+      
+      // UPDATE: Require authentication
+      // Prevent users from changing their own isAdmin field
+      allow update: if isAuthenticated() &&
+                    !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']);
+      
+      // DELETE: Require authentication
+      allow delete: if isAuthenticated();
+    }
+    
+    // ────────────────────────────────────────────────────────────────────────
+    // VENDORS COLLECTION
+    // ────────────────────────────────────────────────────────────────────────
+    
+    match /vendors/{vendorId} {
+      // READ: Require authentication
+      allow read: if isAuthenticated();
+      
+      // CREATE: Require authentication
+      allow create: if isAuthenticated();
+      
+      // UPDATE: Require authentication
+      allow update: if isAuthenticated();
+      
+      // DELETE: Require authentication
+      allow delete: if isAuthenticated();
+    }
+    
+    // ────────────────────────────────────────────────────────────────────────
+    // NEWSPAPERS COLLECTION (Public Catalog)
+    // ────────────────────────────────────────────────────────────────────────
+    
+    match /newspapers/{paperId} {
+      // READ: Public catalog
+      allow read: if true;
+      
+      // WRITE: Require authentication
+      allow write: if isAuthenticated();
+    }
+    
+    // ────────────────────────────────────────────────────────────────────────
+    // PAYMENTS COLLECTION
+    // ────────────────────────────────────────────────────────────────────────
+    
+    match /payments/{paymentId} {
+      // READ: Require authentication
+      allow read: if isAuthenticated();
+      
+      // CREATE: Require authentication
+      allow create: if isAuthenticated();
+      
+      // UPDATE: Require authentication
+      allow update: if isAuthenticated();
+      
+      // DELETE: Require authentication
+      allow delete: if isAuthenticated();
+    }
+    
+    // ────────────────────────────────────────────────────────────────────────
+    // DELIVERIES COLLECTION (with sub-collections)
+    // ────────────────────────────────────────────────────────────────────────
+    
+    match /deliveries/{phone} {
+      // READ: Require authentication
+      allow read: if isAuthenticated();
+      
+      // WRITE: Require authentication
+      allow write: if isAuthenticated();
+      
+      // Sub-collections: newspaper, milk, watercan
+      match /{category}/{deliveryId} {
+        // READ: Require authentication
+        allow read: if isAuthenticated();
+        
+        // CREATE: Require authentication
+        allow create: if isAuthenticated();
+        
+        // UPDATE: Require authentication
+        allow update: if isAuthenticated();
+        
+        // DELETE: Require authentication
+        allow delete: if isAuthenticated();
+      }
+    }
+    
+    // ────────────────────────────────────────────────────────────────────────
+    // COLLECTION GROUP RULES (for querying across sub-collections)
+    // ────────────────────────────────────────────────────────────────────────
+    
+    // Allow collectionGroup queries for authenticated users
+    match /{path=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+  }
+}

@@ -11,14 +11,16 @@ import {
   Platform,
   Modal,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MapPin, RefreshCw, Mail, Lock, Eye, EyeOff, Phone, User, CheckCircle } from 'lucide-react-native';
+import * as Location from 'expo-location';
 import { store } from '../../utils/store';
-import { fetchUser, updateUser } from '../../database';
+import { fetchUser, updateUser, fetchUserByEmail, saveUser } from '../../database';
 import { hashPassword, verifyPassword } from '../../utils/passwordHash';
-// import auth from '@react-native-firebase/auth'; // Uncomment for production APK
+import auth from '@react-native-firebase/auth';
 
 const BLUE = '#2563EB';
 const BLUE_DARK = '#1D4ED8';
@@ -46,10 +48,94 @@ export default function LoginScreen() {
   const [resetPhone, setResetPhone] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [locationDetected, setLocationDetected] = useState(false);
+  const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleDetectLocation = async () => {
+    setIsDetectingLocation(true);
+    try {
+      // Request location permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Location permission is required to detect your address. Please enable it in settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Location.openAppSettings() }
+          ]
+        );
+        setIsDetectingLocation(false);
+        return;
+      }
+
+      // Get current location
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const { latitude, longitude } = location.coords;
+      setLocationCoords({ latitude, longitude });
+
+      // Reverse geocoding to get address (using free Nominatim API)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+      );
+      const data = await response.json();
+
+      if (data && data.address) {
+        const addr = data.address;
+        
+        // Extract address components
+        const fullAddress = addr.display_name || '';
+        
+        // Parse Indian address structure
+        const parts = fullAddress.split(',').map(p => p.trim());
+        
+        // Try to extract pincode (usually last 6 digits)
+        const pincodeMatch = fullAddress.match(/\b\d{6}\b/);
+        if (pincodeMatch) {
+          setPincode(pincodeMatch[0]);
+        }
+
+        // Try to extract city (usually one of the middle parts)
+        const cityCandidates = ['city', 'town', 'village', 'municipality'];
+        let detectedCity = addr.city || addr.town || addr.village || addr.municipality || '';
+        if (!detectedCity && parts.length >= 2) {
+          detectedCity = parts[parts.length - 2] || '';
+        }
+        setCity(detectedCity);
+
+        // Try to extract area/locality
+        const detectedArea = addr.suburb || addr.neighbourhood || addr.road || parts[0] || '';
+        setArea(detectedArea);
+
+        // Try to extract house number
+        const detectedHouseNo = addr.house_number || '';
+        setHouseNo(detectedHouseNo);
+
+        // Set full address
+        setAddress(fullAddress);
+
+        setLocationDetected(true);
+        showToast('Address detected successfully!');
+      } else {
+        // Fallback: just use coordinates if geocoding fails
+        setLocationDetected(true);
+        showToast('Location detected. Please enter address manually.');
+      }
+    } catch (error) {
+      console.error('Location error:', error);
+      showToast('Failed to detect location. Please try again.', false);
+    } finally {
+      setIsDetectingLocation(false);
+    }
   };
 
   const handleResetPassword = async () => {
@@ -87,11 +173,26 @@ export default function LoginScreen() {
   };
 
   const validateForm = () => {
-    // Email validation - proper email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Email validation - strict format with proper domain
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!isLogin && (!email || !emailRegex.test(email))) {
-      showToast('Please enter a valid email address (e.g., name@email.com)', false);
+      showToast('Please enter a valid email address (e.g., name@gmail.com, name@yahoo.com)', false);
       return false;
+    }
+
+    // Additional check: ensure domain has proper TLD (at least 2 letters)
+    if (!isLogin) {
+      const domainParts = email.split('@');
+      if (domainParts.length !== 2 || !domainParts[1]) {
+        showToast('Please enter a valid email address with proper domain', false);
+        return false;
+      }
+      const domain = domainParts[1];
+      const tld = domain.split('.').pop();
+      if (!tld || tld.length < 2 || !/^[a-zA-Z]{2,}$/.test(tld)) {
+        showToast('Please enter a valid email address with proper domain extension (.com, .in, .org, etc.)', false);
+        return false;
+      }
     }
     
     // Phone validation - exactly 10 digits, India only
@@ -122,16 +223,18 @@ export default function LoginScreen() {
     
     // Address validation - structured fields like Swiggy/Zomato
     if (!isLogin) {
-      // At minimum, require area and city
+      // Location detection is mandatory
+      if (!locationDetected || !locationCoords) {
+        showToast('Please detect your location using the auto-detect button', false);
+        return false;
+      }
+      // At minimum, require area (auto-detected or manual)
       if (!area || area.trim().length < 3) {
         showToast('Please enter your area/street (minimum 3 characters)', false);
         return false;
       }
-      if (!city || city.trim().length < 2) {
-        showToast('Please enter your city', false);
-        return false;
-      }
-      // Pincode validation - exactly 6 digits
+      // City is optional if auto-detection fails
+      // Pincode validation - exactly 6 digits if provided
       if (pincode && pincode.length !== 6) {
         showToast('Please enter a valid 6-digit pincode', false);
         return false;
@@ -146,80 +249,8 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      // Firebase Auth - Uncomment for production APK
-      /*
       if (isLogin) {
-        // Login with phone number + password
-        const authPhone = phone.trim();
-
-        // Fetch user by phone number to get their email
-        const userByPhone = await fetchUser(authPhone);
-        if (!userByPhone || !userByPhone.email) {
-          showToast('No account found with this phone number', false);
-          setLoading(false);
-          return;
-        }
-
-        // Verify password from Firestore
-        if (userByPhone.password !== password) {
-          showToast('Wrong password', false);
-          setLoading(false);
-          return;
-        }
-
-        // Authenticate with Firebase Auth using the email from Firestore
-        const userCredential = await auth().signInWithEmailAndPassword(userByPhone.email, password);
-        const fbUser = userCredential.user;
-
-        store.setUser({
-          name: userByPhone.name,
-          phone: userByPhone.phone ?? '',
-          email: fbUser.email ?? undefined,
-          address: userByPhone.address,
-          isAdmin: userByPhone.isAdmin || false,
-          customerKind: userByPhone.customerKind ?? 'new',
-          approvalStatus: userByPhone.approvalStatus ?? 'approved',
-        });
-        showToast('Welcome back!');
-
-        // Navigate to home after successful login
-        const user = store.getUser();
-        if (user?.isAdmin) {
-          router.replace('/customer/bottom_nav/admin');
-        } else {
-          router.replace('/customer/bottom_nav/home');
-        }
-      } else {
-        // Signup with email, phone, password, name, address
-        const userCredential = await auth().createUserWithEmailAndPassword(email.trim(), password);
-        const fbUser = userCredential.user;
-
-        const newUser = {
-          name: name.trim(),
-          phone: phone.trim(),
-          email: fbUser.email ?? undefined,
-          address: address.trim(),
-          password: password, // Store password in Firestore
-          isAdmin: false,
-          customerKind: existingCustomer ? 'legacy' : 'new',
-          approvalStatus: existingCustomer ? 'pending' : 'approved',
-          createdAt: new Date().toISOString(),
-        };
-
-        const { saveUser } = await import('../../database');
-        await saveUser(newUser);
-
-        // After signup, switch to login mode with phone number pre-filled
-        showToast('Account created! Please login.');
-        setPhone(phone.trim());
-        setPassword('');
-        setIsLogin(true);
-      }
-      */
-
-      // Temporary direct login for Expo Go testing
-      if (isLogin) {
-        // Login: fetch user from Firestore by phone number
+        // Step 1: Login with phone + password (current system)
         const authPhone = phone.trim();
         const userByPhone = await fetchUser(authPhone);
 
@@ -229,7 +260,7 @@ export default function LoginScreen() {
           return;
         }
 
-        // Verify password using hash comparison (SECURE)
+        // Verify password using hash comparison
         const passwordMatch = await verifyPassword(password, userByPhone.password || '');
         if (!passwordMatch) {
           showToast('Wrong password', false);
@@ -237,6 +268,28 @@ export default function LoginScreen() {
           return;
         }
 
+        // Step 2: Authenticate with Firebase using email (for security token)
+        if (userByPhone.email) {
+          try {
+            await auth().signInWithEmailAndPassword(userByPhone.email, password);
+          } catch (firebaseError: any) {
+            // If Firebase user doesn't exist, create it
+            if (firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/invalid-credential') {
+              try {
+                await auth().createUserWithEmailAndPassword(userByPhone.email, password);
+              } catch (createError: any) {
+                // If email already in use, just sign in
+                if (createError.code !== 'auth/email-already-in-use') {
+                  console.error('Firebase Auth error:', createError);
+                }
+              }
+            } else {
+              console.error('Firebase Auth error:', firebaseError);
+            }
+          }
+        }
+
+        // Step 3: Set user in store
         store.setUser({
           name: userByPhone.name,
           phone: userByPhone.phone ?? '',
@@ -256,7 +309,23 @@ export default function LoginScreen() {
           router.replace('/customer/bottom_nav/home');
         }
       } else {
-        // Signup: Combine structured address fields
+        // Signup: Check if phone number already exists
+        const existingUserByPhone = await fetchUser(phone.trim());
+        if (existingUserByPhone) {
+          showToast('An account with this phone number already exists. Please login.', false);
+          setLoading(false);
+          return;
+        }
+
+        // Signup: Check if email already exists
+        const existingUserByEmail = await fetchUserByEmail(email.trim());
+        if (existingUserByEmail) {
+          showToast('An account with this email already exists. Please use a different email.', false);
+          setLoading(false);
+          return;
+        }
+
+        // Combine structured address fields
         const fullAddress = [
           houseNo.trim(),
           area.trim(),
@@ -264,28 +333,36 @@ export default function LoginScreen() {
           pincode.trim(),
         ].filter(Boolean).join(', ');
 
-        // Hash password before storing (SECURE)
+        // Hash password before storing
         const hashedPassword = await hashPassword(password);
 
-        // Signup: create new user with hashed password
+        // Create Firebase Auth user with email + password
+        try {
+          await auth().createUserWithEmailAndPassword(email.trim(), password);
+        } catch (firebaseError: any) {
+          if (firebaseError.code === 'auth/email-already-in-use') {
+            showToast('This email is already registered. Please login.', false);
+            setLoading(false);
+            return;
+          }
+          throw firebaseError;
+        }
+
+        // Create user in Firestore with phone as document ID
         const newUser = {
           name: name.trim(),
           phone: phone.trim(),
           email: email.trim(),
           address: fullAddress,
-          password: hashedPassword, // Store HASHED password (secure)
+          password: hashedPassword, // Store HASHED password
           isAdmin: false,
           customerKind: (existingCustomer ? 'legacy' : 'new') as 'new' | 'legacy',
           approvalStatus: (existingCustomer ? 'pending' : 'approved') as 'pending' | 'approved',
           createdAt: new Date().toISOString(),
+          location: locationCoords,
         };
 
-        try {
-          const { saveUser } = await import('../../database');
-          await saveUser(newUser);
-        } catch (error) {
-          console.error('Error saving user:', error);
-        }
+        await saveUser(newUser);
 
         // After signup, switch to login mode with phone number pre-filled
         showToast('Account created! Please login.');
@@ -301,8 +378,19 @@ export default function LoginScreen() {
     }
   };
 
-  const canProceed = phone.length === 10 && password.length >= 6 && 
-    (isLogin ? true : (email.includes('@') && password === confirmPassword && name.trim().length > 0 && area.trim().length > 0 && city.trim().length > 0));
+  const canProceed = phone.length === 10 && password.length >= 6 &&
+    (isLogin ? true : (
+      // Strict email validation
+      /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email) &&
+      // Additional domain check
+      email.split('@').length === 2 &&
+      email.split('@')[1]?.split('.').pop()?.length >= 2 &&
+      // Other validations
+      password === confirmPassword &&
+      name.trim().length > 0 &&
+      area.trim().length > 0 &&
+      locationDetected
+    ));
 
   return (
     <SafeAreaView style={s.container}>
@@ -457,6 +545,28 @@ export default function LoginScreen() {
             {!isLogin && (
               <>
                 <Text style={s.label}>Delivery Address</Text>
+
+                {/* Auto Detect Location Button */}
+                <TouchableOpacity
+                  style={[s.autoDetectBtn, locationDetected && s.autoDetectBtnDetected]}
+                  onPress={handleDetectLocation}
+                  disabled={isDetectingLocation}
+                  activeOpacity={0.8}
+                >
+                  {isDetectingLocation ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : locationDetected ? (
+                    <>
+                      <CheckCircle size={16} color="#FFFFFF" />
+                      <Text style={s.autoDetectBtnText}>Location Detected</Text>
+                    </>
+                  ) : (
+                    <>
+                      <MapPin size={16} color="#FFFFFF" />
+                      <Text style={s.autoDetectBtnText}>Auto Detect Location</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
 
                 {/* House/Flat No */}
                 <View style={s.inputContainer}>
@@ -779,6 +889,25 @@ const s = StyleSheet.create({
     marginTop: 4,
     marginBottom: 10,
     fontWeight: '600',
+  },
+  autoDetectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563EB',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    gap: 8,
+  },
+  autoDetectBtnDetected: {
+    backgroundColor: '#16A34A',
+  },
+  autoDetectBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   modalButtons: {
     flexDirection: 'row',

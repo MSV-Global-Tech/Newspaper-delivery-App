@@ -55,7 +55,7 @@ export default function ProfileScreen() {
   const [deliveries, setDeliveries] = useState(store.getDeliveries());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
-  const [appVersion, setAppVersion] = useState('1.0.6');
+  const [appVersion, setAppVersion] = useState('1.0.2');
   const [appSettings, setAppSettings] = useState(store.getAppSettings());
 
   // Editable fields in modal
@@ -594,7 +594,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <View style={{ alignItems: 'center', marginTop: 20 }}>
-          <Text style={styles.versionFooter}>Newspaper Delivery • v1.0.4</Text>
+          <Text style={styles.versionFooter}>Newspaper Delivery • v1.0.2</Text>
           <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '800', marginTop: 4 }}>
             Developed by MSV Global Tech
           </Text>

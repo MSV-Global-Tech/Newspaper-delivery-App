@@ -73,7 +73,8 @@ export async function fetchUser(phone: string): Promise<UserDoc | null> {
 export async function fetchUserByEmail(email: string): Promise<UserDoc | null> {
   const snap = await getDocs(collection(db, COL));
   const users = snap.docs.map((d) => d.data() as UserDoc);
-  return users.find((u) => u.email === email) || null;
+  // Case-insensitive comparison to prevent duplicates
+  return users.find((u) => u.email?.toLowerCase() === email.toLowerCase()) || null;
 }
 
 export async function listUsers(): Promise<UserDoc[]> {

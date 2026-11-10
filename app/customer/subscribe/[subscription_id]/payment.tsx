@@ -235,16 +235,16 @@ export default function PaymentScreen() {
     <body>
       <script>
         var options = {
-          key: 'rzp_test_SuVuCcW1RgCWJ2',
+          key: 'rzp_live_SuVsRVG2xaLYv4',
           amount: ${SUBSCRIPTION_FEE * 100},
           currency: 'INR',
           name: 'Newspaper Delivery',
           description: 'Subscription for ${paper.name}',
           image: 'https://example.com/logo.png',
           handler: function (response) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ 
-              status: 'success', 
-              paymentId: response.razorpay_payment_id 
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              status: 'success',
+              paymentId: response.razorpay_payment_id
             }));
           },
           prefill: {
