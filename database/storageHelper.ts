@@ -1,14 +1,14 @@
 /**
  * Firebase Free Tier Optimizations
- * 
+ *
  * Free Tier Limits:
- * - Firestore: 50K reads/day, 20K writes/day  
+ * - Firestore: 50K reads/day, 20K writes/day
  * - Storage: 5GB total
  * - Document size: 1MB max
- * 
+ *
  * Current Setup:
- * - USE_STORAGE = false (uses base64 in Firestore to stay within limits)
- * - Max image size: 900KB (safe under 1MB document limit)
+ * - USE_STORAGE = true (uses Firebase Storage for screenshots - 5GB free tier)
+ * - Max image size: 800KB (safe under 1MB document limit)
  * - Compression: 0.8 quality for screenshots
  */
 
@@ -19,11 +19,12 @@ import { compressImageForUpload } from '../utils/imageCompression';
 const NEWSPAPER_LOGOS_FOLDER = 'newspaper_logos';
 
 /**
- * Storage disabled for free tier optimization.
- * Using base64 encoding in Firestore documents instead.
- * This keeps us within the 5GB storage limit.
+ * Storage enabled for free tier optimization.
+ * Using Firebase Storage (5GB free tier) for screenshots.
+ * URLs stored in Firestore documents instead of base64 strings.
+ * This increases capacity from ~200 users to ~1,000+ users.
  */
-export const USE_STORAGE = false;
+export const USE_STORAGE = true;
 
 function uriToBlob(uri: string): Promise<Blob> {
   return new Promise((resolve, reject) => {

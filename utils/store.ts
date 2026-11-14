@@ -11,7 +11,6 @@ import { resolvePaperImage } from '../assets/images';
 import {
   listenDeliveries,
   addDelivery,
-  updateDeliveryStatus as fbUpdateDeliveryStatus,
   listenPapers,
   addPaper as fbAddPaper,
   updatePaper as fbUpdatePaper,
@@ -66,7 +65,7 @@ export interface Delivery {
   startDate?: string;
   days?: string[];
   paymentMethod?: string;
-  category?: 'Newspaper' | 'Milk' | 'Water';
+  category?: 'Newspaper';
   quantity?: number;
   imageSrc?: string;
   homeImageUri?: string;
@@ -94,7 +93,7 @@ export interface Payment {
   txnId: string;
   status: 'Paid' | 'Pending';
   forMonth: string;
-  category?: 'Newspaper' | 'Milk' | 'Water';
+  category?: 'Newspaper';
   createdAt?: any;
 }
 
@@ -408,7 +407,7 @@ export const store = {
     paymentMethod: string;
     imageSrc?: string;
     homeImageUri?: string;
-    category?: 'Newspaper' | 'Milk' | 'Water';
+    category?: 'Newspaper';
     quantity?: number;
     location?: { lat: number; lng: number };
   }) {
@@ -457,20 +456,6 @@ export const store = {
       .catch((error) => {
         console.error('[Store] Failed to add subscription:', error);
       });
-  },
-
-  updateDeliveryStatus(id: string, status: 'Pending' | 'Delivered') {
-    // Optimistic local update for instant UI feedback
-    const delivery = deliveries.find(d => d.id === id);
-    if (!delivery || !delivery.phone || !delivery.category) {
-      console.error('Cannot update delivery: missing phone or category');
-      return;
-    }
-
-    deliveries = deliveries.map((d) => (d.id === id ? { ...d, status } : d));
-    notify();
-    // Sync to Firestore with phone and category (now required parameters)
-    fbUpdateDeliveryStatus(id, status, delivery.phone, delivery.category).catch(console.warn);
   },
 
   getAdminNumbers() {
@@ -546,6 +531,6 @@ export const store = {
   },
 
   notify() {
-    notify();
+    listeners.forEach((listener) => listener());
   },
 };

@@ -4,7 +4,7 @@
  */
 
 export { db } from './firebase';
-export { listenDeliveries, addDelivery, updateDeliveryStatus, seedDeliveries } from './deliveries';
+export { listenDeliveries, addDelivery, seedDeliveries } from './deliveries';
 export type { DeliveryDoc } from './deliveries';
 export { saveUser, fetchUser, fetchUserByEmail, listUsers, listenUsers, updateUser, deleteUser, listenUser, updateCustomerBill } from './users';
 export type { UserDoc } from './users';
@@ -27,8 +27,6 @@ export {
   PAPERS_CATALOG_WITH_IDS,
 } from './papers_catalog';
 export type { CatalogEntry, CatalogCategory } from './papers_catalog';
-export { placeOrder, listenCustomerOrders } from './orders';
-export type { OrderDoc } from './orders';
 
 export {
   saveVendor,

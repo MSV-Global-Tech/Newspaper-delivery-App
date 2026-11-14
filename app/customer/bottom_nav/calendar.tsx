@@ -85,21 +85,9 @@ export default function CalendarScreen() {
       currentMonth === today.getMonth() &&
       dayNum === today.getDate();
 
-    if (isToday) return primarySub?.status || 'Pending';
+    if (isToday) return primarySub?.status || 'Scheduled';
     return 'Scheduled';
   };
-
-  const toggleMarkDelivered = (dayNum: number) => {
-    const dateKey = `${currentYear}-${currentMonth + 1}-${dayNum}`;
-    store.setCalendarMark(dateKey, 'Delivered');
-  };
-
-  const toggleMarkNotDelivered = (dayNum: number) => {
-    const dateKey = `${currentYear}-${currentMonth + 1}-${dayNum}`;
-    store.setCalendarMark(dateKey, 'Not Delivered');
-  };
-
-  const selectedStatus = getDayStatus(selectedDay);
 
   if (!user) {
     return (
@@ -200,36 +188,19 @@ export default function CalendarScreen() {
 
               {Array.from({ length: daysInMonth }).map((_, idx) => {
                 const dayNum = idx + 1;
-                const status = getDayStatus(dayNum);
                 const isSelected = selectedDay === dayNum;
                 const isToday =
                   currentYear === today.getFullYear() &&
                   currentMonth === today.getMonth() &&
                   dayNum === today.getDate();
 
-                let isMarked = false;
-                let bgColor = 'transparent';
-                let textColor = '#0F172A';
-                
-                if (status === 'Delivered') {
-                  bgColor = '#22C55E';
-                  textColor = '#FFFFFF';
-                  isMarked = true;
-                } else if (status === 'Not Delivered') {
-                  bgColor = '#EF4444';
-                  textColor = '#FFFFFF';
-                  isMarked = true;
-                }
-
                 return (
                   <TouchableOpacity
                     key={`day-${dayNum}`}
                     style={[
                       styles.dayTile,
-                      isMarked && { backgroundColor: bgColor },
-                      !isMarked && isSelected && styles.dayTileSelected,
-                      isToday && !isSelected && !isMarked && styles.dayTileToday,
-                      isSelected && isMarked && { borderWidth: 2, borderColor: '#0F172A' },
+                      isSelected && styles.dayTileSelected,
+                      isToday && !isSelected && styles.dayTileToday,
                     ]}
                     onPress={() => setSelectedDay(dayNum)}
                     activeOpacity={0.8}
@@ -237,114 +208,38 @@ export default function CalendarScreen() {
                     <Text
                       style={[
                         styles.dayNumText,
-                        isMarked && { color: textColor, fontWeight: '800' },
-                        !isMarked && isSelected && styles.dayNumTextSelected,
-                        isToday && !isSelected && !isMarked && styles.dayNumTextToday,
+                        isSelected && styles.dayNumTextSelected,
+                        isToday && !isSelected && styles.dayNumTextToday,
                       ]}
                     >
                       {dayNum}
                     </Text>
-                    {!isMarked && (
-                      <View
-                        style={[
-                          styles.statusDot,
-                          { backgroundColor: isSelected ? '#FFFFFF' : '#3B82F6' },
-                        ]}
-                      />
-                    )}
+                    <View
+                      style={[
+                        styles.statusDot,
+                        { backgroundColor: isSelected ? '#FFFFFF' : '#3B82F6' },
+                      ]}
+                    />
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            {/* Legend Bar */}
-            <View style={styles.legendContainer}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#16A34A' }]} />
-                <Text style={styles.legendText}>Delivered</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} />
-                <Text style={styles.legendText}>Not Delivered</Text>
+            {/* ── SELECTED DAY DETAIL ── */}
+            <View style={styles.actionCard}>
+              <View style={styles.actionCardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.selectedDateTitle}>
+                    {MONTH_NAMES[currentMonth]} {selectedDay}, {currentYear}
+                  </Text>
+                  <Text style={styles.paperSubName}>
+                    Paper: <Text style={{ color: '#2563EB', fontWeight: '800' }}>{primarySub?.paperName || 'Vijayavani'}</Text>
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
-
-          {/* ── SELECTED DAY DETAIL & ACTIONS ── */}
-          <View style={styles.actionCard}>
-            <View style={styles.actionCardHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.selectedDateTitle}>
-                  {MONTH_NAMES[currentMonth]} {selectedDay}, {currentYear}
-                </Text>
-                <Text style={styles.paperSubName}>
-                  Paper: <Text style={{ color: '#2563EB', fontWeight: '800' }}>{primarySub?.paperName || 'Vijayavani'}</Text>
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.statusBadge,
-                  selectedStatus === 'Delivered' && { backgroundColor: '#DCFCE7' },
-                  selectedStatus === 'Not Delivered' && { backgroundColor: '#FEE2E2' },
-                  (selectedStatus === 'Scheduled' || selectedStatus === 'Pending') && { backgroundColor: '#EFF6FF' },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusBadgeText,
-                    selectedStatus === 'Delivered' && { color: '#15803D' },
-                    selectedStatus === 'Not Delivered' && { color: '#B91C1C' },
-                    (selectedStatus === 'Scheduled' || selectedStatus === 'Pending') && { color: '#1E40AF' },
-                  ]}
-                >
-                  {selectedStatus}
-                </Text>
-              </View>
-            </View>
-
-            {/* Action Row */}
-            <View style={styles.quickActionRow}>
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  selectedStatus === 'Delivered' ? { backgroundColor: '#16A34A' } : { backgroundColor: '#F0FDF4', borderWidth: 1.5, borderColor: '#BBF7D0' },
-                ]}
-                onPress={() => toggleMarkDelivered(selectedDay)}
-                activeOpacity={0.8}
-              >
-                <Text style={{ fontSize: 14 }}>✅</Text>
-                <Text
-                  style={[
-                    styles.actionBtnText,
-                    selectedStatus === 'Delivered' ? styles.textWhite : { color: '#16A34A' },
-                  ]}
-                >
-                  Mark Delivered
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  selectedStatus === 'Not Delivered' ? styles.actionBtnActiveRed : styles.actionBtnOutlineRed,
-                ]}
-                onPress={() => toggleMarkNotDelivered(selectedDay)}
-                activeOpacity={0.8}
-              >
-                <Text style={{ fontSize: 14 }}>❌</Text>
-                <Text
-                  style={[
-                    styles.actionBtnText,
-                    selectedStatus === 'Not Delivered' ? styles.textWhite : { color: '#DC2626' },
-                  ]}
-                >
-                  Not Delivered
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-      </ScrollView>
+        </ScrollView>
     </SafeAreaView>
   );
 }

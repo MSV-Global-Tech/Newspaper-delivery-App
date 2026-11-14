@@ -223,7 +223,7 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 36 }}>🚀</Text>
             </View>
             <Text style={styles.updateTitle}>Update Available!</Text>
-            <Text style={styles.updateSubtitle}>Download the latest version of newspaper delivery</Text>
+            <Text style={{ fontSize: 14, color: '#64748B', marginTop: 8, textAlign: 'center' }}>Download the latest version of newspaper delivery</Text>
 
             <TouchableOpacity
               style={styles.updateBtn}
@@ -492,7 +492,7 @@ export default function HomeScreen() {
                     <View>
                       <View style={styles.activeBadge}>
                         <Text style={styles.activeBadgeText}>
-                          {delivery?.status === 'Delivered' ? 'Delivered' : 'Active'}
+                          Active
                         </Text>
                       </View>
                       <ChevronRight size={16} color="#CBD5E1" style={{ marginTop: 10, alignSelf: 'flex-end' }} />

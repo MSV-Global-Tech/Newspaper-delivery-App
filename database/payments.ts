@@ -20,7 +20,7 @@ export interface PaymentDoc {
   txnId: string;
   status: 'Paid' | 'Pending';
   forMonth: string;
-  category?: 'Newspaper' | 'Milk' | 'Water';
+  category?: 'Newspaper';
   paperName?: string;
   screenshotUrl?: string;
   createdAt?: any;

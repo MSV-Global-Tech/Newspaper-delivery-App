@@ -138,22 +138,32 @@ export default function AdminScreen() {
   const [isCleaning, setIsCleaning] = useState(false);
 
   // Limit alerts
+  // Firebase Storage: 5GB limit for screenshots
   const storagePercent = Math.round((storageUsage.estimatedSizeMB / 5000) * 100);
   const isStorageWarning = storagePercent > 70;
   const isStorageCritical = storagePercent > 90;
 
-  const estimatedReads = Math.round(usersList.length * 1.5);
+  // Firestore Database: 1GB limit for text data
+  const dbUsageMB = Math.round((usersList.length * 4) / 1024); // ~4KB per user
+  const dbPercent = Math.round((dbUsageMB / 1024) * 100);
+  const isDbWarning = dbPercent > 70;
+  const isDbCritical = dbPercent > 90;
+
+  // Daily Reads: 50,000 limit
+  const estimatedReads = Math.round(usersList.length * 7); // ~7 reads per user/day
   const readsPercent = Math.round((estimatedReads / 50000) * 100);
   const isReadsWarning = readsPercent > 70;
   const isReadsCritical = readsPercent > 90;
 
-  const estimatedWrites = Math.round(storageUsage.totalBills * 0.1);
+  // Daily Writes: 20,000 limit
+  const estimatedWrites = Math.round(usersList.length * 3); // ~3 writes per user/day
   const writesPercent = Math.round((estimatedWrites / 20000) * 100);
   const isWritesWarning = writesPercent > 70;
   const isWritesCritical = writesPercent > 90;
 
-  const estimatedAuth = Math.round(usersList.length * 0.5);
-  const authPercent = Math.round((estimatedAuth / 10000) * 100);
+  // Firebase Auth: 50,000 sign-ins/day limit (optional layer)
+  const estimatedAuth = Math.round(usersList.length * 1); // ~1 auth per user/day
+  const authPercent = Math.round((estimatedAuth / 50000) * 100);
   const isAuthWarning = authPercent > 70;
   const isAuthCritical = authPercent > 90;
 
@@ -455,10 +465,6 @@ export default function AdminScreen() {
     );
   };
 
-  const handleUpdateStatus = (id: string, newStatus: 'Delivered') => {
-    store.updateDeliveryStatus(id, newStatus);
-  };
-
   const handleLogout = () => {
     store.setUser(null);
     router.replace('/customer/login');
@@ -557,7 +563,6 @@ export default function AdminScreen() {
     (sum, d) => sum + (typeof d.priceMonth === 'number' && isFinite(d.priceMonth) ? d.priceMonth : 0),
     0
   );
-  const pendingCount = deliveries.filter(d => d.status === 'Pending').length;
   
   // Calculate total subscription fees collected (₹50 per subscription)
   const subscriptionFeePerUser = 50;
@@ -581,7 +586,6 @@ export default function AdminScreen() {
   const customerChange = computeChange(totalCustomers, prevOverview?.totalCustomers);
   const subsChange = computeChange(activeSubs, prevOverview?.activeSubs);
   const revenueChange = computeChange(totalMonthlyRevenue, prevOverview?.totalMonthlyRevenue);
-  const pendingChange = computeChange(pendingCount, prevOverview?.pendingCount);
   const subscriptionFeesChange = computeChange(totalSubscriptionFees, prevOverview?.totalSubscriptionFees);
 
   useEffect(() => {
@@ -589,22 +593,21 @@ export default function AdminScreen() {
       totalCustomers,
       activeSubs,
       totalMonthlyRevenue,
-      pendingCount,
       totalSubscriptionFees,
+      pendingCount: 0,
       capturedAt: Date.now(),
     };
     const t = setTimeout(() => {
       setAdminOverviewSnapshot(snapshot).catch(() => { });
     }, 800);
     return () => clearTimeout(t);
-  }, [totalCustomers, activeSubs, totalMonthlyRevenue, pendingCount, totalSubscriptionFees]);
+  }, [totalCustomers, activeSubs, totalMonthlyRevenue, totalSubscriptionFees]);
 
   const dynamicStats = [
     { label: 'Total Customers', value: totalCustomers.toString(), change: customerChange.label, trend: customerChange.trend, icon: Users, bg: '#EFF6FF', color: '#2563EB' },
     { label: 'Active Subs', value: activeSubs.toString(), change: subsChange.label, trend: subsChange.trend, icon: Check, bg: '#ECFDF5', color: '#059669' },
     { label: 'Monthly Revenue', value: `₹${totalMonthlyRevenue.toLocaleString('en-IN')}`, change: revenueChange.label, trend: revenueChange.trend, icon: DollarSign, bg: '#FEF2F2', color: '#DC2626' },
     { label: 'Subscription Fees', value: `₹${totalSubscriptionFees.toLocaleString('en-IN')}`, change: subscriptionFeesChange.label, trend: subscriptionFeesChange.trend, icon: CreditCard, bg: '#F0F9FF', color: '#0EA5E9' },
-    { label: 'Pending Delivery', value: pendingCount.toString(), change: pendingChange.label, trend: pendingChange.trend, icon: FileText, bg: '#FFF7ED', color: '#D97706' },
   ];
 
   const paymentCustomerRows = (() => {
@@ -922,6 +925,29 @@ export default function AdminScreen() {
                           style={[styles.custCardPremium, { borderLeftWidth: 3, borderLeftColor: accentColor }]}
                           activeOpacity={0.8}
                           onPress={() => setSelectedCustomerForBilling(u)}
+                          onLongPress={() => {
+                            Alert.alert(
+                              'Delete Customer',
+                              `Are you sure you want to delete ${displayName} (${u.phone})? This will permanently remove all their data including bills, payments, and delivery history. This action cannot be undone.`,
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Delete',
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    try {
+                                      await deleteUser(u.phone);
+                                      Alert.alert('Deleted', `${displayName} has been permanently deleted.`);
+                                    } catch (e: any) {
+                                      Alert.alert('Error', 'Failed to delete customer. Please try again.');
+                                      console.error('[Admin] Delete user error:', e);
+                                    }
+                                  },
+                                },
+                              ],
+                              { cancelable: true }
+                            );
+                          }}
                         >
                           <View style={[styles.custAvatar, { backgroundColor: ac.bg }]}>
                             <Text style={[styles.custAvatarText, { color: ac.text }]}>{getInitials(u.name || 'C')}</Text>
@@ -1184,15 +1210,6 @@ export default function AdminScreen() {
                         <Text style={{ fontSize: 10, fontWeight: '700', color: '#16A34A' }}>₹50 Paid</Text>
                       </View>
                     )}
-                    <View style={[
-                      { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
-                      item.status === 'Delivered' ? { backgroundColor: '#ECFDF5' } : { backgroundColor: '#FFF7ED' }
-                    ]}>
-                      <Text style={[
-                        { fontSize: 10, fontWeight: '700' },
-                        item.status === 'Delivered' ? { color: '#16A34A' } : { color: '#D97706' }
-                      ]}>{item.status}</Text>
-                    </View>
                     <ChevronRight size={14} color="#CBD5E1" />
                   </View>
                 </TouchableOpacity>
@@ -1216,16 +1233,6 @@ export default function AdminScreen() {
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>{selectedDelivery?.name}</Text>
                 <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>Order Details</Text>
-              </View>
-              {/* Status badge */}
-              <View style={[
-                { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-                selectedDelivery?.status === 'Delivered' ? { backgroundColor: '#ECFDF5' } : { backgroundColor: '#FFF7ED' }
-              ]}>
-                <Text style={[
-                  { fontSize: 12, fontWeight: '800' },
-                  selectedDelivery?.status === 'Delivered' ? { color: '#16A34A' } : { color: '#D97706' }
-                ]}>{selectedDelivery?.status}</Text>
               </View>
             </View>
 
@@ -1306,21 +1313,6 @@ export default function AdminScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
-              )}
-
-              {/* Mark Delivered Button */}
-              {selectedDelivery?.status === 'Pending' && (
-                <TouchableOpacity
-                  style={{ marginTop: 24, backgroundColor: '#16A34A', borderRadius: 14, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                  onPress={() => {
-                    store.updateDeliveryStatus(selectedDelivery.id, 'Delivered');
-                    setSelectedDelivery(null);
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <Check size={18} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>Mark as Delivered</Text>
-                </TouchableOpacity>
               )}
             </ScrollView>
           </SafeAreaView>
@@ -1619,7 +1611,7 @@ export default function AdminScreen() {
           <View style={styles.container}>
             <Text style={styles.sectionTitle}>Database Maintenance</Text>
 
-            {/* Storage Usage Card */}
+            {/* Firebase Storage Usage (Screenshots) */}
             <View style={[
               { backgroundColor: '#F8FAFC', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
               isStorageCritical && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
@@ -1627,7 +1619,7 @@ export default function AdminScreen() {
             ]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                 <Database size={20} color={isStorageCritical ? '#DC2626' : isStorageWarning ? '#D97706' : '#2563EB'} />
-                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Storage Usage</Text>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Firebase Storage (Screenshots)</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View>
@@ -1636,7 +1628,7 @@ export default function AdminScreen() {
                     isStorageCritical && { color: '#DC2626' },
                     isStorageWarning && !isStorageCritical && { color: '#D97706' }
                   ]}>{storageUsage.estimatedSizeMB} MB</Text>
-                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>of 5,000 MB free tier</Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>of 5,000 MB (5GB) free tier</Text>
                 </View>
                 <View style={[
                   { backgroundColor: '#DBEAFE', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
@@ -1653,15 +1645,15 @@ export default function AdminScreen() {
               <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
                 {isStorageCritical ? (
                   <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>
-                    ⚠️ CRITICAL: Only ~{Math.round((5000 - storageUsage.estimatedSizeMB) / 0.2)} screenshots remaining. Run cleanup now!
+                    ⚠️ CRITICAL: Only ~{Math.round((5000 - storageUsage.estimatedSizeMB) / 0.3)} screenshots remaining. Run cleanup now!
                   </Text>
                 ) : isStorageWarning ? (
                   <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '500' }}>
-                    ⚠️ WARNING: ~{Math.round((5000 - storageUsage.estimatedSizeMB) / 0.2)} screenshots remaining. Consider cleanup soon.
+                    ⚠️ WARNING: ~{Math.round((5000 - storageUsage.estimatedSizeMB) / 0.3)} screenshots remaining. Consider cleanup soon.
                   </Text>
                 ) : (
                   <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '500' }}>
-                    ✅ You can still store ~{Math.round((5000 - storageUsage.estimatedSizeMB) / 0.2)} more screenshots
+                    ✅ You can still store ~{Math.round((5000 - storageUsage.estimatedSizeMB) / 0.3)} more screenshots
                   </Text>
                 )}
               </View>
@@ -1707,26 +1699,48 @@ export default function AdminScreen() {
               </View>
             </View>
 
-            {/* Text Data Stats */}
-            <View style={{ backgroundColor: '#F8FAFC', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}>
+            {/* Firestore Database Usage */}
+            <View style={[
+              { backgroundColor: '#F8FAFC', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
+              isDbCritical && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+              isDbWarning && !isDbCritical && { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }
+            ]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <FileText size={20} color="#2563EB" />
-                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Text Data (Records)</Text>
+                <FileText size={20} color={isDbCritical ? '#DC2626' : isDbWarning ? '#D97706' : '#2563EB'} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Firestore Database</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <View>
                   <Text style={{ fontSize: 13, color: '#64748B' }}>Est. Size</Text>
-                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#1E293B' }}>{Math.round((storageUsage.totalBills + storageUsage.totalPayments) * 0.26)} KB</Text>
+                  <Text style={[
+                    { fontSize: 18, fontWeight: '600', color: '#2563EB' },
+                    isDbCritical && { color: '#DC2626' },
+                    isDbWarning && !isDbCritical && { color: '#D97706' }
+                  ]}>{dbUsageMB} MB</Text>
                 </View>
                 <View>
-                  <Text style={{ fontSize: 13, color: '#64748B' }}>% of Storage</Text>
-                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#10B981' }}>&lt; 1%</Text>
+                  <Text style={{ fontSize: 13, color: '#64748B' }}>of 1,024 MB</Text>
+                  <Text style={[
+                    { fontSize: 18, fontWeight: '600', color: '#10B981' },
+                    isDbCritical && { color: '#DC2626' },
+                    isDbWarning && !isDbCritical && { color: '#D97706' }
+                  ]}>{dbPercent}%</Text>
                 </View>
               </View>
               <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
-                <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '500' }}>
-                  ✅ Unlimited capacity - text data negligible
-                </Text>
+                {isDbCritical ? (
+                  <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>
+                    ⚠️ CRITICAL: Database approaching 1GB limit
+                  </Text>
+                ) : isDbWarning ? (
+                  <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '500' }}>
+                    ⚠️ WARNING: Database usage at {dbPercent}%
+                  </Text>
+                ) : (
+                  <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '500' }}>
+                    ✅ Database usage healthy (~{1024 - dbUsageMB} MB remaining)
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -1775,7 +1789,7 @@ export default function AdminScreen() {
               </View>
             </View>
 
-            {/* Monthly Auth */}
+            {/* Firebase Auth */}
             <View style={[
               { backgroundColor: '#F8FAFC', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
               isAuthCritical && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
@@ -1783,7 +1797,7 @@ export default function AdminScreen() {
             ]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                 <Shield size={20} color={isAuthCritical ? '#DC2626' : isAuthWarning ? '#D97706' : '#2563EB'} />
-                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Monthly Auth</Text>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B', marginLeft: 8 }}>Firebase Auth</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View>
@@ -1792,7 +1806,7 @@ export default function AdminScreen() {
                     isAuthCritical && { color: '#DC2626' },
                     isAuthWarning && !isAuthCritical && { color: '#D97706' }
                   ]}>{estimatedAuth}</Text>
-                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>of 10,000 verifications</Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>of 50,000 daily sign-ins</Text>
                 </View>
                 <View style={[
                   { backgroundColor: '#DBEAFE', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
@@ -1809,15 +1823,15 @@ export default function AdminScreen() {
               <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
                 {isAuthCritical ? (
                   <Text style={{ fontSize: 11, color: '#DC2626', fontWeight: '500' }}>
-                    ⚠️ CRITICAL: Only {Math.round(10000 - estimatedAuth)} user logins remaining this month
+                    ⚠️ CRITICAL: Only {Math.round(50000 - estimatedAuth)} Firebase Auth sign-ins remaining today
                   </Text>
                 ) : isAuthWarning ? (
                   <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '500' }}>
-                    ⚠️ WARNING: {Math.round(10000 - estimatedAuth)} user logins remaining this month
+                    ⚠️ WARNING: {Math.round(50000 - estimatedAuth)} Firebase Auth sign-ins remaining today
                   </Text>
                 ) : (
                   <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '500' }}>
-                    ✅ {Math.round(10000 - estimatedAuth)} user logins remaining this month
+                    ✅ {Math.round(50000 - estimatedAuth)} Firebase Auth sign-ins remaining today
                   </Text>
                 )}
               </View>
@@ -1913,11 +1927,6 @@ export default function AdminScreen() {
                       <Text style={styles.subRowTitle}>{s.paperName}</Text>
                       <Text style={styles.subRowMeta} numberOfLines={1}>
                         {s.plan || 'Monthly'}  •  ₹{Math.round((typeof s.priceMonth === 'number' && isFinite(s.priceMonth) ? s.priceMonth : 0)).toLocaleString('en-IN')}/mo
-                      </Text>
-                    </View>
-                    <View style={[styles.subStatusPill, s.status === 'Delivered' ? styles.subStatusDelivered : styles.subStatusPending]}>
-                      <Text style={[styles.subStatusText, s.status === 'Delivered' ? styles.subStatusTextDelivered : styles.subStatusTextPending]}>
-                        {s.status}
                       </Text>
                     </View>
                   </View>

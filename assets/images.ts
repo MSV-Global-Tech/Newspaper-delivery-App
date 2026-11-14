@@ -4,9 +4,6 @@
 
 export const IMAGES: Record<string, any> = {
   // ── App UI images ──
-  'onboarding.webp': require('./splash1.webp'),
-  'splash1.webp':    require('./splash1.webp'),
-  'splash2.webp':    require('./splash2.webp'),
   'logo.png':       require('./logo.png'),
 
   // ── Kannada newspaper logos ──

@@ -12,6 +12,7 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -59,6 +60,7 @@ export default function LoginScreen() {
 
   const handleDetectLocation = async () => {
     setIsDetectingLocation(true);
+    
     try {
       // Request location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -68,30 +70,60 @@ export default function LoginScreen() {
           'Location permission is required to detect your address. Please enable it in settings.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Location.openAppSettings() }
+            { text: 'Open Settings', onPress: () => Linking.openSettings() }
           ]
         );
         setIsDetectingLocation(false);
         return;
       }
 
-      // Get current location with better accuracy
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-        timeout: 15000,
-      });
+      // Check if location services are enabled
+      const isLocationServicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!isLocationServicesEnabled) {
+        Alert.alert(
+          'Location Services Disabled',
+          'Please enable location services in your device settings to use auto-detect. You can also enter your address manually below.',
+          [
+            { text: 'Enter Manually', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() }
+          ]
+        );
+        setIsDetectingLocation(false);
+        setLocationDetected(true); // Allow manual entry
+        return;
+      }
+
+      // Try to get location with retries (up to 3 attempts)
+      let location = null;
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts && !location) {
+        attempts++;
+        try {
+          // Use high accuracy for faster results
+          location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+          break; // Success, exit loop
+        } catch (error) {
+          console.log(`Location attempt ${attempts} failed:`, error);
+          if (attempts < maxAttempts) {
+            // Wait 1 second before retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      }
+
+      if (!location) {
+        throw new Error('Failed to get location after multiple attempts');
+      }
 
       const { latitude, longitude } = location.coords;
       setLocationCoords({ latitude, longitude });
-      console.log('Location detected:', latitude, longitude);
 
-      // Try multiple geocoding APIs
-      let addressData = null;
-      let lastError = null;
-
-      // Try 1: Nominatim (OpenStreetMap)
+      // Try reverse geocoding to get address components
       try {
-        console.log('Trying Nominatim API...');
         const response = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
           {
@@ -103,113 +135,56 @@ export default function LoginScreen() {
         );
         
         if (response.ok) {
-          addressData = await response.json();
-          console.log('Nominatim success:', addressData);
-        }
-      } catch (error) {
-        console.error('Nominatim failed:', error);
-        lastError = error;
-      }
-
-      // Try 2: Google Maps Geocoding (if Nominatim failed)
-      if (!addressData) {
-        try {
-          console.log('Trying Google Maps API...');
-          const response = await fetch(
-            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=AIzaSyDP_RxsRZSgIgsY3NYEoJgcJdNOgz-isF0&language=en`
-          );
-          
-          if (response.ok) {
-            const googleData = await response.json();
-            if (googleData.results && googleData.results.length > 0) {
-              const result = googleData.results[0];
-              addressData = {
-                display_name: result.formatted_address,
-                address: {
-                  city: result.address_components.find((c: any) => c.types.includes('locality'))?.long_name || '',
-                  town: result.address_components.find((c: any) => c.types.includes('locality'))?.long_name || '',
-                  village: result.address_components.find((c: any) => c.types.includes('locality'))?.long_name || '',
-                  state_district: result.address_components.find((c: any) => c.types.includes('administrative_area_level_2'))?.long_name || '',
-                  district: result.address_components.find((c: any) => c.types.includes('administrative_area_level_2'))?.long_name || '',
-                  state: result.address_components.find((c: any) => c.types.includes('administrative_area_level_1'))?.long_name || '',
-                  postcode: result.address_components.find((c: any) => c.types.includes('postal_code'))?.long_name || '',
-                  road: result.address_components.find((c: any) => c.types.includes('route'))?.long_name || '',
-                  suburb: result.address_components.find((c: any) => c.types.includes('sublocality'))?.long_name || '',
-                  neighbourhood: result.address_components.find((c: any) => c.types.includes('neighborhood'))?.long_name || '',
-                  house_number: result.address_components.find((c: any) => c.types.includes('street_number'))?.long_name || '',
-                }
-              };
-              console.log('Google Maps success:', addressData);
-            }
-          }
-        } catch (error) {
-          console.error('Google Maps failed:', error);
-          lastError = error;
-        }
-      }
-
-      if (addressData && addressData.address) {
-        const addr = addressData.address;
-        
-        // Extract address components
-        const fullAddress = addressData.display_name || '';
-        
-        // Parse Indian address structure
-        const parts = fullAddress.split(',').map(p => p.trim());
-        
-        // Try to extract pincode (usually last 6 digits)
-        const pincodeMatch = fullAddress.match(/\b\d{6}\b/);
-        if (pincodeMatch) {
-          setPincode(pincodeMatch[0]);
-        } else if (addr.postcode) {
-          setPincode(addr.postcode);
-        }
-
-        // Try to extract city/district (prioritize Indian address structure)
-        let detectedCity = addr.city || addr.town || addr.village || addr.municipality || addr.state_district || addr.district || '';
-        if (!detectedCity && parts.length >= 2) {
-          // Try to find the city from parts (usually 2nd or 3rd from end)
-          for (let i = parts.length - 2; i >= 0; i--) {
-            const part = parts[i];
-            if (part.length > 2 && !/\d/.test(part) && !part.includes('Pin')) {
-              detectedCity = part;
-              break;
-            }
+          const data = await response.json();
+          if (data && data.address) {
+            const addr = data.address;
+            const fullAddress = data.display_name || '';
+            
+            // Extract and auto-fill address components
+            const pincodeMatch = fullAddress.match(/\b\d{6}\b/);
+            if (pincodeMatch) setPincode(pincodeMatch[0]);
+            
+            // Extract city/district/state
+            let detectedCity = addr.city || addr.town || addr.village || addr.municipality || addr.state_district || addr.district || '';
+            setCity(detectedCity);
+            
+            // Extract area
+            let detectedArea = addr.suburb || addr.neighbourhood || addr.road || addr.village || '';
+            setArea(detectedArea);
+            
+            // Extract house number
+            setHouseNo(addr.house_number || '');
+            
+            // Set full address
+            setAddress(fullAddress);
+            
+            setLocationDetected(true);
+            showToast('Location detected! You can edit the address if needed.');
+            return;
           }
         }
-        setCity(detectedCity);
-
-        // Try to extract area/locality (first meaningful part)
-        let detectedArea = addr.suburb || addr.neighbourhood || addr.road || addr.village || '';
-        if (!detectedArea && parts.length > 0) {
-          detectedArea = parts[0];
-        }
-        setArea(detectedArea);
-
-        // Try to extract house number
-        const detectedHouseNo = addr.house_number || '';
-        setHouseNo(detectedHouseNo);
-
-        // Set full address
-        setAddress(fullAddress);
-
-        setLocationDetected(true);
-        showToast('Address detected successfully!');
-      } else {
-        console.error('All geocoding attempts failed. Last error:', lastError);
-        Alert.alert(
-          'Location Detection Failed',
-          'Could not detect your address automatically. Please enter your address manually.',
-          [{ text: 'OK' }]
-        );
+      } catch (geocodingError) {
+        console.error('Geocoding failed:', geocodingError);
       }
+
+      // If geocoding fails, still mark as detected for manual entry
+      setLocationDetected(true);
+      showToast('Location detected! Please enter your address manually.');
     } catch (error) {
       console.error('Location error:', error);
+      
       Alert.alert(
         'Location Detection Failed',
-        'Could not detect your location. Please enable GPS and try again.',
-        [{ text: 'OK' }]
+        'Could not detect your location. Please check your GPS signal or enter your address manually.',
+        [
+          { text: 'Enter Manually', style: 'cancel' },
+          { text: 'Try Again', onPress: () => handleDetectLocation() }
+        ]
       );
+      
+      // Still allow manual entry
+      setLocationDetected(true);
+      showToast('You can enter your address manually below.');
     } finally {
       setIsDetectingLocation(false);
     }
@@ -405,6 +380,59 @@ export default function LoginScreen() {
       } else {
         // Signup: Check if phone number already exists
         const existingUserByPhone = await fetchUser(phone.trim());
+        
+        // If phone exists and is a vendor (created by admin), update it instead of creating new
+        if (existingUserByPhone && (existingUserByPhone as any).isVendor) {
+          console.log('Vendor record found, updating with email/password');
+          
+          // Update the existing vendor record with email and password
+          const hashedPassword = await hashPassword(password);
+          
+          // Create Firebase Auth user with email + password
+          try {
+            console.log('Creating Firebase Auth user for vendor signup...');
+            await auth().createUserWithEmailAndPassword(email.trim(), password);
+            console.log('Firebase Auth user created successfully');
+          } catch (firebaseError: any) {
+            console.error('Firebase Auth signup error:', firebaseError.code, firebaseError.message);
+            if (firebaseError.code === 'auth/email-already-in-use') {
+              showToast('This email is already registered. Please login.', false);
+              setLoading(false);
+              return;
+            } else if (firebaseError.code === 'auth/weak-password') {
+              showToast('Password is too weak. Use at least 6 characters.', false);
+              setLoading(false);
+              return;
+            } else if (firebaseError.code === 'auth/invalid-email') {
+              showToast('Invalid email address', false);
+              setLoading(false);
+              return;
+            }
+            console.error('Firebase Auth failed, continuing without it');
+          }
+
+          // Update the vendor record
+          const address = `${houseNo.trim()}, ${area.trim()}, ${city.trim()}-${pincode.trim()}`;
+          const updatedUser = {
+            ...existingUserByPhone,
+            name: name.trim(),
+            email: email.trim(),
+            address: address,
+            password: hashedPassword,
+            approvalStatus: 'approved' as 'approved' | 'pending' | 'rejected',
+          };
+
+          await saveUser(updatedUser);
+          
+          showToast('Vendor account created successfully! Please login.');
+          setPhone(phone.trim());
+          setPassword('');
+          setIsLogin(true);
+          setLoading(false);
+          return;
+        }
+        
+        // If phone exists but is not a vendor, show error
         if (existingUserByPhone) {
           showToast('An account with this phone number already exists. Please login.', false);
           setLoading(false);
@@ -465,7 +493,7 @@ export default function LoginScreen() {
           customerKind: (existingCustomer ? 'legacy' : 'new') as 'new' | 'legacy',
           approvalStatus: (existingCustomer ? 'pending' : 'approved') as 'pending' | 'approved',
           createdAt: new Date().toISOString(),
-          location: locationCoords,
+          location: locationCoords, // Store GPS coordinates for verification
         };
 
         await saveUser(newUser);
@@ -490,7 +518,7 @@ export default function LoginScreen() {
       /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email) &&
       // Additional domain check
       email.split('@').length === 2 &&
-      email.split('@')[1]?.split('.').pop()?.length >= 2 &&
+      (email.split('@')[1]?.split('.').pop()?.length || 0) >= 2 &&
       // Other validations
       password === confirmPassword &&
       name.trim().length > 0 &&
@@ -673,6 +701,22 @@ export default function LoginScreen() {
                     </>
                   )}
                 </TouchableOpacity>
+
+                {/* Detected Location (Read-only) */}
+                {locationDetected && (
+                  <View style={s.detectedLocationBox}>
+                    <MapPin size={16} color="#2563EB" />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={s.detectedLocationTitle}>Detected Location</Text>
+                      <Text style={s.detectedLocationText} numberOfLines={2}>
+                        {address || 'Location detected'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Manual Entry Fields */}
+                <Text style={[s.label, { marginTop: 16 }]}>Enter Your Address Details</Text>
 
                 {/* House/Flat No */}
                 <View style={s.inputContainer}>
@@ -1006,6 +1050,27 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 12,
     gap: 8,
+  },
+  detectedLocationBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  detectedLocationTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563EB',
+    marginBottom: 4,
+  },
+  detectedLocationText: {
+    fontSize: 13,
+    color: '#475569',
+    lineHeight: 18,
   },
   autoDetectBtnDetected: {
     backgroundColor: '#16A34A',

@@ -40,7 +40,8 @@ export default function DeliveryDetailScreen() {
   };
 
   const handleMarkDelivered = () => {
-    store.updateDeliveryStatus(delivery.id, 'Delivered');
+    // Delivery status marking removed - no longer needed
+    alert('This feature has been removed');
   };
 
   return (

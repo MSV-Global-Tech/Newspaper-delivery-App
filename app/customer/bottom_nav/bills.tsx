@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../../../database/storageHelper';
 import { updateCustomerBill, listenUser, updateUser } from '../../../database/users';
 import { listenPayments } from '../../../database/payments';
+import { listenAppSettings } from '../../../database/settings';
 import { store } from '../../../utils/store';
 import {
   FileText,
@@ -29,6 +30,55 @@ import {
   X,
 } from 'lucide-react-native';
 
+// Helper function to format date from various formats
+const formatBillDate = (dateInput: any): string => {
+  if (!dateInput) return 'N/A';
+  
+  try {
+    let date: Date;
+    
+    // If it's a timestamp number
+    if (typeof dateInput === 'number') {
+      date = new Date(dateInput);
+    }
+    // If it's already a Date object
+    else if (dateInput instanceof Date) {
+      date = dateInput;
+    }
+    // If it's a string, try to parse it
+    else if (typeof dateInput === 'string') {
+      // Try ISO format first
+      date = new Date(dateInput);
+      // If invalid, try other formats
+      if (isNaN(date.getTime())) {
+        // Try DD/MM/YYYY or DD-MM-YYYY
+        const parts = dateInput.split(/[-/]/);
+        if (parts.length === 3) {
+          const [day, month, year] = parts;
+          date = new Date(`${year}-${month}-${day}`);
+        }
+      }
+    } else {
+      return 'N/A';
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'N/A';
+    }
+    
+    // Format as DD/MM/YYYY
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
+};
+
 export default function BillsScreen() {
   const [user, setUser] = useState(store.getUser() as any);
   const [bills, setBills] = useState<any[]>([]);
@@ -39,6 +89,7 @@ export default function BillsScreen() {
   const [isPaymentAmountModalOpen, setIsPaymentAmountModalOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [billForPayment, setBillForPayment] = useState<any>(null);
+  const [appSettings, setAppSettings] = useState<any>(null);
 
   useEffect(() => {
     // Listen to store for user info updates
@@ -58,6 +109,7 @@ export default function BillsScreen() {
     const currentUser = store.getUser();
     let unsubFirestore: (() => void) | null = null;
     let unsubPayments: (() => void) | null = null;
+    let unsubSettings: (() => void) | null = null;
     if (currentUser?.phone) {
       unsubFirestore = listenUser(currentUser.phone, (doc) => {
         if (doc && (doc as any).bills) {
@@ -69,12 +121,18 @@ export default function BillsScreen() {
       unsubPayments = listenPayments((paymentDocs) => {
         setPayments(paymentDocs);
       }, { customerPhone: currentUser.phone });
+
+      // Listen to app settings for UPI ID
+      unsubSettings = listenAppSettings((settings) => {
+        setAppSettings(settings);
+      });
     }
 
     return () => {
       unsubStore();
       if (unsubFirestore) unsubFirestore();
       if (unsubPayments) unsubPayments();
+      if (unsubSettings) unsubSettings();
     };
   }, []);
 
@@ -100,6 +158,10 @@ export default function BillsScreen() {
         paperName: p.category === 'Newspaper' ? 'Newspaper Subscription' : p.category,
       }))
   ] : [];
+
+  const showToast = (message: string) => {
+    Alert.alert('Success', message);
+  };
 
   const handleUploadScreenshot = async (bill: any) => {
     setBillForPayment(bill);
@@ -216,7 +278,25 @@ export default function BillsScreen() {
                     <View style={styles.actionRow}>
                       <TouchableOpacity
                         style={styles.payBtn}
-                        onPress={() => Linking.openURL(`upi://pay?pa=9972505709@ibl&pn=Newspaper%20Delivery&am=${bill.totalAmount}&cu=INR`)}
+                        onPress={() => {
+                          const upiId = appSettings?.paymentUpiId || '9972505709@ibl';
+                          const upiName = appSettings?.paymentUpiName || 'Akhil KS';
+                          const amount = bill.totalAmount;
+                          
+                          // Try generic UPI intent first
+                          const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(upiName)}&am=${amount}&cu=INR&tn=Bill Payment`;
+                          
+                          Linking.openURL(upiUrl).catch(() => {
+                            // Fallback: Show UPI ID for manual payment
+                            Alert.alert(
+                              'UPI Payment',
+                              `Pay ₹${amount} to:\n\nUPI ID: ${upiId}\nName: ${upiName}\n\nOr use any UPI app to scan/pay manually.`,
+                              [
+                                { text: 'OK', style: 'default' }
+                              ]
+                            );
+                          });
+                        }}
                       >
                         <CreditCard size={15} color="#FFF" />
                         <Text style={styles.payBtnText}>Pay ₹{bill.totalAmount} via UPI</Text>
@@ -364,7 +444,7 @@ export default function BillsScreen() {
                   <Text style={styles.dashedLine}>----------------------------------------</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={styles.receiptMeta}>BILL NO: #{selectedBill.id.slice(-8).toUpperCase()}</Text>
-                    <Text style={styles.receiptMeta}>DATE: {new Date(selectedBill.date || selectedBill.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
+                    <Text style={styles.receiptMeta}>DATE: {formatBillDate(selectedBill.date || selectedBill.createdAt)}</Text>
                   </View>
                   <Text style={styles.receiptMeta}>CUSTOMER: {user?.name?.toUpperCase() || 'CUSTOMER'}</Text>
                   <Text style={styles.receiptMeta}>PHONE: {user?.phone || 'N/A'}</Text>
@@ -493,6 +573,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10,
     gap: 8,
+    flex: 1,
   },
   payBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
   uploadBtn: {
@@ -505,6 +586,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#BFDBFE',
     gap: 8,
+    flex: 1,
   },
   uploadBtnText: { color: '#2563EB', fontWeight: '600', fontSize: 13 },
   viewBillBtn: { 

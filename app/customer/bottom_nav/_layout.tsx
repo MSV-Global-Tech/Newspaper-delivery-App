@@ -113,16 +113,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="calendar"
         options={{
-          title: 'Calendar',
-          tabBarIcon: ({ color }) => <CalendarIcon size={22} color={color} />,
+          href: null, // Hidden from tab bar
         }}
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            if (navigation.isFocused()) {
-              e.preventDefault();
-            }
-          },
-        })}
       />
       <Tabs.Screen
         name="notifications"

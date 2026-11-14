@@ -57,50 +57,49 @@ function isScreenshotOld(date: Date): boolean {
 }
 
 /**
- * Cleanup old screenshots from bills collection
+ * Cleanup old screenshots from users.bills[] array
+ * NOTE: Your app stores bills in users collection, not separate bills collection
  */
 async function cleanupBillScreenshots(): Promise<{ cleaned: number; errors: number }> {
   let cleaned = 0;
   let errors = 0;
 
   try {
-    const billsSnapshot = await getDocs(collection(db, 'bills'));
+    const usersSnapshot = await getDocs(collection(db, 'users'));
 
-    for (const billDoc of billsSnapshot.docs) {
+    for (const userDoc of usersSnapshot.docs) {
       try {
-        const billData = billDoc.data();
-        const billDate = getDateFromTimestamp(billData.date);
+        const userData = userDoc.data();
+        
+        if (!userData.bills || !Array.isArray(userData.bills)) continue;
 
-        if (!billDate) continue;
+        let needsUpdate = false;
+        const updatedBills = userData.bills.map((bill: any) => {
+          const billDate = getDateFromTimestamp(bill.date);
+          
+          if (!billDate) return bill;
 
-        // Check if bill is older than 30 days
-        if (isScreenshotOld(billDate)) {
-          const updates: any = {};
-
-          // Remove payment screenshot if exists
-          if (billData.paymentScreenshot) {
-            updates.paymentScreenshot = null;
+          // Check if bill is older than 30 days
+          if (isScreenshotOld(billDate) && bill.paymentProof) {
+            console.log(`[Cleanup] Removing screenshot from bill ${bill.id} for user ${userDoc.id}`);
             cleaned++;
+            needsUpdate = true;
+            return { ...bill, paymentProof: null };
           }
+          
+          return bill;
+        });
 
-          // Remove claimed paid amount if exists (optional)
-          if (billData.claimedPaidAmount) {
-            updates.claimedPaidAmount = null;
-          }
-
-          // Apply updates if any fields to remove
-          if (Object.keys(updates).length > 0) {
-            await updateDoc(doc(db, 'bills', billDoc.id), updates);
-            console.log(`[Cleanup] Removed screenshot from bill ${billDoc.id} (dated ${billDate.toISOString()})`);
-          }
+        if (needsUpdate) {
+          await updateDoc(doc(db, 'users', userDoc.id), { bills: updatedBills });
         }
       } catch (error) {
-        console.error(`[Cleanup] Error processing bill ${billDoc.id}:`, error);
+        console.error(`[Cleanup] Error processing user ${userDoc.id}:`, error);
         errors++;
       }
     }
   } catch (error) {
-    console.error('[Cleanup] Error fetching bills:', error);
+    console.error('[Cleanup] Error fetching users:', error);
     errors++;
   }
 
@@ -155,6 +154,7 @@ async function cleanupPaymentScreenshots(): Promise<{ cleaned: number; errors: n
 
 /**
  * Get storage usage estimate
+ * NOTE: Your app stores bills in users.bills[] array, not separate bills collection
  */
 export async function getStorageUsage(): Promise<{
   totalBills: number;
@@ -169,20 +169,36 @@ export async function getStorageUsage(): Promise<{
   let paymentsWithScreenshots = 0;
 
   try {
-    const billsSnapshot = await getDocs(collection(db, 'bills'));
-    totalBills = billsSnapshot.size;
-    billsWithScreenshots = billsSnapshot.docs.filter(doc => doc.data().paymentScreenshot).length;
+    // Your app stores bills in users collection
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+      
+      // Count bills from users.bills[] array
+      if (userData.bills && Array.isArray(userData.bills)) {
+        totalBills += userData.bills.length;
+        billsWithScreenshots += userData.bills.filter((bill: any) => bill.paymentProof).length;
+      }
+      
+      // Count payments from users.paymentHistory[] array
+      if (userData.paymentHistory && Array.isArray(userData.paymentHistory)) {
+        totalPayments += userData.paymentHistory.length;
+        paymentsWithScreenshots += userData.paymentHistory.filter((payment: any) => payment.screenshot).length;
+      }
+    }
 
+    // Also check payments collection (for subscription payments)
     const paymentsSnapshot = await getDocs(collection(db, 'payments'));
-    totalPayments = paymentsSnapshot.size;
-    paymentsWithScreenshots = paymentsSnapshot.docs.filter(doc => doc.data().screenshot).length;
+    totalPayments += paymentsSnapshot.size;
+    paymentsWithScreenshots += paymentsSnapshot.docs.filter(doc => doc.data().screenshotUrl).length;
   } catch (error) {
     console.error('[Cleanup] Error getting storage usage:', error);
   }
 
-  // Estimate: ~200KB per screenshot
+  // Estimate: ~300KB per screenshot (actual size)
   const totalScreenshots = billsWithScreenshots + paymentsWithScreenshots;
-  const estimatedSizeMB = Math.round((totalScreenshots * 200) / 1024);
+  const estimatedSizeMB = Math.round((totalScreenshots * 300) / 1024);
 
   return {
     totalBills,
@@ -244,6 +260,7 @@ export async function cleanupOldScreenshots(): Promise<{
 
 /**
  * Get cleanup statistics (without actually cleaning)
+ * NOTE: Your app stores bills in users.bills[] array, not separate bills collection
  */
 export async function getCleanupStats(): Promise<{
   billsOlderThan30Days: number;
@@ -257,22 +274,37 @@ export async function getCleanupStats(): Promise<{
   let paymentsOlderThan30Days = 0;
 
   try {
-    const billsSnapshot = await getDocs(collection(db, 'bills'));
-    for (const billDoc of billsSnapshot.docs) {
-      const billData = billDoc.data();
-      const billDate = getDateFromTimestamp(billData.date);
-
-      if (billDate && isScreenshotOld(billDate) && billData.paymentScreenshot) {
-        billsOlderThan30Days++;
+    // Check users.bills[] array
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+      
+      if (userData.bills && Array.isArray(userData.bills)) {
+        for (const bill of userData.bills) {
+          const billDate = getDateFromTimestamp(bill.date);
+          if (billDate && isScreenshotOld(billDate) && bill.paymentProof) {
+            billsOlderThan30Days++;
+          }
+        }
+      }
+      
+      if (userData.paymentHistory && Array.isArray(userData.paymentHistory)) {
+        for (const payment of userData.paymentHistory) {
+          const paymentDate = getDateFromTimestamp(payment.date);
+          if (paymentDate && isScreenshotOld(paymentDate) && payment.screenshot) {
+            paymentsOlderThan30Days++;
+          }
+        }
       }
     }
 
+    // Also check payments collection (for subscription payments)
     const paymentsSnapshot = await getDocs(collection(db, 'payments'));
     for (const paymentDoc of paymentsSnapshot.docs) {
       const paymentData = paymentDoc.data();
-      const paymentDate = getDateFromTimestamp(paymentData.date);
-
-      if (paymentDate && isScreenshotOld(paymentDate) && paymentData.screenshot) {
+      const paymentDate = getDateFromTimestamp(paymentData.createdAt);
+      
+      if (paymentDate && isScreenshotOld(paymentDate) && paymentData.screenshotUrl) {
         paymentsOlderThan30Days++;
       }
     }
@@ -281,7 +313,7 @@ export async function getCleanupStats(): Promise<{
   }
 
   const totalOldScreenshots = billsOlderThan30Days + paymentsOlderThan30Days;
-  const storageToFreeMB = Math.round((totalOldScreenshots * 200) / 1024);
+  const storageToFreeMB = Math.round((totalOldScreenshots * 300) / 1024);
 
   return {
     billsOlderThan30Days,
@@ -294,14 +326,34 @@ export async function getCleanupStats(): Promise<{
 
 /**
  * Cleanup specific bill screenshot (manual cleanup)
+ * NOTE: Your app stores bills in users.bills[] array, not separate bills collection
+ * This function is not currently used but kept for future reference
  */
-export async function cleanupBillScreenshot(billId: string): Promise<boolean> {
+export async function cleanupBillScreenshot(userPhone: string, billId: string): Promise<boolean> {
   try {
-    await updateDoc(doc(db, 'bills', billId), {
-      paymentScreenshot: null,
-      claimedPaidAmount: null,
+    const userDoc = await getDocs(collection(db, 'users'));
+    const user = userDoc.docs.find(doc => doc.id === userPhone);
+    
+    if (!user) {
+      console.error(`[Cleanup] User ${userPhone} not found`);
+      return false;
+    }
+    
+    const userData = user.data();
+    if (!userData.bills || !Array.isArray(userData.bills)) {
+      console.error(`[Cleanup] No bills found for user ${userPhone}`);
+      return false;
+    }
+    
+    const updatedBills = userData.bills.map((bill: any) => {
+      if (bill.id === billId) {
+        return { ...bill, paymentProof: null };
+      }
+      return bill;
     });
-    console.log(`[Cleanup] Manually cleaned bill ${billId}`);
+    
+    await updateDoc(doc(db, 'users', userPhone), { bills: updatedBills });
+    console.log(`[Cleanup] Manually cleaned bill ${billId} for user ${userPhone}`);
     return true;
   } catch (error) {
     console.error(`[Cleanup] Error cleaning bill ${billId}:`, error);

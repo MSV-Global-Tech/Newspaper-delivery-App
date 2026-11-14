@@ -248,9 +248,13 @@ export default function PaymentScreen() {
             }));
           },
           prefill: {
-            name: 'Customer Name',
-            email: 'customer@email.com',
-            contact: '9999999999'
+            name: '${store.getUser()?.name || 'Customer'}',
+            email: '${store.getUser()?.email || ''}',
+            contact: '${store.getUser()?.phone || ''}'
+          },
+          notes: {
+            merchant_name: 'Akhil KS',
+            payment_for: 'Newspaper Subscription'
           },
           theme: {
             color: '#2563EB'
@@ -354,14 +358,6 @@ export default function PaymentScreen() {
               </View>
               <Text style={s.contactAction}>Call</Text>
             </TouchableOpacity>
-
-            <View style={s.contactItem}>
-              <MapPin size={20} color="#64748B" />
-              <View style={s.contactItemText}>
-                <Text style={s.contactItemLabel}>Address</Text>
-                <Text style={s.contactItemValue}>{ownerContact.address}</Text>
-              </View>
-            </View>
           </View>
 
           {/* Instructions */}

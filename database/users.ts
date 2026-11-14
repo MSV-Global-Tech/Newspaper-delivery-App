@@ -11,6 +11,8 @@ import {
   setDoc,
   deleteDoc,
   updateDoc,
+  query,
+  where,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -29,6 +31,7 @@ export interface UserDoc {
   alias?: string; // Admin alias for easy identification
   contactedOwner?: boolean; // Track if customer has contacted owner for subscription
   hasNewBill?: boolean; // Flag for new bill notification badge
+  location?: { latitude: number; longitude: number } | null; // GPS coordinates for location verification
 }
 
 export interface CustomerBillItem {
@@ -104,9 +107,30 @@ export async function deleteUser(phone: string) {
   // Delete the user document
   await deleteDoc(doc(db, COL, phone));
   
-  // Note: Related data in other collections (deliveries, payments, bills) 
-  // should be cleaned up separately if needed to optimize database storage.
-  // This can be implemented when database size becomes a concern.
+  // Delete deliveries for this user
+  try {
+    const deliveriesRef = collection(db, 'deliveries', phone);
+    const deliveriesSnap = await getDocs(deliveriesRef);
+    for (const subDoc of deliveriesSnap.docs) {
+      await deleteDoc(subDoc.ref);
+    }
+    await deleteDoc(doc(db, 'deliveries', phone));
+  } catch (error) {
+    console.error('[DB] Error deleting deliveries:', error);
+  }
+  
+  // Delete payments for this user
+  try {
+    const paymentsQuery = query(collection(db, 'payments'), where('customerPhone', '==', phone));
+    const paymentsSnap = await getDocs(paymentsQuery);
+    for (const paymentDoc of paymentsSnap.docs) {
+      await deleteDoc(paymentDoc.ref);
+    }
+  } catch (error) {
+    console.error('[DB] Error deleting payments:', error);
+  }
+  
+  // Note: Related data in other collections should be cleaned up
 }
 
 // ── Real-time listener for a single user (for customers to receive bill updates) ──

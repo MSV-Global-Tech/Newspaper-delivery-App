@@ -38,26 +38,15 @@ export default function SubscriptionsScreen() {
   const activeSubs = deliveries
     .filter((d) => d.name === user?.name && d.plan !== 'One-time')
     .map((d) => {
-      const isMilk = d.category === 'Milk' || d.imageSrc === 'milk.webp';
-      const isWater = d.category === 'Water' || d.imageSrc === 'water.webp';
+      const isNewspaper = d.category === 'Newspaper' || !d.category;
 
       let logo_text = '';
       let logo_bg = '#EFF6FF';
       let logo_color = '#2563EB';
       let language = d.paperName === 'The Hindu' ? 'English' : 'Kannada';
-      let category = d.category || 'Newspaper';
+      let category = 'Newspaper';
 
-      if (isMilk) {
-        logo_text = '🥛';
-        logo_bg = '#E8F5E9';
-        logo_color = '#2E7D32';
-        language = 'Farm Fresh';
-      } else if (isWater) {
-        logo_text = '💧';
-        logo_bg = '#E3F2FD';
-        logo_color = '#1565C0';
-        language = 'Purified';
-      } else {
+      if (isNewspaper) {
         logo_text = d.paperName.substring(0, 3).toUpperCase();
       }
 
@@ -66,7 +55,7 @@ export default function SubscriptionsScreen() {
         name: d.paperName,
         language,
         category,
-        status: d.status === 'Pending' ? 'Active' : d.status,
+        status: d.status || 'Active',
         nextDelivery: 'Tomorrow',
         plan: d.plan || 'Monthly',
         price: d.priceMonth || 180,

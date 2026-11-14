@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import '../global.css';
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, StatusBar } from 'react-native';
 import { store } from '../utils/store';
 import { getSessionUser } from '../utils/session';
 import { checkForUpdate, type RemoteVersionInfo } from '../utils/updateChecker';
@@ -10,31 +10,27 @@ import { Linking } from 'react-native';
 export default function RootLayout() {
   const bootedRef = useRef(false);
   const [updateInfo, setUpdateInfo] = useState<RemoteVersionInfo | null>(null);
-  const [checkingUpdate, setCheckingUpdate] = useState(true);
 
   // Restore the session user into the store once (covers deep-link entries).
-  // All boot routing (onboarding vs login vs home) is handled by app/index.tsx
+  // All boot routing (login vs home) is handled by app/index.tsx
   // BEFORE it renders anything, so returning users never see the tour flash.
   useEffect(() => {
     if (bootedRef.current) return;
     bootedRef.current = true;
 
-    // Check for updates first (blocking)
+    // Restore session immediately (no blocking)
+    restoreSession();
+
+    // Check for updates in background (non-blocking)
     checkForUpdate().then((info) => {
-      setCheckingUpdate(false);
       if (info) {
         console.log('[RootLayout] Update available:', info.version);
         setUpdateInfo(info);
       } else {
         console.log('[RootLayout] No update available');
-        // Only restore session if no mandatory update
-        restoreSession();
       }
     }).catch((error) => {
       console.error('[RootLayout] Update check failed:', error);
-      setCheckingUpdate(false);
-      // Allow app to continue if update check fails
-      restoreSession();
     });
   }, []);
 
@@ -61,23 +57,20 @@ export default function RootLayout() {
     }
   };
 
-  // If checking for update, show loading
-  if (checkingUpdate) {
-    return (
-      <View style={styles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#2563EB" />
-        <ActivityIndicator size="large" color="#2563EB" />
-        <Text style={styles.loadingText}>Checking for updates...</Text>
-      </View>
-    );
-  }
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="customer/login" options={{ headerShown: false }} />
+        <Stack.Screen name="admin" options={{ headerShown: false }} />
+        <Stack.Screen name="vendor" options={{ headerShown: false }} />
+      </Stack>
 
-  // If mandatory update is available, show blocking modal
-  if (updateInfo && updateInfo.mandatory) {
-    return (
-      <>
-        <StatusBar barStyle="light-content" backgroundColor="#2563EB" />
+      {/* Show update modal only if mandatory update is available */}
+      {updateInfo && updateInfo.mandatory && (
         <Modal visible={true} transparent animationType="fade">
+          <StatusBar barStyle="light-content" backgroundColor="#2563EB" />
           <View style={styles.updateOverlay}>
             <View style={styles.updateCard}>
               <View style={styles.updateIcon}>
@@ -98,28 +91,12 @@ export default function RootLayout() {
             </View>
           </View>
         </Modal>
-      </>
-    );
-  }
-
-  // Otherwise, render the app normally
-  return (
-    <Stack screenOptions={{ headerShown: false }} />
+      )}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
   updateOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -156,23 +133,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
     lineHeight: 20,
-  },
-  updateNotesBox: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-  },
-  updateNotesTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
-  updateNotesText: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 18,
   },
   updateBtn: {
     backgroundColor: '#2563EB',

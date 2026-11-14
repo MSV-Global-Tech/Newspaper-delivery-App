@@ -17,7 +17,6 @@ export type AdminOverviewSnapshot = {
 };
 
 const KEYS = {
-  hasSeenOnboarding: 'hasSeenOnboarding',
   user: 'sessionUser',
   lastRoute: 'lastRoute',
   adminOverviewSnapshot: 'adminOverviewSnapshot',
@@ -32,20 +31,6 @@ function isSessionUser(v: unknown): v is SessionUser {
     typeof u.address === 'string' &&
     typeof u.isAdmin === 'boolean'
   );
-}
-
-export async function getHasSeenOnboarding(): Promise<boolean> {
-  try {
-    return (await SecureStore.getItemAsync(KEYS.hasSeenOnboarding)) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export async function setHasSeenOnboarding(v: boolean): Promise<void> {
-  try {
-    await SecureStore.setItemAsync(KEYS.hasSeenOnboarding, v ? '1' : '0');
-  } catch {}
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {

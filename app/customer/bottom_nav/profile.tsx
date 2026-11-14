@@ -48,7 +48,7 @@ import {
   RefreshCw,
 } from 'lucide-react-native';
 import { store } from '../../../utils/store';
-import { updateCustomerBill } from '../../../database/users';
+import { updateCustomerBill, deleteUser } from '../../../database/users';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState(store.getUser());
@@ -221,6 +221,45 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all your data including bills, payments, and delivery history. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (!user?.phone) {
+                Alert.alert('Error', 'User not logged in. Please login again.');
+                return;
+              }
+
+              // Delete user data from database
+              await deleteUser(user.phone);
+
+              // Clear local store
+              store.setUser(null);
+
+              // Navigate to login
+              setTimeout(() => {
+                if (router.canGoBack()) {
+                  router.replace('/customer/login');
+                }
+              }, 100);
+
+              Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete account. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSupport = () => {
@@ -591,6 +630,16 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.85}>
           <LogOut size={18} color="#DC2626" />
           <Text style={styles.logoutText}>Log Out from Account</Text>
+        </TouchableOpacity>
+
+        {/* ── DELETE ACCOUNT BUTTON ── */}
+        <TouchableOpacity 
+          style={styles.deleteButton} 
+          onPress={handleDeleteAccount} 
+          activeOpacity={0.85}
+        >
+          <X size={16} color="#DC2626" />
+          <Text style={styles.deleteButtonText}>Delete My Account</Text>
         </TouchableOpacity>
 
         <View style={{ alignItems: 'center', marginTop: 20 }}>
@@ -1192,12 +1241,30 @@ const styles = StyleSheet.create({
     borderColor: '#FEE2E2',
     borderRadius: 16,
     paddingVertical: 14,
-    marginTop: 4,
-    marginBottom: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
   },
   logoutText: {
     fontSize: 14,
     fontWeight: '800',
+    color: '#DC2626',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    borderRadius: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+    marginHorizontal: 16,
+  },
+  deleteButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#DC2626',
   },
   versionFooter: {

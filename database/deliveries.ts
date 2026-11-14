@@ -29,7 +29,7 @@ export interface DeliveryDoc {
   startDate?: string;
   days?: string[];
   paymentMethod?: string;
-  category?: 'Newspaper' | 'Milk' | 'Water';
+  category?: 'Newspaper';
   quantity?: number;
   homeImageUri?: string;
   location?: { lat: number; lng: number };
@@ -45,11 +45,9 @@ export async function seedDeliveries() {
 // ── Real-time listener ───────────────────────────────────────────────────────
 export function listenDeliveries(callback: (docs: DeliveryDoc[]) => void) {
   let newsDocs: DeliveryDoc[] = [];
-  let milkDocs: DeliveryDoc[] = [];
-  let waterDocs: DeliveryDoc[] = [];
 
   const emit = () => {
-    callback([...newsDocs, ...milkDocs, ...waterDocs]);
+    callback(newsDocs);
   };
 
   const unsubNews = onSnapshot(collectionGroup(db, 'newspaper'), (snap) => {
@@ -57,21 +55,9 @@ export function listenDeliveries(callback: (docs: DeliveryDoc[]) => void) {
     emit();
   }, (error) => console.error('[DB] listenDeliveries (newspaper) error:', error?.message));
 
-  const unsubMilk = onSnapshot(collectionGroup(db, 'milk'), (snap) => {
-    milkDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DeliveryDoc));
-    emit();
-  }, (error) => console.error('[DB] listenDeliveries (milk) error:', error?.message));
-
-  const unsubWater = onSnapshot(collectionGroup(db, 'watercan'), (snap) => {
-    waterDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DeliveryDoc));
-    emit();
-  }, (error) => console.error('[DB] listenDeliveries (watercan) error:', error?.message));
-
-  // Return a single unsubscribe function that cleans up all three listeners
+  // Return a single unsubscribe function that cleans up all listeners
   return () => {
     unsubNews();
-    unsubMilk();
-    unsubWater();
   };
 }
 
@@ -83,9 +69,7 @@ export async function addDelivery(delivery: Omit<DeliveryDoc, 'id'>) {
     return '';
   }
 
-  let categorySub = 'newspaper';
-  if (delivery.category === 'Milk') categorySub = 'milk';
-  if (delivery.category === 'Water') categorySub = 'watercan';
+  const categorySub = 'newspaper'; // Only newspaper deliveries supported
 
   // 1. Ensure the parent document exists (good practice so it doesn't appear as a "ghost" document in Firestore)
   const parentDocRef = doc(db, COL, phone);
@@ -105,24 +89,4 @@ export async function addDelivery(delivery: Omit<DeliveryDoc, 'id'>) {
   });
 
   return newOrderRef.id;
-}
-
-// ── Update delivery status ───────────────────────────────────────────────────
-export async function updateDeliveryStatus(
-  id: string,
-  status: 'Pending' | 'Delivered',
-  phone: string,
-  category: string,
-) {
-  let categorySub = 'newspaper';
-  if (category === 'Milk') categorySub = 'milk';
-  if (category === 'Water') categorySub = 'watercan';
-
-  if (!phone) {
-    console.error("Cannot update delivery: phone number required.");
-    return;
-  }
-
-  const docRef = doc(db, COL, phone, categorySub, id);
-  await updateDoc(docRef, { status });
 }
