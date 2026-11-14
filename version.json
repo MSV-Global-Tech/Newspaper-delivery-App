@@ -1,5 +1,5 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "versionCode": 35,
   "mandatory": true,
   "releaseNotes": "Security improvements with Firebase Email Auth, location detection with full address, and bug fixes",
