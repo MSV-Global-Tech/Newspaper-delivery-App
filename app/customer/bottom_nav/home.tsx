@@ -97,11 +97,13 @@ export default function HomeScreen() {
   const [showBillAlert, setShowBillAlert] = useState(false);
   const [unpaidBillsCount, setUnpaidBillsCount] = useState(0);
 
-  // ── Check for updates from GitHub on mount ──────────────────────────────────
+  // ── Check for updates from GitHub on mount (production only) ────────────────
   useEffect(() => {
-    checkForUpdate().then((info) => {
-      if (info) setUpdateInfo(info);
-    });
+    if (!__DEV__) {
+      checkForUpdate().then((info) => {
+        if (info) setUpdateInfo(info);
+      });
+    }
   }, []);
 
   const contactAgent = () => {

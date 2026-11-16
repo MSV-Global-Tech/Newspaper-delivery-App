@@ -321,7 +321,8 @@ export default function LoginScreen() {
         }
 
         // Step 2: Authenticate with Firebase using email (for security token)
-        if (userByPhone.email) {
+        // Skip in development mode (Expo Go) - Firebase Auth requires native build
+        if (userByPhone.email && !__DEV__) {
           try {
             console.log('Attempting Firebase Auth with email:', userByPhone.email);
             await auth().signInWithEmailAndPassword(userByPhone.email, password);
@@ -356,6 +357,8 @@ export default function LoginScreen() {
               console.error('Firebase Auth error, continuing without it:', firebaseError.code);
             }
           }
+        } else if (__DEV__) {
+          console.log('Firebase Auth skipped in development mode (Expo Go)');
         }
 
         // Step 3: Set user in store
@@ -388,27 +391,31 @@ export default function LoginScreen() {
           // Update the existing vendor record with email and password
           const hashedPassword = await hashPassword(password);
           
-          // Create Firebase Auth user with email + password
-          try {
-            console.log('Creating Firebase Auth user for vendor signup...');
-            await auth().createUserWithEmailAndPassword(email.trim(), password);
-            console.log('Firebase Auth user created successfully');
-          } catch (firebaseError: any) {
-            console.error('Firebase Auth signup error:', firebaseError.code, firebaseError.message);
-            if (firebaseError.code === 'auth/email-already-in-use') {
-              showToast('This email is already registered. Please login.', false);
-              setLoading(false);
-              return;
-            } else if (firebaseError.code === 'auth/weak-password') {
-              showToast('Password is too weak. Use at least 6 characters.', false);
-              setLoading(false);
-              return;
-            } else if (firebaseError.code === 'auth/invalid-email') {
-              showToast('Invalid email address', false);
-              setLoading(false);
-              return;
+          // Create Firebase Auth user with email + password (skip in development)
+          if (!__DEV__) {
+            try {
+              console.log('Creating Firebase Auth user for vendor signup...');
+              await auth().createUserWithEmailAndPassword(email.trim(), password);
+              console.log('Firebase Auth user created successfully');
+            } catch (firebaseError: any) {
+              console.error('Firebase Auth signup error:', firebaseError.code, firebaseError.message);
+              if (firebaseError.code === 'auth/email-already-in-use') {
+                showToast('This email is already registered. Please login.', false);
+                setLoading(false);
+                return;
+              } else if (firebaseError.code === 'auth/weak-password') {
+                showToast('Password is too weak. Use at least 6 characters.', false);
+                setLoading(false);
+                return;
+              } else if (firebaseError.code === 'auth/invalid-email') {
+                showToast('Invalid email address', false);
+                setLoading(false);
+                return;
+              }
+              console.error('Firebase Auth failed, continuing without it');
             }
-            console.error('Firebase Auth failed, continuing without it');
+          } else {
+            console.log('Firebase Auth skipped in development mode (vendor signup)');
           }
 
           // Update the vendor record
@@ -458,28 +465,32 @@ export default function LoginScreen() {
         // Hash password before storing
         const hashedPassword = await hashPassword(password);
 
-        // Create Firebase Auth user with email + password
-        try {
-          console.log('Creating Firebase Auth user for signup...');
-          await auth().createUserWithEmailAndPassword(email.trim(), password);
-          console.log('Firebase Auth user created successfully');
-        } catch (firebaseError: any) {
-          console.error('Firebase Auth signup error:', firebaseError.code, firebaseError.message);
-          if (firebaseError.code === 'auth/email-already-in-use') {
-            showToast('This email is already registered. Please login.', false);
-            setLoading(false);
-            return;
-          } else if (firebaseError.code === 'auth/weak-password') {
-            showToast('Password is too weak. Use at least 6 characters.', false);
-            setLoading(false);
-            return;
-          } else if (firebaseError.code === 'auth/invalid-email') {
-            showToast('Invalid email address', false);
-            setLoading(false);
-            return;
+        // Create Firebase Auth user with email + password (skip in development)
+        if (!__DEV__) {
+          try {
+            console.log('Creating Firebase Auth user for signup...');
+            await auth().createUserWithEmailAndPassword(email.trim(), password);
+            console.log('Firebase Auth user created successfully');
+          } catch (firebaseError: any) {
+            console.error('Firebase Auth signup error:', firebaseError.code, firebaseError.message);
+            if (firebaseError.code === 'auth/email-already-in-use') {
+              showToast('This email is already registered. Please login.', false);
+              setLoading(false);
+              return;
+            } else if (firebaseError.code === 'auth/weak-password') {
+              showToast('Password is too weak. Use at least 6 characters.', false);
+              setLoading(false);
+              return;
+            } else if (firebaseError.code === 'auth/invalid-email') {
+              showToast('Invalid email address', false);
+              setLoading(false);
+              return;
+            }
+            // For other errors, continue without Firebase Auth (fallback to phone/password only)
+            console.error('Firebase Auth failed, continuing without it');
           }
-          // For other errors, continue without Firebase Auth (fallback to phone/password only)
-          console.error('Firebase Auth failed, continuing without it');
+        } else {
+          console.log('Firebase Auth skipped in development mode (signup)');
         }
 
         // Create user in Firestore with phone as document ID
