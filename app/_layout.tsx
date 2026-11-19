@@ -21,19 +21,17 @@ export default function RootLayout() {
     // Restore session immediately (no blocking)
     restoreSession();
 
-    // Check for updates in background (non-blocking) - only in production
-    if (!__DEV__) {
-      checkForUpdate().then((info) => {
-        if (info) {
-          console.log('[RootLayout] Update available:', info.version);
-          setUpdateInfo(info);
-        } else {
-          console.log('[RootLayout] No update available');
-        }
-      }).catch((error) => {
-        console.error('[RootLayout] Update check failed:', error);
-      });
-    }
+    // Check for updates in background (non-blocking)
+    checkForUpdate().then((info) => {
+      if (info) {
+        console.log('[RootLayout] Update available:', info.version);
+        setUpdateInfo(info);
+      } else {
+        console.log('[RootLayout] No update available');
+      }
+    }).catch((error) => {
+      console.error('[RootLayout] Update check failed:', error);
+    });
   }, []);
 
   const restoreSession = () => {

@@ -15,7 +15,7 @@ interface AdminCustomerBillingModalProps {
 }
 
 export default function AdminCustomerBillingModal({ visible, customer, onClose }: AdminCustomerBillingModalProps) {
-  const [view, setView] = useState<'bills' | 'generate'>('bills');
+  const [view, setView] = useState<'bills' | 'generate' | 'edit'>('bills');
   const [billDate, setBillDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [billItems, setBillItems] = useState<{ id: string; name: string; amount: string }[]>([
@@ -30,6 +30,9 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
   const [selectedScreenshotUrl, setSelectedScreenshotUrl] = useState<string | null>(null);
   const [selectedBillForScreenshot, setSelectedBillForScreenshot] = useState<any>(null);
   const [customerPapers, setCustomerPapers] = useState<string[]>([]);
+  const [editingBill, setEditingBill] = useState<any>(null);
+  const [editBillItems, setEditBillItems] = useState<{ id: string; name: string; amount: string }[]>([]);
+  const [editBillDate, setEditBillDate] = useState(new Date());
 
   // Get all papers and magazines from the store
   useEffect(() => {
@@ -69,7 +72,12 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
 
   const selectPaper = (paper: string) => {
     if (pickerTargetId) {
-      setBillItems(prev => prev.map(i => i.id === pickerTargetId ? { ...i, name: paper } : i));
+      // Update either billItems or editBillItems based on current view
+      if (view === 'edit') {
+        setEditBillItems(prev => prev.map(i => i.id === pickerTargetId ? { ...i, name: paper } : i));
+      } else {
+        setBillItems(prev => prev.map(i => i.id === pickerTargetId ? { ...i, name: paper } : i));
+      }
     }
     setShowPaperPicker(false);
     setPickerTargetId(null);
@@ -156,6 +164,78 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
     setShowScreenshotModal(true);
   };
 
+  const handleEditBill = (bill: any) => {
+    setEditingBill(bill);
+    setEditBillDate(new Date(bill.date));
+    setEditBillItems(bill.items.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      amount: item.amount.toString()
+    })));
+    setView('edit');
+  };
+
+  const handleSaveEditBill = async () => {
+    if (!editingBill) return;
+    
+    const validItems = editBillItems
+      .filter(i => i.name.trim() && parseFloat(i.amount) > 0)
+      .map(i => ({ id: i.id, name: i.name.trim(), amount: parseFloat(i.amount) }));
+    
+    if (validItems.length === 0) {
+      Alert.alert('Error', 'Please add at least one item with a valid amount.');
+      return;
+    }
+    
+    const formattedDate = editBillDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    
+    const updatedBill = {
+      ...editingBill,
+      month: formattedDate,
+      date: editBillDate.toISOString(),
+      items: validItems,
+      totalAmount: validItems.reduce((s, i) => s + i.amount, 0),
+    };
+    
+    try {
+      setSaving(true);
+      const updated = allBills.map((b: any) => b.id === editingBill.id ? updatedBill : b);
+      await updateCustomerBill(customer.phone, updated);
+      Alert.alert('Success', 'Bill updated successfully!');
+      setEditingBill(null);
+      setView('bills');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to update bill.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteBill = async (bill: any) => {
+    Alert.alert(
+      'Delete Bill',
+      `Are you sure you want to delete the bill for ${bill.month} (₹${bill.totalAmount})?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const updated = allBills.filter((b: any) => b.id !== bill.id);
+              await updateCustomerBill(customer.phone, updated);
+              Alert.alert('Deleted', 'Bill has been deleted.');
+              setEditingBill(null);
+              setView('bills');
+            } catch (e: any) {
+              Alert.alert('Error', 'Failed to delete bill.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const filteredPapers = customerPapers.filter(p => p.toLowerCase().includes(paperSearch.toLowerCase()));
 
   return (
@@ -193,11 +273,16 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
                   <Text style={s.emptyTxt}>No unpaid bills.</Text>
                 ) : (
                   unpaidBills.map((bill: any, index: number) => (
-                    <View key={bill.id} style={[s.billRow, index > 0 && { marginTop: 10 }]}>
+                    <TouchableOpacity
+                      key={bill.id}
+                      style={[s.billRow, index > 0 && { marginTop: 10 }]}
+                      onPress={() => handleEditBill(bill)}
+                      activeOpacity={0.7}
+                    >
                       <View style={[s.dot, { backgroundColor: '#EF4444' }]} />
                       <View style={{ flex: 1 }}>
                         <Text style={s.billAmount}>₹{bill.totalAmount} <Text style={s.billMonthTxt}>({bill.month})</Text></Text>
-                        <Text style={s.billMeta}>{(bill.items || []).length} item{(bill.items || []).length !== 1 ? 's' : ''}</Text>
+                        <Text style={s.billMeta}>{(bill.items || []).length} item{(bill.items || []).length !== 1 ? 's' : ''} • Tap to edit</Text>
                         {bill.paymentProof && (
                           <TouchableOpacity 
                             style={s.proofBadge} 
@@ -218,7 +303,7 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
                         <CheckCircle size={14} color="#FFF" />
                         <Text style={s.markPaidTxt}>{markingId === bill.id ? '...' : 'Mark Paid'}</Text>
                       </TouchableOpacity>
-                    </View>
+                    </TouchableOpacity>
                   ))
                 )}
 
@@ -228,19 +313,24 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
                   <Text style={s.emptyTxt}>No paid bills yet.</Text>
                 ) : (
                   paidBills.map((bill: any, index: number) => (
-                    <View key={bill.id} style={[s.billRow, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }, index > 0 && { marginTop: 10 }]}>
+                    <TouchableOpacity
+                      key={bill.id}
+                      style={[s.billRow, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }, index > 0 && { marginTop: 10 }]}
+                      onPress={() => handleEditBill(bill)}
+                      activeOpacity={0.7}
+                    >
                       <View style={[s.dot, { backgroundColor: '#10B981' }]} />
                       <View style={{ flex: 1 }}>
                         <Text style={[s.billAmount, { color: '#166534' }]}>₹{bill.totalAmount} <Text style={s.billMonthTxt}>({bill.month})</Text></Text>
                         <Text style={[s.billMeta, { color: '#15803D' }]}>
-                          Paid: {bill.paidAt ? new Date(bill.paidAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                          Paid: {bill.paidAt ? new Date(bill.paidAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} • Tap to edit
                         </Text>
                       </View>
                       <View style={s.paidBadge}>
                         <CheckCircle size={13} color="#065F46" />
                         <Text style={s.paidTxt}>Paid</Text>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   ))
                 )}
               </>
@@ -304,6 +394,93 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
                 <TouchableOpacity style={[s.generateBtn, saving && { opacity: 0.7 }]} onPress={handleGenerateBill} disabled={saving}>
                   <Text style={s.generateBtnTxt}>{saving ? 'Saving…' : 'Send Bill to Customer'}</Text>
                 </TouchableOpacity>
+              </>
+            )}
+
+            {/* ── Edit Bill View ── */}
+            {view === 'edit' && editingBill && (
+              <>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <Text style={s.sectionLabel}>Edit Bill</Text>
+                  <TouchableOpacity onPress={() => { setEditingBill(null); setView('bills'); }}>
+                    <X size={20} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={s.sectionLabel}>Billing Date</Text>
+                <TouchableOpacity 
+                  style={s.dateInput} 
+                  onPress={() => setShowDatePicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <Calendar size={16} color="#2563EB" />
+                  <Text style={s.dateText}>
+                    {editBillDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={editBillDate}
+                    mode="date"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                      setShowDatePicker(false);
+                      if (selectedDate) setEditBillDate(selectedDate);
+                    }}
+                  />
+                )}
+
+                <Text style={[s.sectionLabel, { marginTop: 12 }]}>Items</Text>
+                {editBillItems.map((item, index) => (
+                  <View key={item.id} style={s.itemRow}>
+                    <TouchableOpacity style={[s.input, { flex: 2, marginRight: 8, justifyContent: 'center' }]} onPress={() => {
+                      setPickerTargetId(item.id);
+                      setShowPaperPicker(true);
+                    }}>
+                      <Text style={{ color: item.name ? '#0F172A' : '#94A3B8', fontSize: 14 }}>
+                        {item.name || 'Select paper…'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TextInput
+                      style={[s.input, { flex: 1, marginRight: 8 }]}
+                      placeholder="₹ Amount"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="numeric"
+                      value={item.amount}
+                      onChangeText={v => setEditBillItems(prev => prev.map(i => i.id === item.id ? { ...i, amount: v } : i))}
+                    />
+                    <TouchableOpacity onPress={() => setEditBillItems(prev => prev.filter(i => i.id !== item.id))} style={s.removeBtn}>
+                      <Trash2 size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                <TouchableOpacity style={s.addItemBtn} onPress={() => setEditBillItems(prev => [...prev, { id: Date.now().toString(), name: '', amount: '' }])}>
+                  <PlusCircle size={16} color="#2563EB" />
+                  <Text style={s.addItemTxt}>Add Another Item</Text>
+                </TouchableOpacity>
+
+                <View style={s.totalRow}>
+                  <Text style={s.totalLabel}>Total Amount</Text>
+                  <Text style={s.totalAmt}>₹{editBillItems.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0).toFixed(2)}</Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                  <TouchableOpacity 
+                    style={[s.generateBtn, { flex: 1, backgroundColor: '#EF4444' }, saving && { opacity: 0.7 }]} 
+                    onPress={() => handleDeleteBill(editingBill)}
+                    disabled={saving}
+                  >
+                    <Text style={s.generateBtnTxt}>Delete Bill</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[s.generateBtn, { flex: 1 }, saving && { opacity: 0.7 }]} 
+                    onPress={handleSaveEditBill}
+                    disabled={saving}
+                  >
+                    <Text style={s.generateBtnTxt}>{saving ? 'Saving…' : 'Save Changes'}</Text>
+                  </TouchableOpacity>
+                </View>
               </>
             )}
           </ScrollView>
@@ -446,4 +623,8 @@ const s = StyleSheet.create({
   screenshotFooter: { padding: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   screenshotCloseBtn: { backgroundColor: '#F1F5F9', paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   screenshotCloseBtnText: { fontSize: 14, fontWeight: '700', color: '#64748B' },
+  editOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  editSheet: { backgroundColor: '#FFF', borderRadius: 20, width: '100%', maxWidth: 500, maxHeight: '85%', padding: 20 },
+  editHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  editTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
 });

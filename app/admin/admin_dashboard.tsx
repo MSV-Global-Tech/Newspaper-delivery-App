@@ -557,7 +557,10 @@ export default function AdminScreen() {
     setPaymentDraft({ amount: '', method: 'UPI', txnId: '', status: 'Paid', forMonth: '' });
   };
 
-  const totalCustomers = new Set(deliveries.map(d => d.name)).size;
+  // Total Customers = All users in the system (regardless of subscriptions)
+  const totalCustomers = usersList.filter(u => !u.isAdmin && !u.isVendor).length;
+  
+  // Active Subs = Current active deliveries/subscriptions
   const activeSubs = deliveries.length;
   const totalMonthlyRevenue = deliveries.reduce(
     (sum, d) => sum + (typeof d.priceMonth === 'number' && isFinite(d.priceMonth) ? d.priceMonth : 0),
