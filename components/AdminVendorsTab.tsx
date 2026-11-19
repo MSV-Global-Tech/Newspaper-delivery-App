@@ -234,6 +234,26 @@ export default function AdminVendorsTab() {
     }
   };
 
+  const handleDeleteBill = (bill: VendorBill) => {
+    if (!selectedVendor) return;
+    Alert.alert(
+      'Delete Bill',
+      `Are you sure you want to delete the bill for ${bill.month} (Rs.${bill.totalAmount})?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            const updatedBills = (selectedVendor.bills || []).filter(b => b.id !== bill.id);
+            await updateVendor(selectedVendor.id, { bills: updatedBills });
+            Alert.alert('Deleted', 'Bill has been deleted.');
+          } catch (e: any) {
+            Alert.alert('Error', e.message);
+          }
+        }}
+      ]
+    );
+  };
+
   const handleDeleteVendor = () => {
     if (!selectedVendor) return;
     Alert.alert(
@@ -386,11 +406,16 @@ export default function AdminVendorsTab() {
                 return <Text style={s.emptyTxt}>No active/unpaid bills.</Text>;
               }
               return unpaidBills.map((bill, index) => (
-                <View key={bill.id} style={[s.paymentRow, index > 0 && { marginTop: 10 }]}>
+                <TouchableOpacity
+                  key={bill.id}
+                  style={[s.paymentRow, index > 0 && { marginTop: 10 }]}
+                  onLongPress={() => handleDeleteBill(bill)}
+                  activeOpacity={0.7}
+                >
                   <View style={[s.paymentDot, bill.status === 'Paid' ? { backgroundColor: '#10B981' } : bill.status === 'Unpaid' ? { backgroundColor: '#EF4444' } : { backgroundColor: '#F59E0B' }]} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.paymentAmount}>Rs.{bill.totalAmount} <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '500' }}>({bill.month})</Text></Text>
-                    <Text style={s.paymentDate}>{bill.items.length} item{bill.items.length !== 1 ? 's' : ''}</Text>
+                    <Text style={s.paymentDate}>{bill.items.length} item{bill.items.length !== 1 ? 's' : ''} • Long press to delete</Text>
                     {bill.deadline ? (
                       <Text style={s.paymentDate}>Due: {new Date(bill.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
                     ) : null}
@@ -410,7 +435,7 @@ export default function AdminVendorsTab() {
                         : <><CheckCircle size={14} color="#FFF" /><Text style={s.markPaidTxt}>Mark Paid</Text></>
                     }
                   </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               ));
             })()}
           </View>

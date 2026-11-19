@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.newspaper.deliveryapp",
-      "versionCode": 26,
+      "versionCode": 42,
       "googleServicesFile": "./google-services.json",
       "icon": "./assets/logo.png",
       "adaptiveIcon": {

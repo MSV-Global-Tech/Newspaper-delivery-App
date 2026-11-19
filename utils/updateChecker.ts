@@ -21,7 +21,7 @@ export const PLAY_STORE_URL =
 
 // The current installed version of the app (keep this in sync with app.json → version)
 export const CURRENT_VERSION = '1.0.2';
-export const CURRENT_VERSION_CODE = 26;
+export const CURRENT_VERSION_CODE = 42;
 // ───────────────────────────────────────────────────────────────────────────────
 
 export interface RemoteVersionInfo {
@@ -62,12 +62,26 @@ export async function checkForUpdate(): Promise<RemoteVersionInfo | null> {
 
     const remote: RemoteVersionInfo = await response.json();
 
-    const updateAvailable =
-      isNewerVersion(remote.version, CURRENT_VERSION) ||
-      remote.versionCode > CURRENT_VERSION_CODE;
+    console.log('[UpdateChecker] Current version:', CURRENT_VERSION, '(code:', CURRENT_VERSION_CODE + ')');
+    console.log('[UpdateChecker] Remote version:', remote.version, '(code:', remote.versionCode + ')');
+
+    // Only trigger update if version OR versionCode is strictly greater
+    const isVersionNewer = isNewerVersion(remote.version, CURRENT_VERSION);
+    const isCodeNewer = remote.versionCode > CURRENT_VERSION_CODE;
+    
+    console.log('[UpdateChecker] isVersionNewer:', isVersionNewer, 'isCodeNewer:', isCodeNewer);
+
+    const updateAvailable = isVersionNewer || isCodeNewer;
+
+    if (updateAvailable) {
+      console.log('[UpdateChecker] Update available!');
+    } else {
+      console.log('[UpdateChecker] App is up to date');
+    }
 
     return updateAvailable ? remote : null;
-  } catch {
+  } catch (error) {
+    console.error('[UpdateChecker] Update check failed:', error);
     // Silently fail — no internet, GitHub down, etc.
     return null;
   }

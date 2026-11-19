@@ -276,13 +276,13 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
                     <TouchableOpacity
                       key={bill.id}
                       style={[s.billRow, index > 0 && { marginTop: 10 }]}
-                      onPress={() => handleEditBill(bill)}
+                      onLongPress={() => handleDeleteBill(bill)}
                       activeOpacity={0.7}
                     >
                       <View style={[s.dot, { backgroundColor: '#EF4444' }]} />
                       <View style={{ flex: 1 }}>
                         <Text style={s.billAmount}>₹{bill.totalAmount} <Text style={s.billMonthTxt}>({bill.month})</Text></Text>
-                        <Text style={s.billMeta}>{(bill.items || []).length} item{(bill.items || []).length !== 1 ? 's' : ''} • Tap to edit</Text>
+                        <Text style={s.billMeta}>{(bill.items || []).length} item{(bill.items || []).length !== 1 ? 's' : ''} • Long press to delete</Text>
                         {bill.paymentProof && (
                           <TouchableOpacity 
                             style={s.proofBadge} 
@@ -316,14 +316,14 @@ export default function AdminCustomerBillingModal({ visible, customer, onClose }
                     <TouchableOpacity
                       key={bill.id}
                       style={[s.billRow, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }, index > 0 && { marginTop: 10 }]}
-                      onPress={() => handleEditBill(bill)}
+                      onLongPress={() => handleDeleteBill(bill)}
                       activeOpacity={0.7}
                     >
                       <View style={[s.dot, { backgroundColor: '#10B981' }]} />
                       <View style={{ flex: 1 }}>
                         <Text style={[s.billAmount, { color: '#166534' }]}>₹{bill.totalAmount} <Text style={s.billMonthTxt}>({bill.month})</Text></Text>
                         <Text style={[s.billMeta, { color: '#15803D' }]}>
-                          Paid: {bill.paidAt ? new Date(bill.paidAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} • Tap to edit
+                          Paid: {bill.paidAt ? new Date(bill.paidAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} • Long press to delete
                         </Text>
                       </View>
                       <View style={s.paidBadge}>
